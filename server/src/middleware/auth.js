@@ -2,6 +2,8 @@ import jwt from 'jsonwebtoken';
 import asyncHandler from 'express-async-handler';
 import Admin from '../models/Admin.js';
 import Driver from '../models/Driver.js';
+import School from '../models/School.js';
+import mongoose from 'mongoose';
 import { tenantContext } from '../utils/tenantContext.js';
 
 const extractBearerToken = (req) => {
@@ -77,6 +79,30 @@ export const protectAdmin = asyncHandler(async (req, res, next) => {
     req.school = decoded.school;
     next();
   });
+});
+
+// For school pages (students, trips, live tracking, ...). Must run after
+// protectAdmin. School admins are already limited to their own school. A
+// superadmin has no school of their own, so they must say which school they
+// are viewing (X-View-School header, set by the "Viewing school" picker);
+// everything in the request is then limited to that one school. Without it
+// the request is refused instead of mixing every school's data together.
+export const schoolScope = asyncHandler(async (req, res, next) => {
+  if (req.admin?.role !== 'superadmin') return next();
+
+  const id = req.headers['x-view-school'];
+  if (!id || !mongoose.isValidObjectId(id)) {
+    res.status(400);
+    throw new Error('Choose which school to view first');
+  }
+  const school = await tenantContext.runAsSystem(() => School.findById(id).select('name status'));
+  if (!school) {
+    res.status(404);
+    throw new Error('That school was not found');
+  }
+  req.school = String(school._id);
+  req.viewSchool = school;
+  await tenantContext.run(school._id, async () => next());
 });
 
 // Restricts a route to superadmins only. Must run after protectAdmin.

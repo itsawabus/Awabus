@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useViewSchoolStore } from '../../store/viewSchoolStore.js';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { School as SchoolIcon, Users, GraduationCap, Bus, Plus, Inbox } from 'lucide-react';
 import { getSuperadminAnalytics, createSchool, updateSchoolStatus } from '../../api/superadmin.js';
@@ -18,6 +20,8 @@ import Modal from '../../components/ui/Modal.jsx';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SuperadminDashboard() {
+  const navigate = useNavigate();
+  const setViewSchool = useViewSchoolStore((st) => st.setSchool);
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ schoolName: '', adminName: '', adminEmail: '', adminPhone: '' });
@@ -166,7 +170,16 @@ export default function SuperadminDashboard() {
                   <Td>{s.drivers}</Td>
                   <Td>{s.admins}</Td>
                   <Td><Badge>{s.status}</Badge></Td>
-                  <Td>
+                  <Td className="whitespace-nowrap">
+                    <button
+                      onClick={() => {
+                        setViewSchool({ id: s.id, name: s.name });
+                        navigate('/');
+                      }}
+                      className="mr-4 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                    >
+                      Open
+                    </button>
                     <button
                       onClick={() => setStatusTarget(s)}
                       className="text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400"

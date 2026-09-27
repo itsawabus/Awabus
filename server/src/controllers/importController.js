@@ -50,7 +50,8 @@ async function runCreate(handler, req, body) {
 // @route   GET /api/import/:entity/template
 export const downloadTemplate = asyncHandler(async (req, res) => {
   const spec = specFor(req, res);
-  const school = req.admin?.school ? await School.findById(req.admin.school).select('name').lean() : null;
+  const schoolId = req.school || req.admin?.school; // req.school is also set when a superadmin views a school
+  const school = schoolId ? await School.findById(schoolId).select('name').lean() : null;
   const buffer = await buildTemplate(req.params.entity, school?.name);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="awabus-${req.params.entity}-template.xlsx"`);

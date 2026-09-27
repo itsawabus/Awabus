@@ -1,6 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import Bus from '../models/Bus.js';
 import Trip from '../models/Trip.js';
+import { closeStaleTrips, LIVE_TRIP_FILTER } from '../services/staleTrips.js';
 
 const statusFromBus = (bus) => {
   if (bus.gpsSignal === 'lost') return 'GPS Signal Lost';
@@ -12,7 +13,10 @@ const statusFromBus = (bus) => {
 // @desc    Live tracking overview: every bus with an in-progress trip today plus its last known GPS fix.
 // @route   GET /api/tracking/overview
 export const getTrackingOverview = asyncHandler(async (req, res) => {
-  const trips = await Trip.find({ status: { $in: ['In Progress', 'Delayed'] } })
+  // Don't show trips the driver forgot to end as live (the sweeper also does
+  // this every 10 minutes; doing it here keeps this screen right in between).
+  await closeStaleTrips();
+  const trips = await Trip.find(LIVE_TRIP_FILTER)
     .populate('route', 'routeId name')
     .populate('bus', 'plateNumber name capacity lastKnownLocation gpsSignal status')
     .populate('driver', 'firstName lastName phone');

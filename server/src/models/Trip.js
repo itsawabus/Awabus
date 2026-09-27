@@ -68,6 +68,8 @@ const tripSchema = new mongoose.Schema(
     // used by the driver app to compute a live elapsed timer and an exact duration.
     startedAt: { type: Date, default: null },
     endedAt: { type: Date, default: null },
+    // true when AwaBus ended the trip because the driver never did (services/staleTrips.js)
+    autoEnded: { type: Boolean, default: false },
 
     status: {
       type: String,

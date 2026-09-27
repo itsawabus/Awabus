@@ -1,4 +1,4 @@
-import { forwardRef, useState } from 'react';
+import { forwardRef, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../lib/utils.js';
 
@@ -41,15 +41,35 @@ Input.displayName = 'Input';
 
 // Pass `visible` + `onToggleVisible` to control the eye button yourself (e.g. to
 // require verification before showing); otherwise it toggles freely.
-export const PasswordInput = forwardRef(({ className, error, visible: visibleProp, onToggleVisible, ...props }, ref) => {
+export const PasswordInput = forwardRef(({ className, error, visible: visibleProp, onToggleVisible, value, ...props }, ref) => {
   const [visibleState, setVisibleState] = useState(false);
   const controlled = visibleProp !== undefined;
   const visible = controlled ? visibleProp : visibleState;
   const toggle = () => (controlled ? onToggleVisible?.(!visible) : setVisibleState((v) => !v));
+
+  // `value` is deliberately not passed to the <input>: React copies a
+  // controlled value into the HTML value="..." attribute, which would show the
+  // typed password in the page's HTML (DevTools, extensions). The browser keeps
+  // the text itself; onChange still reports every keystroke, and a new value
+  // from the parent (e.g. clearing the form) is written to the field directly.
+  const inputRef = useRef(null);
+  const setRefs = useCallback(
+    (el) => {
+      inputRef.current = el;
+      if (typeof ref === 'function') ref(el);
+      else if (ref) ref.current = el;
+    },
+    [ref]
+  );
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (el && value !== undefined && el.value !== String(value ?? '')) el.value = value ?? '';
+  }, [value]);
+
   return (
     <div className="relative">
       <input
-        ref={ref}
+        ref={setRefs}
         type={visible ? 'text' : 'password'}
         className={cn(
           baseInputClasses,

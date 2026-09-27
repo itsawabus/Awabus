@@ -9,6 +9,7 @@ import useConfirmSignOut from './useConfirmSignOut.jsx';
 import { formatPhone } from '../../lib/phone.js';
 import { guideSectionFor } from '../../pages/help/HelpGuide.jsx';
 import NotificationBell from '../notifications/NotificationBell.jsx';
+import SchoolPicker from './SchoolPicker.jsx';
 
 // Section names used in page breadcrumbs, mapped to their list pages. A crumb can
 // also be given explicitly as { label, to } (e.g. a record's profile page).
@@ -100,6 +101,7 @@ export default function Topbar() {
       </div>
 
       <div className="flex shrink-0 items-center gap-3">
+        {admin?.role === 'superadmin' && <SchoolPicker />}
         {!pathname.startsWith('/help') && (
           <Link
             to={`/help#${guideSectionFor(pathname)}`}

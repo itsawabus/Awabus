@@ -1,0 +1,63 @@
+import Trip from '../models/Trip.js';
+import Bus from '../models/Bus.js';
+import { tenantContext } from '../utils/tenantContext.js';
+
+// A school run takes an hour or two. A trip still "In Progress" this long after
+// it started was never ended by its driver (app closed, phone died, ...).
+export const STALE_TRIP_HOURS = 6;
+const SWEEP_EVERY_MS = 10 * 60 * 1000;
+
+// A trip that is really still running: live status and never finished. Old
+// "Delayed" trips that did arrive (arrivalTime/endedAt set) are finished trips
+// that ran late, not live ones.
+export const LIVE_TRIP_FILTER = {
+  status: { $in: ['In Progress', 'Delayed'] },
+  endedAt: null,
+  arrivalTime: { $in: ['', null] },
+};
+
+const timeNow = () => new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+/**
+ * End trips that were left "In Progress"/"Delayed" for longer than
+ * STALE_TRIP_HOURS, so they stop showing as live. They are marked autoEnded so
+ * Trip History can say the driver did not end them. Runs for the school in the
+ * current tenant context, or for every school inside runAsSystem.
+ */
+export async function closeStaleTrips() {
+  const cutoff = new Date(Date.now() - STALE_TRIP_HOURS * 60 * 60 * 1000);
+  const trips = await Trip.find({
+    ...LIVE_TRIP_FILTER,
+    $or: [{ startedAt: { $lt: cutoff } }, { startedAt: null, date: { $lt: cutoff } }],
+  });
+
+  for (const trip of trips) {
+    trip.status = 'Completed';
+    trip.autoEnded = true;
+    trip.endedAt = new Date();
+    trip.gpsSignal = 'offline';
+    trip.timeline.push({
+      time: timeNow(),
+      title: 'Ended automatically',
+      description: `The driver did not end this trip, so AwaBus ended it after more than ${STALE_TRIP_HOURS} hours. Student statuses are as the driver last recorded them.`,
+    });
+    // eslint-disable-next-line no-await-in-loop
+    await trip.save();
+    // eslint-disable-next-line no-await-in-loop
+    const stillLive = await Trip.exists({ ...LIVE_TRIP_FILTER, bus: trip.bus });
+    // eslint-disable-next-line no-await-in-loop
+    if (!stillLive) await Bus.updateOne({ _id: trip.bus, status: 'Active' }, { status: 'Idle', gpsSignal: 'offline' });
+  }
+  return trips.length;
+}
+
+/** Sweep every school on start-up and then every 10 minutes. */
+export function startStaleTripSweeper() {
+  const sweep = () =>
+    tenantContext
+      .runAsSystem(closeStaleTrips)
+      .then((n) => n && console.log(`[trips] ended ${n} trip(s) left in progress for over ${STALE_TRIP_HOURS} hours`))
+      .catch((err) => console.error('[trips] could not end stale trips:', err.message));
+  sweep();
+  return setInterval(sweep, SWEEP_EVERY_MS);
+}

@@ -165,7 +165,13 @@ export default function TripHistory() {
                     <Td>{t.arrivalTime || '--'}</Td>
                     <Td>{t.durationMinutes ? `${Math.floor(t.durationMinutes / 60)}h ${t.durationMinutes % 60}m` : '--'}</Td>
                     <Td>
-                      <Badge>{t.status === 'In Progress' ? 'In progress' : t.status}</Badge>
+                      {t.autoEnded ? (
+                        <Badge tone="warning" title="The driver never ended this trip, so AwaBus ended it automatically.">
+                          Ended automatically
+                        </Badge>
+                      ) : (
+                        <Badge>{t.status === 'In Progress' ? 'In progress' : t.status}</Badge>
+                      )}
                     </Td>
                   </Tr>
                 ))}

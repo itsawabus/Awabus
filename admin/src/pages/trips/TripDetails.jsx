@@ -45,8 +45,17 @@ export default function TripDetails() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">{trip.tripCode}</h1>
-            <Badge>{trip.status === 'In Progress' ? 'In progress' : trip.status}</Badge>
+            {trip.autoEnded ? (
+              <Badge tone="warning">Ended automatically</Badge>
+            ) : (
+              <Badge>{trip.status === 'In Progress' ? 'In progress' : trip.status}</Badge>
+            )}
           </div>
+          {trip.autoEnded && (
+            <p className="mt-2 max-w-xl text-sm text-amber-700 dark:text-amber-400">
+              The driver never ended this trip, so AwaBus ended it automatically. Student statuses are as the driver last recorded them.
+            </p>
+          )}
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {new Date(trip.date).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             {trip.departureTime && ` • Started ${trip.departureTime}`}

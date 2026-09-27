@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { queryClient } from '../lib/queryClient.js';
+import { useViewSchoolStore } from './viewSchoolStore.js';
 
 const DRAFT_PREFIX = 'awabus.draft.';
 
@@ -21,6 +23,9 @@ export const useAuthStore = create((set) => ({
   isAuthenticated: Boolean(persisted?.token),
 
   setAuth: ({ token, admin }) => {
+    // A new sign-in starts clean: nothing loaded for a previous account is kept.
+    queryClient.clear();
+    useViewSchoolStore.getState().clear();
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, admin }));
     set({ token, admin, isAuthenticated: true });
   },
@@ -39,6 +44,10 @@ export const useAuthStore = create((set) => ({
     Object.keys(localStorage)
       .filter((k) => k.startsWith(DRAFT_PREFIX))
       .forEach((k) => localStorage.removeItem(k));
+    // Forget everything this account loaded (students, live trips, ...) so the
+    // next person to sign in on this browser never sees it, even briefly.
+    queryClient.clear();
+    useViewSchoolStore.getState().clear();
     set({ token: null, admin: null, isAuthenticated: false });
   },
 }));

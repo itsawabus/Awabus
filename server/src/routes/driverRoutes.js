@@ -8,11 +8,11 @@ import {
   getDriverOptions,
   validateLicense,
 } from '../controllers/driverController.js';
-import { protectAdmin } from '../middleware/auth.js';
+import { protectAdmin, schoolScope } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.use(protectAdmin);
+router.use(protectAdmin, schoolScope);
 
 router.get('/meta/options', getDriverOptions);
 router.post('/validate-license', validateLicense);

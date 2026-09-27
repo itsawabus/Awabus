@@ -1,6 +1,6 @@
 import express from 'express';
 import { downloadTemplate, uploadFile } from '../controllers/importController.js';
-import { protectAdmin } from '../middleware/auth.js';
+import { protectAdmin, schoolScope } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ const router = express.Router();
 // straight on into the controller.
 const readFile = express.raw({ type: () => true, limit: '10mb' });
 
-router.get('/:entity/template', protectAdmin, downloadTemplate);
-router.post('/:entity', readFile, protectAdmin, uploadFile);
+router.get('/:entity/template', protectAdmin, schoolScope, downloadTemplate);
+router.post('/:entity', readFile, protectAdmin, schoolScope, uploadFile);
 
 export default router;
