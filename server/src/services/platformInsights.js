@@ -16,6 +16,10 @@ const LICENSE_SOON_DAYS = 30;
 
 const dayKey = (d) => new Date(d).toISOString().slice(0, 10); // schools run on Africa/Accra = UTC
 const startOfUtcDay = (d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+const validDate = (v) => {
+  const d = v ? new Date(v) : null;
+  return d && !Number.isNaN(d.getTime()) ? d : null;
+};
 const pct = (part, whole) => (whole ? Math.round((part / whole) * 1000) / 10 : null);
 
 // What happened on a trip, for the charts.
@@ -67,9 +71,10 @@ export async function buildInsights({ days = 30, schoolId = null, now = new Date
       String(s._id),
       {
         id: String(s._id),
-        name: s.name,
-        code: s.code,
-        status: s.status,
+        // older records may be missing fields; never let one bad record break the page
+        name: s.name || 'Unnamed school',
+        code: s.code || '',
+        status: s.status || 'Active',
         createdAt: s.createdAt,
         admins: 0,
         adminsPending: 0,
@@ -108,6 +113,7 @@ export async function buildInsights({ days = 30, schoolId = null, now = new Date
   students.forEach((st) => {
     const s = S(st.school);
     if (!s) return;
+    st.createdAt = validDate(st.createdAt) || new Date(0); // no date = count as an existing student
     s.students += 1;
     if (st.createdAt >= start) s.studentsNew += 1;
     if (!st.route) s.studentsNoRoute += 1;
@@ -132,8 +138,9 @@ export async function buildInsights({ days = 30, schoolId = null, now = new Date
     const s = S(d.school);
     if (!s) return;
     s.drivers += 1;
-    if (d.licenseExpiry && d.licenseExpiry < now) s.licenseExpired += 1;
-    else if (d.licenseExpiry && d.licenseExpiry <= soon) s.licenseSoon += 1;
+    const expiry = validDate(d.licenseExpiry);
+    if (expiry && expiry < now) s.licenseExpired += 1;
+    else if (expiry && expiry <= soon) s.licenseSoon += 1;
   });
 
   routes.forEach((r) => {
@@ -149,7 +156,8 @@ export async function buildInsights({ days = 30, schoolId = null, now = new Date
 
   trips.forEach((t) => {
     const s = S(t.school);
-    if (!s) return;
+    t.date = validDate(t.date);
+    if (!s || !t.date) return; // skip trips without a usable date
     const outcome = tripOutcome(t);
     if (!outcome) return;
     if (!s.lastTripAt || t.date > s.lastTripAt) s.lastTripAt = t.date;

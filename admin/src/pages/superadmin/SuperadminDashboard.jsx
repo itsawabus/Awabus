@@ -44,7 +44,7 @@ export default function SuperadminDashboard() {
   const [days, setDays] = useState(30);
   const [focus, setFocus] = useState(''); // '' = the whole platform, else a school id
 
-  const { data, isLoading, isError, isFetching, isPlaceholderData } = useQuery({
+  const { data, isLoading, isError, error, refetch, isFetching, isPlaceholderData } = useQuery({
     queryKey: ['superadmin', 'insights', days, focus],
     queryFn: () => getPlatformInsights({ days, school: focus }),
     placeholderData: (prev) => prev, // keep the charts on screen while a new range loads
@@ -90,7 +90,21 @@ export default function SuperadminDashboard() {
 
   if (isLoading) return <PageLoader label="Loading platform insights..." />;
   if (isError || !data) {
-    return <p className="py-16 text-center text-sm text-red-600">Couldn&apos;t load the platform insights. Try again shortly.</p>;
+    // A 404 here means the API server is older than this admin site and has no insights endpoint yet.
+    const outdated = /not found/i.test(error?.message || '');
+    return (
+      <div className="mx-auto max-w-lg py-16 text-center">
+        <p className="text-sm font-semibold text-red-600">Couldn&apos;t load the platform insights.</p>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          {outdated
+            ? 'The server this site is connected to does not have the insights feature yet. Update and restart the API server, then try again.'
+            : `The server said: ${error?.message || 'no response'}`}
+        </p>
+        <Button className="mt-4" variant="outline" onClick={() => refetch()}>
+          Try again
+        </Button>
+      </div>
+    );
   }
 
   const schools = data.schools;
