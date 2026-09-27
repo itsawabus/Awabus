@@ -9,6 +9,7 @@ import RouteModel from '../models/Route.js';
 import Trip from '../models/Trip.js';
 import { tenantContext } from '../utils/tenantContext.js';
 import { assertFormats } from '../utils/formats.js';
+import { buildInsights, INSIGHT_RANGES } from '../services/platformInsights.js';
 
 // Derives a short, URL/login-screen-friendly code from the school name,
 // e.g. "Awabus Demo School" -> "AWABUS-DEMO-SCHOOL". Matches School.code's
@@ -89,6 +90,16 @@ export const getAnalytics = asyncHandler(async (req, res) => {
     },
     schools: breakdown,
   });
+});
+
+// @desc    Platform insights: totals, trends, school comparison, needs-attention list
+// @route   GET /api/superadmin/insights?days=30&school=<id>
+// @access  Private (superadmin)
+export const getInsights = asyncHandler(async (req, res) => {
+  const days = INSIGHT_RANGES.includes(Number(req.query.days)) ? Number(req.query.days) : 30;
+  const schoolId = mongoose.isValidObjectId(req.query.school) ? req.query.school : null;
+  const data = await asSystem(() => buildInsights({ days, schoolId }));
+  res.json({ success: true, data });
 });
 
 // @desc    List all schools

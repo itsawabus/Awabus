@@ -3,6 +3,7 @@ import { protectAdmin } from '../middleware/auth.js';
 import { requireSuperadmin } from '../middleware/superadmin.js';
 import {
   getAnalytics,
+  getInsights,
   listSchools,
   createSchool,
   updateSchoolStatus,
@@ -13,6 +14,7 @@ const router = express.Router();
 router.use(protectAdmin, requireSuperadmin);
 
 router.get('/analytics', getAnalytics);
+router.get('/insights', getInsights);
 router.get('/schools', listSchools);
 router.post('/schools', createSchool);
 router.patch('/schools/:id/status', updateSchoolStatus);

@@ -2,16 +2,27 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useViewSchoolStore } from '../../store/viewSchoolStore.js';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { School as SchoolIcon, Users, GraduationCap, Bus, Plus, Inbox } from 'lucide-react';
-import { getSuperadminAnalytics, createSchool, updateSchoolStatus } from '../../api/superadmin.js';
+import { Plus, Inbox, ExternalLink } from 'lucide-react';
+import { getPlatformInsights, createSchool, updateSchoolStatus } from '../../api/superadmin.js';
 import PhoneInput from '../../components/ui/PhoneInput.jsx';
 import { isValidPhone } from '../../lib/phone.js';
 import usePageHeader from '../../hooks/usePageHeader.js';
 import Card, { CardHeader } from '../../components/ui/Card.jsx';
-import StatCard from '../../components/ui/StatCard.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
-import { Input, Label, FieldError } from '../../components/ui/Input.jsx';
+import { Input, Label, FieldError, Select } from '../../components/ui/Input.jsx';
+import { PillTabs } from '../../components/ui/Tabs.jsx';
+import Sparkline from '../../components/charts/Sparkline.jsx';
+import { fmtNumber, fmtPct } from '../../components/charts/chartUtils.js';
+import {
+  KpiTiles,
+  TripsChart,
+  AttentionList,
+  CompareSchools,
+  StudentOutcomes,
+  FleetStatus,
+  StudentGrowth,
+} from './PlatformInsights.jsx';
 import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
@@ -30,16 +41,26 @@ export default function SuperadminDashboard() {
 
   usePageHeader({ breadcrumb: ['AwaBus', 'Platform'] });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['superadmin-analytics'],
-    queryFn: getSuperadminAnalytics,
-    refetchInterval: 30000,
+  const [days, setDays] = useState(30);
+  const [focus, setFocus] = useState(''); // '' = the whole platform, else a school id
+
+  const { data, isLoading, isError, isFetching, isPlaceholderData } = useQuery({
+    queryKey: ['superadmin', 'insights', days, focus],
+    queryFn: () => getPlatformInsights({ days, school: focus }),
+    placeholderData: (prev) => prev, // keep the charts on screen while a new range loads
+    refetchInterval: 60000,
   });
+  const dim = isFetching && isPlaceholderData;
+
+  const openSchool = (id, name) => {
+    setViewSchool({ id, name });
+    navigate('/');
+  };
 
   const createMutation = useMutation({
     mutationFn: () => createSchool(form),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin'] });
       setForm({ schoolName: '', adminName: '', adminEmail: '', adminPhone: '' });
       setShowForm(false);
       setFormError('');
@@ -50,7 +71,7 @@ export default function SuperadminDashboard() {
   const statusMutation = useMutation({
     mutationFn: ({ id, status }) => updateSchoolStatus(id, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['superadmin-analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin'] });
       setStatusTarget(null);
     },
   });
@@ -67,10 +88,13 @@ export default function SuperadminDashboard() {
     createMutation.mutate();
   };
 
-  if (isLoading) return <PageLoader label="Loading platform analytics..." />;
+  if (isLoading) return <PageLoader label="Loading platform insights..." />;
+  if (isError || !data) {
+    return <p className="py-16 text-center text-sm text-red-600">Couldn&apos;t load the platform insights. Try again shortly.</p>;
+  }
 
-  const stats = data?.stats || {};
-  const schools = data?.schools || [];
+  const schools = data.schools;
+  const focused = schools.find((s) => s.id === focus);
 
   return (
     <div>
@@ -78,7 +102,7 @@ export default function SuperadminDashboard() {
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">Platform Overview</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Manage schools and monitor activity across the entire AwaBus platform.
+            How every school is doing, and the platform as a whole.
           </p>
         </div>
         <Button onClick={() => setShowForm((v) => !v)}>
@@ -86,11 +110,34 @@ export default function SuperadminDashboard() {
         </Button>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Schools" value={stats.totalSchools ?? 0} hint={`${stats.activeSchools ?? 0} active`} icon={SchoolIcon} />
-        <StatCard label="School Admins" value={stats.totalAdmins ?? 0} hint="Across all tenants" icon={Users} tone="slate" />
-        <StatCard label="Total Students" value={stats.totalStudents ?? 0} hint={`${stats.totalRoutes ?? 0} routes configured`} icon={GraduationCap} tone="amber" />
-        <StatCard label="Total Buses" value={stats.totalBuses ?? 0} hint={`${stats.totalDrivers ?? 0} drivers registered`} icon={Bus} />
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <PillTabs
+          tabs={[
+            { value: 7, label: 'Last 7 days' },
+            { value: 30, label: 'Last 30 days' },
+            { value: 90, label: 'Last 90 days' },
+          ]}
+          active={days}
+          onChange={setDays}
+        />
+        <div className="w-full sm:w-60">
+        <Select className="!h-10" value={focus} onChange={(e) => setFocus(e.target.value)} aria-label="School">
+          <option value="">All schools</option>
+          {schools.map((sc) => (
+            <option key={sc.id} value={sc.id}>{sc.name}</option>
+          ))}
+        </Select>
+        </div>
+        {focused && (
+          <>
+            <Button variant="outline" size="sm" className="!h-10" onClick={() => openSchool(focused.id, focused.name)}>
+              <ExternalLink className="h-4 w-4" /> Open {focused.name}
+            </Button>
+            <button type="button" onClick={() => setFocus('')} className="text-sm font-semibold text-slate-500 hover:underline">
+              Show all schools
+            </button>
+          </>
+        )}
       </div>
 
       {showForm && (
@@ -148,34 +195,64 @@ export default function SuperadminDashboard() {
         </Card>
       )}
 
+      <KpiTiles data={data} days={days} schoolName={focused?.name} />
+
+      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <TripsChart data={data} days={days} dim={dim} />
+        <AttentionList items={data.attention} dim={dim} onOpen={(it) => openSchool(it.schoolId, it.school)} />
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <CompareSchools schools={schools} days={days} selectedId={focus || null} onSelect={(id) => setFocus(id === focus ? '' : id)} dim={dim} />
+        <StudentOutcomes schools={schools} days={days} selectedId={focus || null} dim={dim} />
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <StudentGrowth growth={data.growth} schoolName={focused?.name} dim={dim} />
+        <FleetStatus schools={schools} selectedId={focus || null} dim={dim} />
+      </div>
+
       <Card>
-        <CardHeader title="Schools" />
+        <CardHeader title="Schools" subtitle={`Figures for the last ${days} days where they relate to trips`} />
         {schools.length ? (
           <Table>
             <Thead>
               <Th>School</Th>
-              <Th>Students</Th>
-              <Th>Buses</Th>
-              <Th>Drivers</Th>
-              <Th>Admins</Th>
-              <Th>Status</Th>
+              <Th className="text-right">Students</Th>
+              <Th className="text-right">Buses</Th>
+              <Th>Trips</Th>
+              <Th className="text-right">On time</Th>
+              <Th className="text-right">Seat use</Th>
+              <Th>Last trip</Th>
               <Th>Actions</Th>
             </Thead>
             <Tbody>
               {schools.map((s) => (
-                <Tr key={s.id}>
-                  <Td className="font-medium text-slate-800 dark:text-slate-100">{s.name}</Td>
-                  <Td>{s.students}</Td>
-                  <Td>{s.buses}</Td>
-                  <Td>{s.drivers}</Td>
-                  <Td>{s.admins}</Td>
-                  <Td><Badge>{s.status}</Badge></Td>
+                <Tr key={s.id} className={focus === s.id ? 'bg-brand-50/60 dark:bg-brand-500/5' : ''}>
+                  <Td>
+                    <p className="flex items-center gap-2 font-medium text-slate-800 dark:text-slate-100">
+                      {s.name}
+                      {s.status !== 'Active' && <Badge>{s.status}</Badge>}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {s.code} · {s.admins} admin{s.admins === 1 ? '' : 's'}
+                      {s.adminsPending ? ` (${s.adminsPending} not signed in yet)` : ''}
+                    </p>
+                  </Td>
+                  <Td className="text-right tabular-nums">{fmtNumber(s.students)}</Td>
+                  <Td className="text-right tabular-nums">{fmtNumber(s.buses)}</Td>
+                  <Td>
+                    <div className="flex items-center gap-3">
+                      <span className="w-10 text-right tabular-nums">{fmtNumber(s.tripsTotal)}</span>
+                      <Sparkline values={s.daily} width={64} height={24} label={`${s.name} trips per day`} />
+                    </div>
+                  </Td>
+                  <Td className="text-right tabular-nums">{fmtPct(s.onTimeRate)}</Td>
+                  <Td className={`text-right tabular-nums ${s.seatUse > 100 ? 'font-semibold text-red-600 dark:text-red-400' : ''}`}>{fmtPct(s.seatUse)}</Td>
+                  <Td className="whitespace-nowrap">{s.lastTripAt ? new Date(s.lastTripAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Never'}</Td>
                   <Td className="whitespace-nowrap">
                     <button
-                      onClick={() => {
-                        setViewSchool({ id: s.id, name: s.name });
-                        navigate('/');
-                      }}
+                      onClick={() => openSchool(s.id, s.name)}
                       className="mr-4 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400"
                     >
                       Open

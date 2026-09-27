@@ -7,3 +7,6 @@ export const createSchool = (payload) =>
   apiClient.post('/superadmin/schools', payload).then((r) => r.data);
 export const updateSchoolStatus = (id, status) =>
   apiClient.patch(`/superadmin/schools/${id}/status`, { status }).then((r) => r.data);
+// days: 7 | 30 | 90; school: a school id, or omit for the whole platform
+export const getPlatformInsights = ({ days, school }) =>
+  apiClient.get('/superadmin/insights', { params: { days, school: school || undefined } }).then((r) => r.data.data);
