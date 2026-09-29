@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { DrawerContentScrollView } from 'expo-router/drawer';
 import { router, usePathname } from 'expo-router';
 import {
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore.js';
 import { reportSignOut } from '../../api/driverApp.js';
-import { colors, radii } from '../../lib/theme.js';
+import { colors, radii, themed } from '../../lib/theme.js';
 import Avatar from '../ui/Avatar.jsx';
 import Button from '../ui/Button.jsx';
 import Modal from '../ui/Modal.jsx';
@@ -117,7 +117,7 @@ export default function DrawerContent(props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   drawerBadges: { alignItems: 'flex-end', gap: 4 },
   unsentWarning: { marginTop: 12, fontSize: 13, fontWeight: '700', color: colors.red700 },
   container: {
@@ -195,4 +195,4 @@ const styles = StyleSheet.create({
   },
   sheetTitle: { fontSize: 18, fontWeight: '800', color: colors.slate900 },
   sheetSubtitle: { fontSize: 14, color: colors.slate500, marginTop: 6, lineHeight: 20 },
-});
+}));

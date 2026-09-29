@@ -1,6 +1,6 @@
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../../lib/theme.js';
+import { colors, themed } from '../../lib/theme.js';
 
 const LOGO = require('../../../assets/awabus-logo.png');
 
@@ -23,7 +23,7 @@ export default function AuthLayout({ children }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   container: {
     flex: 1,
     backgroundColor: colors.white,
@@ -42,4 +42,4 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingBottom: 48,
   },
-});
+}));

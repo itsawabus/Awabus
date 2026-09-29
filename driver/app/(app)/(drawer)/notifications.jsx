@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, BellOff, CheckSquare, Info, Square, Trash2, UploadCloud, X } from 'lucide-react-native';
@@ -12,14 +12,14 @@ import Button from '../../../src/components/ui/Button.jsx';
 import { useOfflineQueueStore } from '../../../src/store/offlineQueueStore.js';
 import { useUiStore } from '../../../src/store/uiStore.js';
 import { formatDateTime } from '../../../src/lib/utils.js';
-import { colors } from '../../../src/lib/theme.js';
+import { colors, themed, themedMap } from '../../../src/lib/theme.js';
 
-const LOOK = {
+const LOOK = themedMap(() => ({
   danger: { Icon: AlertTriangle, color: colors.red600, bg: colors.red50 },
   warning: { Icon: AlertTriangle, color: colors.amber800, bg: colors.amber50 },
   info: { Icon: Info, color: colors.ink, bg: colors.brand50 },
   queue: { Icon: UploadCloud, color: colors.ink, bg: colors.slate100 },
-};
+}));
 
 export default function Notifications() {
   const { data, isLoading, isRefetching, refetch, isError, error } = useQuery({
@@ -173,7 +173,7 @@ export default function Notifications() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   list: { padding: 16, gap: 10, flexGrow: 1 },
   card: { padding: 14 },
   cardTicked: { borderColor: colors.brand600, borderWidth: 1 },
@@ -190,4 +190,4 @@ const styles = StyleSheet.create({
   emptyTitle: { fontWeight: '800', color: colors.slate800, fontSize: 15 },
   emptyText: { color: colors.slate500, fontSize: 13, textAlign: 'center' },
   error: { color: colors.red600, marginBottom: 8 },
-});
+}));

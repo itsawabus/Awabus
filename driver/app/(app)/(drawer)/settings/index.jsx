@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, LogOut } from 'lucide-react-native';
@@ -13,7 +13,7 @@ import { OptionField } from '../../../../src/components/ui/OptionPicker.jsx';
 import { getMe, reportSignOut } from '../../../../src/api/driverApp.js';
 import { useAuthStore } from '../../../../src/store/authStore.js';
 import { useUiStore } from '../../../../src/store/uiStore.js';
-import { colors } from '../../../../src/lib/theme.js';
+import { colors, themed } from '../../../../src/lib/theme.js';
 import { formatPhone } from '../../../../src/lib/phone.js';
 import { buildLine } from '../../../../src/lib/buildInfo.js';
 import { useOfflineQueueStore } from '../../../../src/store/offlineQueueStore.js';
@@ -68,7 +68,7 @@ export default function Settings() {
             onOpen={() => setThemeOpen(true)}
             onClose={() => setThemeOpen(false)}
           />
-          <Text style={styles.themeHint}>The app restarts for a moment to apply a new theme.</Text>
+          <Text style={styles.themeHint}>Tip: the sun / moon button at the top left switches light and dark too.</Text>
         </Card>
 
         <Text style={styles.sectionTitle}>Notifications</Text>
@@ -167,7 +167,7 @@ const ToggleRow = ({ label, value, onValueChange, last }) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   themeHint: { marginTop: 8, fontSize: 12, color: colors.slate500 },
   unsentWarning: { marginTop: 12, fontSize: 13, fontWeight: '700', color: colors.red700 },
   scroll: { padding: 16, gap: 16, paddingBottom: 40 },
@@ -197,4 +197,4 @@ const styles = StyleSheet.create({
   version: { textAlign: 'center', color: colors.slate400, fontSize: 12 },
   sheetTitle: { fontSize: 18, fontWeight: '800', color: colors.slate900 },
   sheetSubtitle: { marginTop: 6, color: colors.slate500, fontSize: 14 },
-});
+}));

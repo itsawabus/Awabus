@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Bell, Menu } from 'lucide-react-native';
 import { router, useNavigation } from 'expo-router';
@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getNotifications } from '../../api/driverApp.js';
 import { useUiStore } from '../../store/uiStore.js';
 import { useOfflineQueueStore } from '../../store/offlineQueueStore.js';
-import { colors } from '../../lib/theme.js';
+import { colors, themed } from '../../lib/theme.js';
+import ThemeButton from '../ThemeButton.jsx';
 
 const LOGO = require('../../../assets/awabus-logo.png');
 
@@ -38,6 +39,7 @@ export default function Header({ title, logo = false, back = false, right }) {
       <Pressable onPress={handleMenuPress} style={styles.iconButton} hitSlop={10}>
         {back ? <ArrowLeft size={22} color={colors.onDark} /> : <Menu size={22} color={colors.onDark} />}
       </Pressable>
+      <ThemeButton style={{ marginLeft: -8 }} />
       {logo ? (
         <View style={styles.logoWrap}>
           <Image source={LOGO} style={styles.logo} resizeMode="contain" accessibilityLabel="AwaBus" />
@@ -73,7 +75,7 @@ function NotificationBell() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   header: {
     backgroundColor: colors.navy,
     flexDirection: 'row',
@@ -113,4 +115,4 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
   },
-});
+}));

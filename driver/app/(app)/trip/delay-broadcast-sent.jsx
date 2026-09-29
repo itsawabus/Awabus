@@ -1,11 +1,11 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { CheckCircle2 } from 'lucide-react-native';
 import Header from '../../../src/components/layout/Header.jsx';
 import Card from '../../../src/components/ui/Card.jsx';
 import Button from '../../../src/components/ui/Button.jsx';
 import { formatTime } from '../../../src/lib/utils.js';
-import { colors } from '../../../src/lib/theme.js';
+import { colors, themed } from '../../../src/lib/theme.js';
 
 export default function BroadcastSent() {
   const { recipientCount, deliveredCount, failedCount, sentAt } = useLocalSearchParams();
@@ -40,7 +40,7 @@ const Row = ({ label, value, last }) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   content: { alignItems: 'center', padding: 24, paddingTop: 40 },
   title: { marginTop: 16, fontSize: 20, fontWeight: '800', color: colors.slate900 },
   subtitle: { marginTop: 4, fontSize: 14, color: colors.slate500, textAlign: 'center' },
@@ -50,4 +50,4 @@ const styles = StyleSheet.create({
   rowLabel: { color: colors.slate500, fontSize: 14 },
   rowValue: { color: colors.slate800, fontWeight: '700', fontSize: 14 },
   footer: { padding: 16 },
-});
+}));

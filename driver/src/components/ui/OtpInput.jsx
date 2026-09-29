@@ -1,6 +1,6 @@
 import { useRef } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
-import { colors, radii } from '../../lib/theme.js';
+import { TextInput, View } from 'react-native';
+import { colors, radii, themed } from '../../lib/theme.js';
 
 export default function OtpInput({ length = 6, value, onChange, error }) {
   const refs = useRef([]);
@@ -42,7 +42,7 @@ export default function OtpInput({ length = 6, value, onChange, error }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   row: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -63,4 +63,4 @@ const styles = StyleSheet.create({
   boxError: {
     borderColor: colors.red500,
   },
-});
+}));

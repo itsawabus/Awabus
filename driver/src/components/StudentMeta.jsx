@@ -1,7 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { MessageSquare, Phone } from 'lucide-react-native';
 import { formatPhone } from '../lib/phone.js';
-import { colors, radii } from '../lib/theme.js';
+import { colors, radii, themed } from '../lib/theme.js';
 
 export const guardianName = (g) => (g ? `${g.firstName || ''} ${g.lastName || ''}`.trim() : '');
 
@@ -52,7 +52,7 @@ export default function StudentMeta({ student, onCall, onMessage }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   wrap: { marginTop: 2, gap: 2 },
   cls: { fontSize: 12, fontWeight: '700', color: colors.slate500 },
   parentRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -66,4 +66,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

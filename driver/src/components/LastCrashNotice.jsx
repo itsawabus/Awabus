@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { AlertTriangle } from 'lucide-react-native';
 import { readLastCrash, clearLastCrash } from '../lib/crashLog.js';
-import { colors, radii } from '../lib/theme.js';
+import { colors, radii, themed } from '../lib/theme.js';
 
 /** "The app closed unexpectedly last time", with the reason, until dismissed. */
 export default function LastCrashNotice({ style }) {
@@ -34,10 +34,10 @@ export default function LastCrashNotice({ style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   box: { flexDirection: 'row', gap: 8, backgroundColor: colors.amber50, borderWidth: 1, borderColor: colors.warnBorder, borderRadius: radii.lg, padding: 12 },
   title: { fontSize: 13, fontWeight: '800', color: colors.amber800 },
   text: { fontSize: 12, color: colors.amber800, marginTop: 4 },
   hint: { fontSize: 11, color: colors.amber700, marginTop: 4 },
   dismiss: { fontSize: 13, fontWeight: '700', color: colors.brand600, marginTop: 6 },
-});
+}));

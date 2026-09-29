@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Mail, MapPin } from 'lucide-react-native';
@@ -8,7 +8,7 @@ import Badge from '../../../../src/components/ui/Badge.jsx';
 import { PageLoader } from '../../../../src/components/ui/Spinner.jsx';
 import { getTripById } from '../../../../src/api/driverApp.js';
 import { formatDate, formatDuration, formatTime } from '../../../../src/lib/utils.js';
-import { colors } from '../../../../src/lib/theme.js';
+import { colors, themed } from '../../../../src/lib/theme.js';
 import { statusLabel } from '../../../../src/lib/runs.js';
 import { busLabel } from '../../../../src/lib/bus.js';
 
@@ -110,7 +110,7 @@ const Stat = ({ label, value }) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   scroll: { padding: 16, gap: 16, paddingBottom: 32 },
   headCard: { gap: 4 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -139,4 +139,4 @@ const styles = StyleSheet.create({
   broadcastMeta: { color: colors.slate400, fontSize: 11, marginTop: 4 },
   emptyText: { color: colors.slate400, fontSize: 13, textAlign: 'center', padding: 20 },
   emptyBroadcast: { alignItems: 'center', gap: 8, paddingVertical: 12 },
-});
+}));

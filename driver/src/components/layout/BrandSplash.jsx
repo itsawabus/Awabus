@@ -1,5 +1,5 @@
-import { Image, StyleSheet, View } from 'react-native';
-import { colors } from '../../lib/theme.js';
+import { Image, View } from 'react-native';
+import { colors, themed } from '../../lib/theme.js';
 
 const LOGO = require('../../../assets/awabus-logo.png');
 
@@ -16,7 +16,7 @@ export default function BrandSplash() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   container: {
     flex: 1,
     backgroundColor: colors.logoBg,
@@ -27,4 +27,4 @@ const styles = StyleSheet.create({
     width: 220,
     height: 108,
   },
-});
+}));

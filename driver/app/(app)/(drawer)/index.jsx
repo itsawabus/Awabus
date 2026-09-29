@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Linking, RefreshControl, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { Linking, RefreshControl, ScrollView, Text, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,7 +20,7 @@ import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
 import { useAuthStore } from '../../../src/store/authStore.js';
 import { getTodaysTrip, markAttendance, startTrip } from '../../../src/api/driverApp.js';
 import { formatDate } from '../../../src/lib/utils.js';
-import { colors, radii } from '../../../src/lib/theme.js';
+import { colors, radii, themed } from '../../../src/lib/theme.js';
 import { runWords } from '../../../src/lib/runs.js';
 import { busLabel } from '../../../src/lib/bus.js';
 import { useTripPhotos } from '../../../src/hooks/useTripPhotos.js';
@@ -292,7 +292,7 @@ const SummaryRow = ({ label, value }) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   connection: { flexShrink: 1, maxWidth: '55%' },
   startError: { marginTop: 16, color: colors.red600, fontSize: 13, lineHeight: 18 },
   scroll: { padding: 16, gap: 20, paddingBottom: 32 },
@@ -345,4 +345,4 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
   summaryLabel: { color: colors.slate500, fontSize: 14 },
   summaryValue: { color: colors.slate800, fontWeight: '700', fontSize: 14 },
-});
+}));

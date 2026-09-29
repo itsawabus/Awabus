@@ -1,6 +1,6 @@
 import { Modal as RNModal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, radii } from '../../lib/theme.js';
+import { colors, radii, themed } from '../../lib/theme.js';
 
 export default function Modal({ open, onClose, children, style }) {
   return (
@@ -15,7 +15,7 @@ export default function Modal({ open, onClose, children, style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -28,4 +28,4 @@ const styles = StyleSheet.create({
     padding: 20,
     maxHeight: '85%',
   },
-});
+}));

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { Check } from 'lucide-react-native';
@@ -8,7 +8,7 @@ import { PasswordInput, Label, FieldError } from '../../src/components/ui/Input.
 import Button from '../../src/components/ui/Button.jsx';
 import { resetPassword } from '../../src/api/driverApp.js';
 import { useResetFlowStore } from '../../src/store/resetFlowStore.js';
-import { colors } from '../../src/lib/theme.js';
+import { colors, themed } from '../../src/lib/theme.js';
 
 const RULES = [
   { key: 'length', label: 'At least 8 characters', test: (v) => v.length >= 8 },
@@ -87,7 +87,7 @@ export default function ResetPassword() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   title: { fontSize: 26, fontWeight: '800', color: colors.slate900 },
   subtitle: { marginTop: 4, fontSize: 15, color: colors.slate500, marginBottom: 20 },
   field: { marginBottom: 18 },
@@ -104,4 +104,4 @@ const styles = StyleSheet.create({
   ruleDotActive: { backgroundColor: colors.brand100 },
   ruleText: { fontSize: 13, color: colors.slate400 },
   ruleTextActive: { color: colors.brand700, fontWeight: '600' },
-});
+}));

@@ -1,5 +1,5 @@
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { colors } from '../../lib/theme.js';
+import { ActivityIndicator, Text, View } from 'react-native';
+import { colors, themed } from '../../lib/theme.js';
 
 export default function Spinner({ size = 'small', color = colors.brand500 }) {
   return <ActivityIndicator size={size} color={color} />;
@@ -14,7 +14,7 @@ export function PageLoader({ label = 'Loading…' }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   wrap: {
     flex: 1,
     alignItems: 'center',
@@ -27,4 +27,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.slate400,
   },
-});
+}));

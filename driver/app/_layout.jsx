@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { Stack, router, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -63,6 +63,33 @@ export default function RootLayout() {
   const queueHydrated = useOfflineQueueStore((s) => s.isHydrated);
   const hydrateQueue = useOfflineQueueStore((s) => s.hydrate);
 
+  const themeVersion = useUiStore((s) => s.themeVersion);
+
+  // A new theme draws every screen again (their styles are remade with the new
+  // colours) and comes back to the page the driver was on.
+  const pathname = usePathname();
+  const pathRef = useRef(pathname);
+  const drawnFor = useRef(themeVersion);
+  useEffect(() => {
+    if (drawnFor.current === themeVersion) {
+      pathRef.current = pathname;
+      return;
+    }
+    drawnFor.current = themeVersion;
+    const back = pathRef.current;
+    if (back && back !== '/') {
+      const t = setTimeout(() => {
+        try {
+          router.replace(back);
+        } catch {
+          // stays on the start screen
+        }
+      }, 0);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [pathname, themeVersion]);
+
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const ready = authHydrated && uiHydrated && queueHydrated && minTimeElapsed;
 
@@ -94,10 +121,10 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
-          <StatusBar style="light" />
           {/* Sends the bus position and checks notifications on every screen, without moving between screens. */}
           {isAuthenticated && <BackgroundWork />}
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.page } }}>
+          <StatusBar style="light" />
+          <Stack key={`theme-${themeVersion}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.page } }}>
             <Stack.Protected guard={!isAuthenticated}>
               <Stack.Screen name="(auth)" />
             </Stack.Protected>

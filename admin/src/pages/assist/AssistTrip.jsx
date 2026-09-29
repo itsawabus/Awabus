@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Bus, CheckCircle2, CheckSquare, Circle, Clock, CornerUpRight, ListChecks, MessageSquare, Monitor, Moon, Navigation, Phone, RefreshCw, Search, Sun, UserRound, X } from 'lucide-react';
+import { AlertTriangle, Bus, CheckCircle2, CheckSquare, Circle, Clock, CornerUpRight, ListChecks, MessageSquare, Moon, Navigation, Phone, RefreshCw, Search, Sun, UserRound, X } from 'lucide-react';
 import { API_URL } from '../../api/client.js';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -100,11 +100,6 @@ export default function AssistTrip() {
 
 // The teacher's own light / dark choice: follows the phone unless they pick one.
 const ASSIST_THEME_KEY = 'awabus.assist.theme';
-const THEMES = [
-  { value: 'system', label: 'Phone setting', Icon: Monitor },
-  { value: 'light', label: 'Light', Icon: Sun },
-  { value: 'dark', label: 'Dark', Icon: Moon },
-];
 function useAssistTheme() {
   const [theme, setTheme] = useState(() => {
     try {
@@ -137,22 +132,21 @@ function useAssistTheme() {
 
 function Shell({ children }) {
   const [theme, setTheme] = useAssistTheme();
-  const current = THEMES.find((t) => t.value === theme) || THEMES[0];
-  const next = THEMES[(THEMES.indexOf(current) + 1) % THEMES.length];
+  const dark = theme === 'dark' || (theme === 'system' && Boolean(window.matchMedia?.('(prefers-color-scheme: dark)').matches));
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-navy dark:text-slate-100">
       <div className="mx-auto max-w-2xl px-4 py-5">
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <img src="/awabus1.png" alt="AwaBus" className="h-8 w-auto" />
+        <div className="mb-4 flex items-center gap-3">
           <button
             type="button"
-            onClick={() => setTheme(next.value)}
-            title={`Theme: ${current.label}. Tap for ${next.label}.`}
-            aria-label={`Theme: ${current.label}. Switch to ${next.label}`}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 shadow-sm dark:bg-navy-light dark:text-slate-300"
+            onClick={() => setTheme(dark ? 'light' : 'dark')}
+            title={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm hover:text-slate-900 dark:bg-navy-light dark:text-slate-300 dark:hover:text-white"
           >
-            <current.Icon className="h-3.5 w-3.5" /> {current.label}
+            {dark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
           </button>
+          <img src="/awabus1.png" alt="AwaBus" className="h-8 w-auto" />
         </div>
         {children}
       </div>

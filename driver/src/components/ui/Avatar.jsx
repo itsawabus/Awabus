@@ -1,5 +1,5 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
-import { colors } from '../../lib/theme.js';
+import { Image, Text, View } from 'react-native';
+import { colors, themed } from '../../lib/theme.js';
 import { initials } from '../../lib/utils.js';
 
 const SIZES = { sm: 36, md: 48, lg: 64 };
@@ -27,7 +27,7 @@ export default function Avatar({ name, src, size = 'md', style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   circle: {
     backgroundColor: colors.brand500,
     alignItems: 'center',
@@ -37,4 +37,4 @@ const styles = StyleSheet.create({
     color: colors.onDark,
     fontWeight: '700',
   },
-});
+}));

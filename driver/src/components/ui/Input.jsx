@@ -1,7 +1,7 @@
 import { forwardRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, View, Pressable } from 'react-native';
+import { Text, TextInput, View, Pressable } from 'react-native';
 import { Eye, EyeOff } from 'lucide-react-native';
-import { colors, radii } from '../../lib/theme.js';
+import { colors, radii, themed } from '../../lib/theme.js';
 
 export const Label = ({ children, style }) => <Text style={[styles.label, style]}>{children}</Text>;
 
@@ -48,7 +48,7 @@ export const Textarea = forwardRef(({ style, error, ...props }, ref) => (
 ));
 Textarea.displayName = 'Textarea';
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   label: {
     fontSize: 14,
     fontWeight: '700',
@@ -87,6 +87,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 14,
   },
-});
+}));
 
 export default Input;
