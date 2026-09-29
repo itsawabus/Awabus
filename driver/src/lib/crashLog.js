@@ -38,3 +38,18 @@ export const saveCrash = (error) =>
     KEY,
     JSON.stringify({ message: String(error?.message || error).slice(0, 400), stack: String(error?.stack || '').split('\n').slice(0, 6).join('\n'), fatal: true, at: Date.now() })
   ).catch(() => {});
+
+/**
+ * Sends a recorded crash to the AwaBus server once (the System page lists
+ * them), so a crash on a driver's phone can be fixed without the phone.
+ */
+export async function reportLastCrash(send) {
+  const crash = await readLastCrash();
+  if (!crash || crash.reported) return;
+  try {
+    await send(crash);
+    await AsyncStorage.setItem(KEY, JSON.stringify({ ...crash, reported: true }));
+  } catch {
+    // try again next launch
+  }
+}

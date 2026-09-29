@@ -70,7 +70,8 @@
             "backgroundColor": "#0a1f2a"
           }
         }
-      ]
+      ],
+      "./plugins/withCrashCapture.js"
     ],
     "extra": {
       "router": {},

@@ -1,6 +1,7 @@
 // Developer tools for the superadmin "System" page: health, messaging and errors.
 import { voiceProviderStatus } from '../services/voice/index.js';
 import asyncHandler from 'express-async-handler';
+import AppCrash from '../models/AppCrash.js';
 import mongoose from 'mongoose';
 import { readFileSync } from 'node:fs';
 import MessageLog from '../models/MessageLog.js';
@@ -63,9 +64,11 @@ export const getHealth = asyncHandler(async (req, res) => {
   }
   const io = req.app.get('io');
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const [messages24h, failed24h] = await Promise.all([
+  const [messages24h, failed24h, appCrashes] = await Promise.all([
     MessageLog.countDocuments({ createdAt: { $gte: since24h } }),
     MessageLog.countDocuments({ createdAt: { $gte: since24h }, status: 'failed' }),
+    // Driver app crashes reported by phones (last 30 days), newest first.
+    AppCrash.find().sort({ createdAt: -1 }).limit(10).populate('driver', 'firstName lastName').lean(),
   ]);
   const errors = recentErrors();
 
@@ -95,6 +98,14 @@ export const getHealth = asyncHandler(async (req, res) => {
         last24h: { total: messages24h, failed: failed24h },
       },
       errors: { sinceStart: errors.total, latest: errors.entries[0] || null },
+      appCrashes: appCrashes.map((c) => ({
+        at: c.happenedAt || c.createdAt,
+        driver: c.driver ? `${c.driver.firstName} ${c.driver.lastName}` : '',
+        message: c.message,
+        stack: c.stack,
+        native: c.native,
+        code: c.code,
+      })),
       config: CONFIG.map((c) => ({ ...c, set: Boolean(process.env[c.key]) })),
     },
   });

@@ -144,7 +144,10 @@ export async function startTripTracking(tripId, driverId, { manual = false } = {
         killServiceOnDestroy: true,
       },
     });
-    await AsyncStorage.removeItem(STARTING_KEY).catch(() => {});
+    // Android starts the service a moment after this call returns, and a
+    // refusal there would close the app: only clear the flag once the app
+    // has stayed alive for a while.
+    setTimeout(() => AsyncStorage.removeItem(STARTING_KEY).catch(() => {}), 15000);
     return 'running';
   } catch (err) {
     await AsyncStorage.removeItem(STARTING_KEY).catch(() => {});
