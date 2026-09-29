@@ -4,7 +4,8 @@
 //
 // - One pass per trip; making a new one cancels the old one.
 // - It works only while that trip has not ended (Scheduled / In Progress /
-//   Delayed), and never longer than PASS_HOURS.
+//   Delayed), and never longer than PASS_HOURS. If AwaBus (not the driver)
+//   closed the trip, it follows the driver to their current trip.
 // - Only a SHA-256 hash of the pass is stored.
 import crypto from 'node:crypto';
 import Trip from '../models/Trip.js';
@@ -79,15 +80,60 @@ export const revokePass = (tripId) =>
  */
 export async function resolvePass(pass) {
   if (!pass || String(pass).length < 20) return { error: 'This bus assistant link is not valid.', status: 401, code: 'ASSIST_INVALID' };
-  const trip = await tenantContext.runAsSystem(() =>
-    Trip.findOne({ 'assistPass.hash': hashOf(pass) }).select('_id school driver status assistPass')
+  let trip = await tenantContext.runAsSystem(() =>
+    Trip.findOne({ 'assistPass.hash': hashOf(pass) }).select('_id school driver status autoEnded createdAt assistPass assistants')
   );
   if (!trip) {
     return { error: 'This link no longer works. Ask the driver to show the QR code again.', status: 401, code: 'ASSIST_INVALID' };
   }
-  if (!OPEN.includes(trip.status)) return { error: 'This trip has ended, so this link no longer works.', status: 410, code: 'ASSIST_ENDED' };
   if (trip.assistPass?.expiresAt && Date.now() > new Date(trip.assistPass.expiresAt).getTime()) {
     return { error: 'This link has expired. Ask the driver to show a new QR code.', status: 410, code: 'ASSIST_EXPIRED' };
   }
+  if (!OPEN.includes(trip.status)) {
+    trip = await followDriver(trip);
+    if (!trip) return { error: 'This trip has ended, so this link no longer works. Ask the driver to show the QR code again.', status: 410, code: 'ASSIST_ENDED' };
+  }
   return { trip };
+}
+
+/**
+ * The driver did not end this trip: AwaBus closed it (a run prepared before
+ * noon and started after noon is replaced by a fresh afternoon trip; a trip
+ * left running for hours is ended automatically). The bus is still out with
+ * the same driver, so the teacher's link moves to the driver's current trip
+ * today, unless the driver already made a new code for it. A trip the driver
+ * ended himself keeps its link ended.
+ */
+async function followDriver(old) {
+  if (!(old.status === 'Cancelled' || old.autoEnded)) return null;
+  return tenantContext.run(String(old.school), async () => {
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const next = await Trip.findOne({
+      _id: { $ne: old._id },
+      driver: old.driver,
+      date: { $gte: dayStart },
+      status: { $in: OPEN },
+      createdAt: { $gt: old.createdAt },
+    })
+      .sort({ createdAt: -1 })
+      .select('_id school driver status autoEnded createdAt assistPass assistants');
+    if (!next || next.assistPass?.hash) return null;
+    // Only one request moves it (the pass must still be on the old trip).
+    const moved = await Trip.updateOne({ _id: old._id, 'assistPass.hash': old.assistPass.hash }, { $set: { assistPass: { hash: '', createdAt: null, expiresAt: null } } });
+    if (!moved.modifiedCount) return Trip.findOne({ 'assistPass.hash': old.assistPass.hash }).select('_id school driver status assistPass');
+    await Trip.updateOne(
+      { _id: next._id },
+      { $set: { assistPass: { hash: old.assistPass.hash, createdAt: old.assistPass.createdAt, expiresAt: old.assistPass.expiresAt }, assistants: old.assistants || [] } }
+    );
+    return Trip.findById(next._id).select('_id school driver status assistPass');
+  });
+}
+
+/** Moves a trip's still-working pass to the trip that replaced it (see followDriver). */
+export async function carryPass(oldTripId) {
+  const old = await Trip.findById(oldTripId).select('_id school driver status autoEnded createdAt assistPass assistants');
+  if (!old?.assistPass?.hash) return;
+  if (old.assistPass.expiresAt && Date.now() > new Date(old.assistPass.expiresAt).getTime()) return;
+  await followDriver(old);
 }

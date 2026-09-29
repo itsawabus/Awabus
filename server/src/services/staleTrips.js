@@ -3,8 +3,12 @@ import Bus from '../models/Bus.js';
 import { tenantContext } from '../utils/tenantContext.js';
 
 // A school run takes an hour or two. A trip still "In Progress" this long after
-// it started was never ended by its driver (app closed, phone died, ...).
+// it started, with no location from the bus for a while, was never ended by
+// its driver (app closed, phone died, ...).
 export const STALE_TRIP_HOURS = 6;
+// ...unless the bus is clearly still out: the driver's phone (or the bus
+// assistant's, as backup) sent a location this recently.
+export const STILL_ACTIVE_MINUTES = 30;
 const SWEEP_EVERY_MS = 10 * 60 * 1000;
 
 // A trip that is really still running: live status and never finished. Old
@@ -26,9 +30,14 @@ const timeNow = () => new Date().toLocaleTimeString('en-US', { hour: '2-digit', 
  */
 export async function closeStaleTrips() {
   const cutoff = new Date(Date.now() - STALE_TRIP_HOURS * 60 * 60 * 1000);
+  const recent = new Date(Date.now() - STILL_ACTIVE_MINUTES * 60 * 1000);
   const trips = await Trip.find({
     ...LIVE_TRIP_FILTER,
-    $or: [{ startedAt: { $lt: cutoff } }, { startedAt: null, date: { $lt: cutoff } }],
+    $and: [
+      { $or: [{ startedAt: { $lt: cutoff } }, { startedAt: null, date: { $lt: cutoff } }] },
+      { $or: [{ driverSeenAt: null }, { driverSeenAt: { $lt: recent } }] },
+      { $or: [{ 'assistantLocation.updatedAt': null }, { 'assistantLocation.updatedAt': { $lt: recent } }] },
+    ],
   });
 
   for (const trip of trips) {

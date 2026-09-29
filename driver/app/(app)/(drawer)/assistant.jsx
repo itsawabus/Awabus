@@ -62,6 +62,28 @@ export function AssistantScreen({ back = false }) {
     };
   }, [tripId]);
 
+  // AwaBus moved the code to this trip (the earlier run was replaced, e.g. a
+  // morning trip started after noon): it is the same code, so keep showing it.
+  const passExpires = status.data?.active ? status.data.expiresAt : null;
+  useEffect(() => {
+    let alive = true;
+    if (tripId && passExpires && !qr) {
+      AsyncStorage.getItem(QR_KEY)
+        .then((raw) => {
+          const saved = JSON.parse(raw || 'null');
+          if (alive && saved && saved.tripId !== tripId && saved.expiresAt === passExpires) {
+            const value = { ...saved, tripId, shownAt: Date.now() };
+            setQr(value);
+            saveQr(value);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      alive = false;
+    };
+  }, [tripId, passExpires, qr]);
+
   // A code whose pass was stopped or has run out is not shown any more. Only
   // a status fetched after the code was made counts (right after "Show QR
   // code" the previous, pre-code status is still on screen for a moment).
