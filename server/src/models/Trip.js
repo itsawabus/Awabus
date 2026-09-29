@@ -45,6 +45,11 @@ const studentProgressSchema = new mongoose.Schema(
     callSeconds: { type: Number, default: null },
     // Text sent instead when the call was not picked up ('' = none needed yet).
     callFallback: { type: String, default: '' },
+    // When and where the bus was at this student's last step (picked up,
+    // dropped, not here), for the trail on Live Tracking.
+    scannedAt: { type: Date, default: null },
+    scanLat: { type: Number, default: null },
+    scanLng: { type: Number, default: null },
     dropoffStatus: {
       type: String,
       enum: ['Pending', 'On board', 'Dropped off', 'Not on board', 'Boarding now'],
@@ -117,6 +122,11 @@ const tripSchema = new mongoose.Schema(
     assistantLocation: { lat: Number, lng: Number, heading: Number, accuracy: Number, updatedAt: Date, name: String },
     // Is the assistant's phone on the bus (near the driver's)? null = not compared yet.
     assistantOnBus: { type: Boolean, default: null },
+    // Where the bus has been on this trip (the trail on Live Tracking): a point
+    // each time it moves on 15 m or more, the newest MAX_TRAIL_POINTS kept.
+    // Left out of every query unless asked for (it can be long): the driver
+    // app and the assistant page never download it.
+    path: { type: [{ lat: Number, lng: Number, at: Date, _id: false }], select: false },
     distanceCoveredKm: { type: Number, default: 0 },
     etaMinutes: { type: Number, default: 0 },
 

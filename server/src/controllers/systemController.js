@@ -32,6 +32,7 @@ const CONFIG = [
   { key: 'PORT', group: 'Core', note: 'Set by the host' },
   { key: 'CLIENT_URL', group: 'Web access (CORS)', note: 'Admin site address allowed to call the API' },
   { key: 'DEPLOYED_URL', group: 'Web access (CORS)', note: 'Deployed admin site address' },
+  { key: 'ASSIST_APP_URL', group: 'Web access (CORS)', note: 'Optional: admin site address in the bus assistant QR code (otherwise DEPLOYED_URL)' },
   { key: 'CODESPACE_URL', group: 'Web access (CORS)', note: 'Codespace admin site address (development)' },
   { key: 'SMS_PROVIDER', group: 'SMS (Arkesel)', note: 'Set to "arkesel" to send real SMS' },
   { key: 'ARKESEL_API_KEY', group: 'SMS (Arkesel)', note: 'From the Arkesel dashboard' },

@@ -15,16 +15,24 @@ const OPEN = ['Scheduled', 'In Progress', 'Delayed'];
 
 const hashOf = (pass) => crypto.createHash('sha256').update(String(pass)).digest('hex');
 
-// Where the assistant page lives (the admin website). ASSIST_APP_URL wins; in a
-// GitHub Codespace the admin dev server's forwarded address (port 5173);
-// otherwise CLIENT_URL.
+// Where the assistant page lives (the admin website), as phones must open it:
+// ASSIST_APP_URL if set; otherwise the deployed admin site (DEPLOYED_URL, the
+// same address allowed to sign in); in a GitHub Codespace the admin dev
+// server's forwarded address (port 5173); then CLIENT_URL / CODESPACE_URL.
+// A localhost address is only used when nothing else is set: another phone
+// can never open it.
+const isLocal = (url) => /^https?:\/\/(localhost|127\.|0\.0\.0\.0|\[::1\])/i.test(url);
+const clean = (url) => String(url || '').split(',')[0].trim().replace(/\/+$/, '');
 export function assistBaseUrl() {
-  if (process.env.ASSIST_APP_URL) return process.env.ASSIST_APP_URL.replace(/\/+$/, '');
+  if (process.env.ASSIST_APP_URL) return clean(process.env.ASSIST_APP_URL);
+  const deployed = clean(process.env.DEPLOYED_URL);
+  if (deployed && !isLocal(deployed)) return deployed;
   if (process.env.CODESPACE_NAME) {
     const domain = process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN || 'app.github.dev';
     return `https://${process.env.CODESPACE_NAME}-5173.${domain}`;
   }
-  return String(process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim().replace(/\/+$/, '');
+  const candidates = [process.env.CLIENT_URL, process.env.CODESPACE_URL].map(clean).filter(Boolean);
+  return candidates.find((u) => !isLocal(u)) || candidates[0] || 'http://localhost:5173';
 }
 
 /** Makes a new pass for a trip (cancelling any earlier one). Returns { url, qrSvg, expiresAt }. */

@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MapContainer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet';
+import { CircleMarker, MapContainer, Marker, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { MapLayers } from '../../components/map/GeofenceMap.jsx';
 import { AlertTriangle, CheckCircle2, Clock, Navigation2, MapPin as MapPinIcon, SignalZero } from 'lucide-react';
 import usePageHeader from '../../hooks/usePageHeader.js';
 import { useSocketEvent } from '../../hooks/useSocket.js';
-import { getTrackingOverview } from '../../api/tracking.js';
+import { getTrackingOverview, getTrackingTrail } from '../../api/tracking.js';
 import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -17,7 +17,7 @@ import { PageLoader } from '../../components/ui/Spinner.jsx';
 import { gpsFreshness } from '../../lib/gps.js';
 import useNow from '../../hooks/useNow.js';
 import { formatPhone } from '../../lib/phone.js';
-import { sessionLabel } from '../../lib/sessions.js';
+import { sessionLabel, statusLabel } from '../../lib/sessions.js';
 import { ConnectionPair } from '../../components/buses/BusOnlineStatus.jsx';
 
 const busIcon = (color) =>
@@ -51,6 +51,50 @@ function FollowBus({ position, follow }) {
   return null;
 }
 
+// The trail: where the selected bus has been (dots) and where each child was
+// picked up or dropped, with the time.
+const TRAIL_COLOR = '#0d9488';
+const EVENT_COLOR = { 'Dropped off': '#059669', 'On board': '#2563eb', 'Not on board': '#dc2626' };
+const MAX_DOTS = 600;
+const timeOf = (at) => (at ? new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '');
+function BusTrail({ trail, session }) {
+  const points = (trail?.path || []).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+  if (!points.length && !trail?.events?.length) return null;
+  const line = points.map((p) => [p.lat, p.lng]);
+  // Long trips: every nth dot, so the map stays quick (the line still shows it all).
+  const step = Math.max(1, Math.ceil(points.length / MAX_DOTS));
+  const dots = points.filter((_, i) => i % step === 0 || i === points.length - 1);
+  return (
+    <>
+      {line.length > 1 && <Polyline positions={line} pathOptions={{ color: TRAIL_COLOR, weight: 3, opacity: 0.45 }} />}
+      {dots.map((p, i) => (
+        <CircleMarker
+          key={`d${i}`}
+          center={[p.lat, p.lng]}
+          radius={3}
+          pathOptions={{ color: TRAIL_COLOR, weight: 1, fillColor: TRAIL_COLOR, fillOpacity: 0.8 }}
+        >
+          <Tooltip direction="top">Bus passed here at {timeOf(p.at)}</Tooltip>
+        </CircleMarker>
+      ))}
+      {(trail?.events || []).map((e) => (
+        <CircleMarker
+          key={`e${e.studentId}`}
+          center={[e.lat, e.lng]}
+          radius={8}
+          pathOptions={{ color: 'white', weight: 2, fillColor: EVENT_COLOR[e.status] || TRAIL_COLOR, fillOpacity: 1 }}
+        >
+          <Tooltip direction="top">
+            <strong>{e.name}</strong>
+            <br />
+            {statusLabel(session, e.status)} at {timeOf(e.at)}
+          </Tooltip>
+        </CircleMarker>
+      ))}
+    </>
+  );
+}
+
 // Dragging the map means the admin wants to look around: stop following.
 function StopFollowOnDrag({ onDrag }) {
   useMapEvents({ dragstart: onDrag });
@@ -80,7 +124,23 @@ export default function LiveTracking() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
+  // Trail of the selected bus: loaded once, then grown live from positions.
+  const { data: trail } = useQuery({
+    queryKey: ['tracking-trail', selectedTripId],
+    queryFn: () => getTrackingTrail(selectedTripId),
+    enabled: Boolean(selectedTripId),
+    refetchInterval: 60000,
+  });
+  useSocketEvent('trip:studentUpdate', ({ tripId }) => {
+    if (tripId === selectedTripId) queryClient.invalidateQueries({ queryKey: ['tracking-trail', tripId] });
+  });
+
   useSocketEvent('bus:location', ({ tripId, location, source }) => {
+    if (tripId === selectedTripId && Number.isFinite(location?.lat)) {
+      queryClient.setQueryData(['tracking-trail', tripId], (old) =>
+        old ? { ...old, path: [...(old.path || []), { lat: location.lat, lng: location.lng, at: location.updatedAt }] } : old
+      );
+    }
     setLiveBuses((prev) =>
       prev.map((b) => (b.tripId === tripId ? { ...b, liveLocation: location, gpsSignal: 'ok', busOnline: true, locationSource: source || b.locationSource } : b))
     );
@@ -171,6 +231,7 @@ export default function LiveTracking() {
                 <MapLayers />
                 <FollowBus position={selectedPos} follow={follow} />
                 <StopFollowOnDrag onDrag={() => setFollow(false)} />
+                {selected && <BusTrail trail={trail} session={selected.session} />}
                 {filtered.map((b) => {
                   const pos = toLatLng(b.liveLocation);
                   if (!pos) return null;
@@ -195,6 +256,9 @@ export default function LiveTracking() {
               <LegendRow color={MARKER.delayed} label="Live, trip delayed" />
               <LegendRow color={MARKER.stale} label="Last seen 2-10 min ago" />
               <LegendRow color={MARKER.lost} label="No GPS for 10+ min" />
+              <LegendRow color={TRAIL_COLOR} label="Trail: where the bus passed" />
+              <LegendRow color={EVENT_COLOR['Dropped off']} label="Child dropped here (tap for time)" />
+              <LegendRow color={EVENT_COLOR['On board']} label="Child picked up here" />
             </div>
           </Card>
 
