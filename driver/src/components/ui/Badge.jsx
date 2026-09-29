@@ -6,7 +6,7 @@ const TONES = {
   danger: { bg: colors.red50, text: colors.red600 },
   warning: { bg: colors.amber50, text: colors.amber700 },
   neutral: { bg: colors.slate100, text: colors.slate600 },
-  brand: { bg: 'rgba(255,255,255,0.18)', text: colors.white },
+  brand: { bg: 'rgba(255,255,255,0.18)', text: colors.onDark },
 };
 
 export default function Badge({ children, tone = 'success', style }) {

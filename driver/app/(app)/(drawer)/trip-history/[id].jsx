@@ -85,7 +85,7 @@ export default function TripHistoryDetail() {
             broadcasts.map((b, index) => (
               <View key={b._id || index} style={[styles.broadcastRow, index < broadcasts.length - 1 && styles.studentRowBorder]}>
                 <View style={styles.broadcastIcon}>
-                  <Mail size={16} color={colors.navy} />
+                  <Mail size={16} color={colors.ink} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.studentName}>{b.reason}</Text>

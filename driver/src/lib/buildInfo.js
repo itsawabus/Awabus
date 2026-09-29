@@ -3,7 +3,7 @@
 // CODE_LABEL with each driver-app change; if a phone still shows an older
 // label, it is running an older bundle (an installed APK, or Expo not
 // restarted with --clear).
-export const CODE_LABEL = '2026-09-30 · accurate trail';
+export const CODE_LABEL = '2026-09-30 · dark mode';
 
 // The server this build sends to (EXPO_PUBLIC_API_URL is baked in when Expo
 // bundles the app).

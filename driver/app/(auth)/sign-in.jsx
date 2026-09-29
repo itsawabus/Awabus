@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   },
   bannerError: {
     backgroundColor: colors.red50,
-    borderColor: '#fecaca',
+    borderColor: colors.redBorder,
   },
   bannerNeutral: {
     backgroundColor: colors.slate50,

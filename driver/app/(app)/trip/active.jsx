@@ -275,15 +275,7 @@ export default function ActiveTrip() {
             </Text>
           </Text>
           <Text style={styles.dateText}>{formatDate(trip.date)}</Text>
-          <Pressable onPress={() => router.push('/trip/assistant')} style={styles.assistBtn} accessibilityRole="button">
-            <QrCode size={16} color={colors.brand600} />
-            <Text style={styles.assistBtnText}>Bus assistant QR code</Text>
-          </Pressable>
-          {helpers.length ? (
-            helpers.map((h) => <AssistantLine key={h.name} assistant={h} style={{ marginTop: 6 }} />)
-          ) : (
-            <Text style={styles.noAssistant}>No bus assistant connected</Text>
-          )}
+          <AssistantStatusBox helpers={helpers} onOpen={() => router.push('/trip/assistant')} />
         </Card>
 
         <Card>
@@ -357,7 +349,7 @@ export default function ActiveTrip() {
 
         {nextUp && !searching ? (
           <View style={styles.nextCard}>
-            <Navigation size={18} color={colors.white} />
+            <Navigation size={18} color={colors.onDark} />
             <View style={{ flex: 1 }}>
               <Text style={styles.nextLabel}>{trip.session === 'evening' ? 'Next drop-off' : trip.session === 'morning' ? 'Next pick-up' : 'Next'}</Text>
               <Text style={styles.nextName}>
@@ -372,7 +364,7 @@ export default function ActiveTrip() {
                 accessibilityRole="button"
                 accessibilityLabel={`Directions to ${nextUp.p.student?.firstName}'s home`}
               >
-                <CornerUpRight size={16} color={colors.navy} />
+                <CornerUpRight size={16} color={colors.ink} />
                 <Text style={styles.nextDirectionsText}>Directions</Text>
               </Pressable>
             ) : null}
@@ -556,7 +548,7 @@ function StudentRow({ p, photo, distance, session, isOnline, onSet, onCall, onMe
     return (
       <View style={[styles.studentRow, styles.studentRowMuted]}>
         <Avatar name={name} src={photo} size="sm" style={{ marginRight: 10 }} />
-        <View style={{ flex: 1 }}>
+        <View style={styles.info}>
           <Text style={[styles.studentName, styles.mutedName]}>{name}</Text>
           <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
           {extra}
@@ -569,7 +561,7 @@ function StudentRow({ p, photo, distance, session, isOnline, onSet, onCall, onMe
     return (
       <View style={styles.studentRow}>
         <Avatar name={name} src={photo} size="sm" style={{ marginRight: 10 }} />
-        <View style={{ flex: 1 }}>
+        <View style={styles.info}>
           <Text style={styles.studentName}>{name}</Text>
           <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
           {extra}
@@ -585,7 +577,7 @@ function StudentRow({ p, photo, distance, session, isOnline, onSet, onCall, onMe
     return (
       <View style={styles.studentRow}>
         <Avatar name={name} src={photo} size="sm" style={{ marginRight: 10 }} />
-        <View style={{ flex: 1 }}>
+        <View style={styles.info}>
           <Text style={styles.studentName}>{name}</Text>
           <Text style={styles.onBoardText}>{w.board}{when}</Text>
           <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
@@ -598,7 +590,7 @@ function StudentRow({ p, photo, distance, session, isOnline, onSet, onCall, onMe
   return (
     <View style={styles.studentRow}>
       <Avatar name={name} src={photo} size="sm" style={{ marginRight: 10 }} />
-      <View style={{ flex: 1 }}>
+      <View style={styles.info}>
         <Text style={styles.studentName}>{name}</Text>
         {status === 'Not on board' ? <Text style={styles.notHereText}>{w.notHere}{when}</Text> : <Text style={styles.waitingText}>{w.waiting}</Text>}
         <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
@@ -624,6 +616,50 @@ function SelectableRow({ selecting, isSelected, onToggle, children }) {
           {isSelected ? <CheckCircle2 size={22} color={colors.brand600} /> : <Circle size={22} color={colors.slate300} />}
         </View>
       ) : null}
+    </Pressable>
+  );
+}
+
+// The bus assistant on this trip: connected (green), gone quiet (amber, with
+// a button to show the QR code again so they can scan and reconnect), or none yet.
+function AssistantStatusBox({ helpers, onOpen }) {
+  const connected = helpers.filter((h) => h.connected);
+  const quiet = helpers.filter((h) => !h.connected);
+  if (connected.length) {
+    return (
+      <View style={[styles.assistBox, styles.assistOk]}>
+        {connected.map((h) => (
+          <AssistantLine key={h.name} assistant={h} />
+        ))}
+        {quiet.map((h) => (
+          <AssistantLine key={h.name} assistant={h} style={{ marginTop: 4 }} />
+        ))}
+        <Pressable onPress={onOpen} hitSlop={8} accessibilityRole="button" style={styles.assistLink}>
+          <QrCode size={14} color={colors.brand600} />
+          <Text style={styles.assistBtnText}>QR code</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  if (quiet.length) {
+    return (
+      <View style={[styles.assistBox, styles.assistWarn]}>
+        {quiet.map((h) => (
+          <AssistantLine key={h.name} assistant={h} />
+        ))}
+        <Text style={styles.assistWarnText}>They may have lost their connection or closed the page.</Text>
+        <Pressable onPress={onOpen} style={({ pressed }) => [styles.assistAgainBtn, pressed && { opacity: 0.8 }]} accessibilityRole="button">
+          <QrCode size={16} color={colors.onDark} />
+          <Text style={styles.assistAgainText}>Show QR code again</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  return (
+    <Pressable onPress={onOpen} style={styles.assistBtn} accessibilityRole="button">
+      <QrCode size={16} color={colors.brand600} />
+      <Text style={styles.assistBtnText}>Bus assistant QR code</Text>
+      <Text style={styles.noAssistant}> · no assistant connected</Text>
     </Pressable>
   );
 }
@@ -672,7 +708,7 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: colors.amber50,
     borderWidth: 1,
-    borderColor: '#fcd34d',
+    borderColor: colors.warnBorder,
     borderRadius: radii.lg,
     padding: 12,
   },
@@ -681,17 +717,24 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', color: colors.slate400 },
   progressText: { fontSize: 13, fontWeight: '800', color: colors.emerald700 },
   progressTrack: { height: 8, borderRadius: 4, backgroundColor: colors.slate200, overflow: 'hidden' },
-  progressFill: { position: 'absolute', left: 0, top: 0, height: '100%', backgroundColor: colors.navy, borderRadius: 4 },
+  progressFill: { position: 'absolute', left: 0, top: 0, height: '100%', backgroundColor: colors.primary, borderRadius: 4 },
   progressOnBoard: { position: 'absolute', left: 0, top: 0, height: '100%', backgroundColor: colors.brand600, opacity: 0.35, borderRadius: 4 },
   progressDetail: { marginTop: 6, fontSize: 12, color: colors.slate500 },
-  nextCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.navy, borderRadius: radii.xl, padding: 14 },
+  nextCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.primary, borderRadius: radii.xl, padding: 14 },
   nextLabel: { color: colors.slate300, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-  nextName: { color: colors.white, fontSize: 16, fontWeight: '800', marginTop: 2 },
+  nextName: { color: colors.onDark, fontSize: 16, fontWeight: '800', marginTop: 2 },
   listLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   listLinkText: { color: colors.brand600, fontSize: 13, fontWeight: '700' },
   assistBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, alignSelf: 'flex-start' },
   assistBtnText: { color: colors.brand600, fontSize: 13, fontWeight: '700' },
-  noAssistant: { marginTop: 6, fontSize: 12, color: colors.slate400 },
+  noAssistant: { fontSize: 12, color: colors.slate400 },
+  assistBox: { marginTop: 10, borderRadius: radii.lg, padding: 10, borderWidth: 1 },
+  assistOk: { backgroundColor: colors.emerald50, borderColor: colors.emerald600 },
+  assistWarn: { backgroundColor: colors.amber50, borderColor: colors.warnBorder },
+  assistWarnText: { marginTop: 4, fontSize: 12, color: colors.amber800 },
+  assistLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, alignSelf: 'flex-start' },
+  assistAgainBtn: { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.primary, borderRadius: radii.lg, paddingVertical: 10 },
+  assistAgainText: { color: colors.onDark, fontWeight: '800', fontSize: 14 },
   selectedRow: { borderRadius: radii.xl, borderWidth: 2, borderColor: colors.brand600 },
   selectMark: { position: 'absolute', top: 8, right: 8 },
   selectBar: { borderTopWidth: 1, borderTopColor: colors.slate200, backgroundColor: colors.white, paddingHorizontal: 16, paddingTop: 10, gap: 10 },
@@ -719,7 +762,7 @@ const styles = StyleSheet.create({
   dirLink: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   dirLinkText: { fontSize: 12, fontWeight: '800', color: colors.brand600 },
   nextDirections: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.white, borderRadius: radii.lg, paddingHorizontal: 10, paddingVertical: 8 },
-  nextDirectionsText: { fontSize: 13, fontWeight: '800', color: colors.navy },
+  nextDirectionsText: { fontSize: 13, fontWeight: '800', color: colors.ink },
   distanceText: { marginTop: 2, fontSize: 12, fontWeight: '700', color: colors.slate600 },
   callText: { marginTop: 2, fontSize: 12, fontWeight: '800' },
   searchInput: {
@@ -734,6 +777,8 @@ const styles = StyleSheet.create({
   },
   studentRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap', // buttons drop below the name when it needs the room
+    rowGap: 10,
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: colors.white,
@@ -751,9 +796,10 @@ const styles = StyleSheet.create({
   absentText: { fontSize: 13, fontWeight: '700', color: colors.slate400 },
   studentRowMuted: { backgroundColor: colors.slate50 },
   mutedName: { color: colors.slate400 },
-  actions: { flexDirection: 'row', gap: 8 },
-  smallBtn: { backgroundColor: colors.navy, borderRadius: radii.lg, paddingHorizontal: 14, paddingVertical: 9 },
-  smallBtnText: { color: colors.white, fontWeight: '800', fontSize: 13 },
+  actions: { flexDirection: 'row', gap: 8, marginLeft: 'auto' },
+  info: { flex: 1, minWidth: 150 },
+  smallBtn: { backgroundColor: colors.primary, borderRadius: radii.lg, paddingHorizontal: 14, paddingVertical: 9 },
+  smallBtnText: { color: colors.onDark, fontWeight: '800', fontSize: 13 },
   smallBtnGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.slate200 },
   smallBtnGhostText: { color: colors.slate600 },
   emptyListText: { textAlign: 'center', color: colors.slate400, paddingVertical: 20, fontSize: 13 },
@@ -774,6 +820,6 @@ const styles = StyleSheet.create({
   summaryValue: { color: colors.slate800, fontWeight: '700', fontSize: 14 },
   warningBox: { marginTop: 14, backgroundColor: colors.amber50, borderRadius: radii.lg, padding: 12 },
   warningText: { fontSize: 13, color: colors.amber800 },
-  dangerBox: { backgroundColor: '#fef2f2' },
-  dangerText: { fontSize: 13, fontWeight: '700', color: '#b91c1c' },
+  dangerBox: { backgroundColor: colors.red50 },
+  dangerText: { fontSize: 13, fontWeight: '700', color: colors.red700 },
 });

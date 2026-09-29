@@ -8,7 +8,7 @@ export default function Switch({ value, onValueChange, disabled }) {
       onValueChange={onValueChange}
       disabled={disabled}
       trackColor={{ false: colors.slate300, true: colors.brand600 }}
-      thumbColor={Platform.OS === 'android' ? colors.white : undefined}
+      thumbColor={Platform.OS === 'android' ? colors.onDark : undefined}
       ios_backgroundColor={colors.slate300}
     />
   );

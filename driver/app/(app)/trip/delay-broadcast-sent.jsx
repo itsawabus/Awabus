@@ -14,7 +14,7 @@ export default function BroadcastSent() {
     <View style={{ flex: 1 }}>
       <Header title="Delay broadcast" back />
       <View style={styles.content}>
-        <CheckCircle2 size={64} color={colors.navy} />
+        <CheckCircle2 size={64} color={colors.ink} />
         <Text style={styles.title}>Broadcast sent</Text>
         <Text style={styles.subtitle}>Parents have been notified about the delay.</Text>
 
