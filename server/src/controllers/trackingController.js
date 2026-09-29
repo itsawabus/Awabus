@@ -3,6 +3,7 @@ import Bus from '../models/Bus.js';
 import Trip from '../models/Trip.js';
 import { closeStaleTrips, LIVE_TRIP_FILTER } from '../services/staleTrips.js';
 import { assistantsWithStatus } from '../services/assistPass.js';
+import { assistantLocationState } from '../services/busPosition.js';
 
 const statusFromBus = (bus) => {
   if (bus.gpsSignal === 'lost') return 'GPS Signal Lost';
@@ -45,6 +46,8 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
       locationSource: t.locationSource || 'driver',
       // The bus assistant (teacher) helping on this trip: connected or not.
       assistants: assistantsWithStatus(t),
+      // Their "Share my location as backup" switch: off / standing by / covering...
+      assistantLocation: assistantLocationState(t),
       assistantName: t.assistantLocation?.name || '',
       driverSeenAt: t.driverSeenAt,
     }));
@@ -100,5 +103,6 @@ export const getTrackingTripDetail = asyncHandler(async (req, res) => {
   const data = trip.toObject();
   data.driverOnline = Boolean(trip.driver?.online);
   data.busOnline = Boolean(trip.bus?.online);
+  data.assistantLocationState = assistantLocationState(trip);
   res.json({ success: true, data });
 });

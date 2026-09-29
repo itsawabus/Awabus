@@ -149,6 +149,7 @@ export default function LiveTracking() {
   // instead of waiting for the next 15-second refresh.
   const reload = () => queryClient.invalidateQueries({ queryKey: ['tracking-overview'] });
   useSocketEvent('trip:started', reload);
+  useSocketEvent('trip:assistLocation', reload);
   useSocketEvent('trip:ended', reload);
 
   // Every bus gets its GPS freshness, re-worked out as time passes (useNow).
@@ -279,6 +280,7 @@ export default function LiveTracking() {
                   {selected.driver ? `${selected.driver.firstName} ${selected.driver.lastName}` : '—'}
                 </p>
                 <p className="text-sm text-slate-400">Driver · {formatPhone(selected.driver?.phone)}</p>
+                <AssistantLocationLine info={selected.assistantLocation} />
                 {(selected.assistants || []).map((a) => (
                   <p key={a.name} className="mt-1 flex items-center gap-1.5 text-sm">
                     <span className={`h-2 w-2 rounded-full ${a.connected ? 'bg-emerald-500' : 'bg-slate-400'}`} />
@@ -322,6 +324,30 @@ export default function LiveTracking() {
         </div>
       )}
     </div>
+  );
+}
+
+const ASSIST_LOCATION = {
+  standby: { dot: 'bg-emerald-500', text: 'on, standing by (the driver\'s phone is reporting)' },
+  covering: { dot: 'bg-amber-500', text: 'on, showing the bus now (the driver\'s phone is not reporting)' },
+  not_on_bus: { dot: 'bg-red-500', text: 'on, but their phone is not near the bus, so it is not used' },
+  off: { dot: 'bg-slate-400', text: 'off' },
+};
+
+/** The bus assistant's "Share my location as backup" switch. */
+export function AssistantLocationLine({ info }) {
+  if (!info || info.state === 'none') return null;
+  const look = ASSIST_LOCATION[info.state] || ASSIST_LOCATION.off;
+  const when = info.state === 'off' && info.at ? ` since ${new Date(info.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : '';
+  return (
+    <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
+      <span className={`h-2 w-2 shrink-0 rounded-full ${look.dot}`} />
+      <span>
+        Assistant{info.name ? ` ${info.name}` : ''}&apos;s backup location: {look.text}
+        {when}
+        {info.quiet && info.state === 'off' ? ' (their page stopped sending)' : ''}
+      </span>
+    </p>
   );
 }
 

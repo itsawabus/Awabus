@@ -25,6 +25,7 @@ import {
   getDriverNotifications,
   deleteDriverNotifications,
   reportAppCrash,
+  getTripPhotos,
 } from '../controllers/driverAppController.js';
 import { protectDriver } from '../middleware/auth.js';
 import { authLimits } from '../middleware/rateLimit.js';
@@ -48,6 +49,7 @@ router.post('/notifications/delete', protectDriver, deleteDriverNotifications);
 router.get('/trips/today', protectDriver, getTodaysTrip);
 router.get('/trips', protectDriver, getTripHistory);
 router.get('/trips/:id', protectDriver, getTripByIdForDriver);
+router.get('/trips/:id/photos', protectDriver, getTripPhotos);
 router.post('/trips/:id/start', protectDriver, startTrip);
 router.post('/trips/:id/end', protectDriver, endTrip);
 router.post('/trips/:id/location', protectDriver, pushLocation);

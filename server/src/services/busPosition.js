@@ -81,7 +81,7 @@ export async function driverReading({ trip, location, io, school }) {
  */
 export async function assistantReading({ trip, location, accuracy, name, io, school }) {
   const now = Date.now();
-  const assistantLocation = { ...location, accuracy: Number.isFinite(accuracy) ? accuracy : null, name };
+  const assistantLocation = { ...location, accuracy: Number.isFinite(accuracy) ? accuracy : null, name, sharing: true, stoppedAt: null };
   const set = { assistantLocation };
   const onBus = assistantNearDriver(trip.driverLocation, trip.driverSeenAt, assistantLocation, now);
   if (onBus !== null) set.assistantOnBus = onBus;
@@ -94,4 +94,26 @@ export async function assistantReading({ trip, location, accuracy, name, io, sch
   if (Number.isFinite(accuracy) && accuracy > MAX_ASSIST_ACCURACY_M) return { used: false, reason: 'weak_gps' };
   await publishBusLocation({ trip, location, source: 'assistant', io, school });
   return { used: true, reason: 'backup' };
+}
+
+// The assistant's backup location counts as off when nothing came for this long
+// (page closed, screen off, or the switch turned off without reaching us).
+export const ASSIST_LOCATION_QUIET_MS = 60 * 1000;
+
+/**
+ * The bus assistant's "Share my location as backup", for the admin:
+ *   { state: 'none' | 'off' | 'standby' | 'covering' | 'not_on_bus', name, at }
+ *   none: never switched on on this trip; off: switched off or gone quiet;
+ *   standby: on, the driver's phone is reporting; covering: showing the bus
+ *   now; not_on_bus: on, but too far from the driver's phone to be used.
+ */
+export function assistantLocationState(trip, now = Date.now()) {
+  const a = trip.assistantLocation;
+  if (!a || (!a.updatedAt && !a.stoppedAt)) return { state: 'none', name: '', at: null };
+  const name = a.name || '';
+  if (a.sharing === false) return { state: 'off', name, at: a.stoppedAt || a.updatedAt };
+  if (!recent(a.updatedAt, ASSIST_LOCATION_QUIET_MS, now)) return { state: 'off', name, at: a.updatedAt, quiet: true };
+  if (trip.locationSource === 'assistant') return { state: 'covering', name, at: a.updatedAt };
+  if (trip.assistantOnBus === false) return { state: 'not_on_bus', name, at: a.updatedAt };
+  return { state: 'standby', name, at: a.updatedAt };
 }

@@ -46,9 +46,11 @@ export default function useBackupLocation(api, pass, live) {
   const toggle = useCallback(() => {
     setOn((was) => {
       writeOn(pass, !was);
+      // Tell the school straight away when it is turned off.
+      if (was) api.delete('/assist/location').catch(() => {});
       return !was;
     });
-  }, [pass]);
+  }, [pass, api]);
 
   const send = useCallback(
     async (pos) => {

@@ -23,6 +23,8 @@ import { formatDate } from '../../../src/lib/utils.js';
 import { colors, radii } from '../../../src/lib/theme.js';
 import { runWords } from '../../../src/lib/runs.js';
 import { busLabel } from '../../../src/lib/bus.js';
+import { useTripPhotos } from '../../../src/hooks/useTripPhotos.js';
+import Avatar from '../../../src/components/ui/Avatar.jsx';
 
 export default function Home() {
   const queryClient = useQueryClient();
@@ -48,6 +50,7 @@ export default function Home() {
   // this one. (This screen stays loaded behind others; checking only when it
   // is in view stops background refreshes from pulling the driver away.)
   const live = trip?.status === 'In Progress' || trip?.status === 'Delayed';
+  const photos = useTripPhotos(trip?._id);
   useFocusEffect(
     useCallback(() => {
       if (live) router.replace('/trip/active');
@@ -220,6 +223,7 @@ export default function Home() {
         <View style={styles.studentList}>
           {progress.map((p) => (
             <View key={p.student?._id} style={styles.studentRow}>
+              <Avatar name={p.student ? `${p.student.firstName} ${p.student.lastName}` : ''} src={photos[p.student?._id]} size="sm" style={{ marginRight: 10 }} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.studentName}>{p.student ? `${p.student.firstName} ${p.student.lastName}` : 'Student'}</Text>
                 <StudentMeta student={p.student} onCall={callParent} onMessage={(student) => setMessageTo({ tripId: trip._id, student })} />

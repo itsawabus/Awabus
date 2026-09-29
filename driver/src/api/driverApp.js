@@ -79,3 +79,6 @@ export const stopAssistPass = (tripId) => apiClient.delete(`/driver-app/trips/${
 // A crash noted on this phone (src/lib/crashLog.js), for the System page.
 export const sendCrashReport = (crash) =>
   apiClient.post('/driver-app/crash-report', { ...crash, code: CODE_LABEL }).then((r) => r.data);
+
+// Students' photos for a trip ({ studentId: photo }), fetched once per trip.
+export const getTripPhotos = (tripId) => apiClient.get(`/driver-app/trips/${tripId}/photos`).then((r) => r.data.data || {});
