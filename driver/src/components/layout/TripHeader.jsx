@@ -1,73 +1,51 @@
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radii, themed } from '../../lib/theme.js';
+import { themed } from '../../lib/theme.js';
 import { formatClock } from '../../lib/utils.js';
 import ThemeButton from '../ThemeButton.jsx';
 
-export default function TripHeader({ status, isOnline, subtitle, elapsedSeconds }) {
+// Good morning / afternoon / evening, by the phone's clock.
+export function greeting(date = new Date()) {
+  const h = date.getHours();
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+}
+
+// The bar's colour is the connection status: green while the network is good,
+// yellow when it is lost or poor.
+const LOOK = {
+  ok: { bg: '#15803d', text: '#ffffff' },
+  poor: { bg: '#facc15', text: '#422006' },
+};
+
+export default function TripHeader({ driverName, networkOk = true, elapsedSeconds }) {
   const insets = useSafeAreaInsets();
+  const look = networkOk ? LOOK.ok : LOOK.poor;
   return (
-    <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+    <View
+      style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: look.bg }]}
+      testID="trip-header"
+      accessibilityLabel={networkOk ? 'Network good' : 'Network poor or lost'}
+    >
       <View style={styles.row}>
-        <ThemeButton style={{ marginLeft: -8, marginRight: 4, marginTop: -4 }} />
+        <ThemeButton color={look.text} style={{ marginLeft: -8, marginRight: 4 }} />
         <View style={{ flex: 1 }}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>{status}</Text>
-            <View style={[styles.pill, { backgroundColor: isOnline ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)' }]}>
-              <Text style={styles.pillText}>{isOnline ? 'DRIVER ONLINE' : 'DRIVER OFFLINE'}</Text>
-            </View>
-          </View>
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {subtitle}
-          </Text>
+          <Text style={[styles.hello, { color: look.text }]}>{greeting()}{driverName ? ',' : ''}</Text>
+          {driverName ? (
+            <Text style={[styles.title, { color: look.text }]} numberOfLines={1}>
+              {driverName}
+            </Text>
+          ) : null}
         </View>
-        <Text style={styles.timer}>{formatClock(elapsedSeconds)}</Text>
+        <Text style={[styles.timer, { color: look.text }]}>{formatClock(elapsedSeconds)}</Text>
       </View>
     </View>
   );
 }
 
 const styles = themed(() => ({
-  header: {
-    backgroundColor: colors.navy,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.onDark,
-  },
-  pill: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: radii.full,
-  },
-  pillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: colors.onDark,
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    marginTop: 2,
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-  },
-  timer: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.onDark,
-    fontVariant: ['tabular-nums'],
-  },
+  header: { paddingHorizontal: 16, paddingBottom: 14 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  hello: { fontSize: 14, fontWeight: '700', opacity: 0.9 },
+  title: { fontSize: 20, fontWeight: '800' },
+  timer: { fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
 }));

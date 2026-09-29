@@ -5,7 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useStayAwake } from '../../../src/hooks/useStayAwake.js';
-import { AlertTriangle, Car, CheckCircle2, Circle, CornerUpRight, ListChecks, MessageSquare, Navigation, QrCode, Search, X } from 'lucide-react-native';
+import { AlertTriangle, CheckCircle2, Circle, CornerUpRight, ListChecks, MessageSquare, Navigation, QrCode, Search, X } from 'lucide-react-native';
 import TripHeader from '../../../src/components/layout/TripHeader.jsx';
 import Card from '../../../src/components/ui/Card.jsx';
 import Button from '../../../src/components/ui/Button.jsx';
@@ -27,7 +27,6 @@ import { formatClock, timeAgo } from '../../../src/lib/utils.js';
 import { colors, radii, themed, themedMap } from '../../../src/lib/theme.js';
 import { runWords } from '../../../src/lib/runs.js';
 import { orderTrip, sectionsFor, matchesSearch, callInfo, formatDistance, CALL_IN_PROGRESS } from '../../../src/lib/nearest.js';
-import { BusOfflineBanner } from '../../../src/components/ConnectionStatus.jsx';
 import { busLabel } from '../../../src/lib/bus.js';
 import { hasHome, openDirections } from '../../../src/lib/directions.js';
 import { useTripPhotos } from '../../../src/hooks/useTripPhotos.js';
@@ -43,6 +42,7 @@ export default function ActiveTrip() {
   const enqueue = useOfflineQueueStore((s) => s.enqueue);
   const vibrationEnabled = useUiStore((s) => s.vibration);
   const driverId = useAuthStore((s) => s.driver?.id);
+  const driverFullName = useAuthStore((s) => s.driver?.name || s.driver?.firstName);
   const queue = useOfflineQueueStore((s) => s.queue);
 
   const [elapsed, setElapsed] = useState(0);
@@ -70,7 +70,6 @@ export default function ActiveTrip() {
   }, [selecting]);
   // Position sent by the background tracker (src/components/BackgroundWork.jsx).
   const position = useLiveGpsStore((s) => s.position);
-  const gpsError = useLiveGpsStore((s) => s.error);
 
   const { data: trip, isLoading } = useQuery({
     queryKey: ['todays-trip'],
@@ -164,6 +163,10 @@ export default function ActiveTrip() {
   });
 
   const waiting = queue.filter((q) => q.tripId === trip?._id).length;
+  // Top bar: green while the network is good, yellow when it is lost or poor
+  // (no connection, or updates waiting that have not gone through for a minute).
+  const networkOk = isOnline && !(waiting > 0 && (!lastSyncAt || Date.now() - lastSyncAt > 60000));
+  const driverFirstName = trip?.driver?.firstName || String(driverFullName || '').split(' ')[0];
   const progress = trip?.studentProgress || [];
   // Students marked absent at roll call are not expected on the bus.
   const riding = progress.filter((p) => p.attendance !== 'Absent' && p.attendance !== 'Cancelled');
@@ -252,44 +255,16 @@ export default function ActiveTrip() {
 
   return (
     <View style={{ flex: 1 }}>
-      <TripHeader
-        status="Trip active"
-        isOnline={isOnline}
-        subtitle={`${trip.session ? `${runWords(trip.session).name} · ` : ''}${busLabel(trip.bus)}, ${trip.route?.name || ''}`}
-        elapsedSeconds={elapsed}
-      />
+      <TripHeader driverName={driverFirstName} networkOk={networkOk} elapsedSeconds={elapsed} />
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Pressable
-          onPress={() => router.push('/trip/driving')}
-          style={({ pressed }) => [styles.drivingButton, pressed && { opacity: 0.85 }]}
-          accessibilityRole="button"
-          accessibilityLabel="Driving mode"
-        >
-          <Car size={22} color={colors.onDark} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.drivingTitle}>Driving mode</Text>
-            <Text style={styles.drivingHint}>Big and simple: green when all is well, yellow if there is a problem</Text>
-          </View>
-        </Pressable>
-
-        {/* Only what the driver needs: sync status and the bus assistant. */}
+        {/* The bus assistant's QR code, and when the app last reached the school. */}
         <Card>
-          <Text style={styles.syncText}>
+          <AssistantStatusBox helpers={helpers} onOpen={() => router.push('/trip/assistant')} />
+          <Text style={[styles.syncText, { marginTop: 8 }]}>
             {waiting ? `${waiting} waiting to send · ` : ''}Last sync: {lastSyncAt ? timeAgo(lastSyncAt) : 'never'}
           </Text>
-          <AssistantStatusBox helpers={helpers} onOpen={() => router.push('/trip/assistant')} />
         </Card>
-
-        {gpsError ? (
-          <View style={styles.offlineBanner}>
-            <AlertTriangle size={16} color={colors.amber800} />
-            <Text style={styles.offlineText}>GPS is off: {gpsError} The school cannot see the bus until location is allowed.</Text>
-          </View>
-        ) : null}
-
-        {/* Location off (data is fine): the school can't see the bus. */}
-        {!gpsError && isOnline ? <BusOfflineBanner /> : null}
 
         {!isOnline && (
           <View style={styles.offlineBanner}>
@@ -659,9 +634,6 @@ const SummaryRow = ({ label, value }) => (
 );
 
 const styles = themed(() => ({
-  drivingButton: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.brand600, borderRadius: radii.lg, paddingHorizontal: 16, paddingVertical: 14 },
-  drivingTitle: { color: colors.onDark, fontSize: 17, fontWeight: '800' },
-  drivingHint: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 },
   scroll: { padding: 16, gap: 16, paddingBottom: 32 },
   syncText: { fontSize: 12, color: colors.slate400 },
   offlineBanner: {
