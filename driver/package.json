@@ -12,6 +12,7 @@
     "rebuild:ios": "expo prebuild --clean --platform ios && expo run:ios",
     "build:dev:android": "npx -y eas-cli@latest build --profile development --platform android",
     "build:preview:android": "node scripts/build-preview.mjs android",
+    "update:preview": "node scripts/update-preview.mjs",
     "build:dev:ios": "npx -y eas-cli@latest build --profile development --platform ios",
     "lint": "expo lint",
     "doctor": "expo-doctor",

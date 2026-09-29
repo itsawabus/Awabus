@@ -34,10 +34,6 @@ const FAQS = [
     a: 'Yes. While a trip is running the app keeps sending the bus position whichever screen you are on, as long as the app stays open.',
   },
   {
-    q: 'What is driving mode?',
-    a: 'On the trip screen, tap Driving mode for a big, simple screen: the next child and how far away. The whole screen is light green when the internet and location are working, and turns yellow (with a buzz) if something is wrong, such as no network or a weak GPS signal. Tap Exit to go back.',
-  },
-  {
     q: 'How do I switch between light and dark?',
     a: 'Tap the sun / moon button at the top left of any screen. It changes straight away. Settings > Theme can also follow your phone\'s own setting.',
   },

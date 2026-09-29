@@ -7,7 +7,7 @@ import { colors, currentScheme } from '../lib/theme.js';
  * Sun / moon button at the top left: switches between light and dark straight
  * away (no restart). Settings > Appearance can set it back to the phone's own.
  */
-export default function ThemeButton({ size = 20, style }) {
+export default function ThemeButton({ size = 20, style, color }) {
   useUiStore((s) => s.themeVersion);
   const setPref = useUiStore((s) => s.setPref);
   const dark = currentScheme() === 'dark';
@@ -19,7 +19,7 @@ export default function ThemeButton({ size = 20, style }) {
       accessibilityRole="button"
       accessibilityLabel={dark ? 'Switch to light theme' : 'Switch to dark theme'}
     >
-      {dark ? <Sun size={size} color={colors.onDark} /> : <Moon size={size} color={colors.onDark} />}
+      {dark ? <Sun size={size} color={color || colors.onDark} /> : <Moon size={size} color={color || colors.onDark} />}
     </Pressable>
   );
 }
