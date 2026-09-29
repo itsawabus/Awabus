@@ -177,7 +177,10 @@ export default function ActiveTrip() {
 
   // Nearest first, from the phone's position (or the last one the school has).
   // The order stays put while a dialog is open, so it never moves under a tap.
-  const busPos = position || trip?.liveLocation || null;
+  // A rough reading (indoors, no GPS) would shuffle the list: use the school's
+  // filtered position instead.
+  const phoneFixGood = position && !(Number.isFinite(position.accuracy) && position.accuracy > 100);
+  const busPos = (phoneFixGood ? position : null) || trip?.liveLocation || null;
   const frozen = Boolean(confirm || messageTo || selecting || groupMessage);
   const lastOrder = useRef({ order: [], bus: null });
   const ordered = useMemo(() => {

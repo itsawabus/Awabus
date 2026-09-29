@@ -49,8 +49,8 @@ export const startTrip = (tripId) => apiClient.post(`/driver-app/trips/${tripId}
 
 export const endTrip = (tripId) => apiClient.post(`/driver-app/trips/${tripId}/end`).then((r) => r.data.data);
 
-export const pushLocation = (tripId, { lat, lng, heading, recordedAt }) =>
-  apiClient.post(`/driver-app/trips/${tripId}/location`, { lat, lng, heading, recordedAt }).then((r) => r.data.data);
+export const pushLocation = (tripId, { lat, lng, heading, recordedAt, accuracy, speed }) =>
+  apiClient.post(`/driver-app/trips/${tripId}/location`, { lat, lng, heading, recordedAt, accuracy, speed }).then((r) => r.data.data);
 
 export const markAttendance = (tripId, studentId, { attendance, dropoffStatus }) =>
   apiClient

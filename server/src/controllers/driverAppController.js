@@ -580,10 +580,16 @@ export const pushLocation = asyncHandler(async (req, res) => {
   const shown = lastFromDriver ? new Date(lastFromDriver).getTime() : 0;
   if (recordedAt.getTime() < shown) return res.json({ success: true, data: trip.liveLocation, ignored: 'older than the last position' });
 
+  // How far off the phone says the reading may be, and its speed: used to
+  // ignore GPS wander (services/positionFilter.js).
+  const accuracy = Number(req.body.accuracy);
+  const speed = Number(req.body.speed);
   const location = {
     lat,
     lng,
     heading: Number.isFinite(heading) && heading >= 0 && heading <= 360 ? heading : 0,
+    accuracy: req.body.accuracy != null && Number.isFinite(accuracy) && accuracy >= 0 ? accuracy : null,
+    speed: req.body.speed != null && Number.isFinite(speed) && speed >= 0 ? speed : null,
     updatedAt: recordedAt,
   };
   // The driver's position always wins over the bus assistant's backup

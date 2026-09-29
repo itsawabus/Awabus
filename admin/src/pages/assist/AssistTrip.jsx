@@ -197,7 +197,10 @@ function AssistBoard({ pass, name, onChangeName }) {
   // a dialog is open, so nothing moves under a tap.
   const frozen = Boolean(confirm || messageTo || selecting || groupMessage);
   // The teacher's own position (when sharing) is the freshest view of where the bus is.
-  const ownFix = backup.on && backup.position && Date.now() - backup.position.at < 60000 && backup.state !== 'not_on_bus' ? backup.position : null;
+  const ownFix =
+    backup.on && backup.position && Date.now() - backup.position.at < 60000 && backup.state !== 'not_on_bus' && !(backup.position.accuracy > 100)
+      ? backup.position
+      : null;
   const bus = frozen ? lastOrder.current.bus : ownFix || trip.liveLocation || null;
   const ordered = orderTrip({ progress: rows, session: trip.session, bus, previous: lastOrder.current.order });
   lastOrder.current = { order: ordered.order, bus };

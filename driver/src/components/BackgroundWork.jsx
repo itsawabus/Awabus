@@ -11,7 +11,7 @@ import { useOfflineQueueStore } from '../store/offlineQueueStore.js';
 import { useConnectionStore } from '../store/connectionStore.js';
 import { useAuthStore } from '../store/authStore.js';
 import { useUiStore } from '../store/uiStore.js';
-import { startTripTracking, stopTripTracking, startErrorMessage, PUSH_EVERY_MS } from '../lib/backgroundLocation.js';
+import { startTripTracking, stopTripTracking, startErrorMessage, PUSH_EVERY_MS, USELESS_ACCURACY_M } from '../lib/backgroundLocation.js';
 
 // A new position goes to the school at most every PUSH_EVERY_MS (8 s)...
 // ...and at least this often while the trip runs, even when the bus is parked,
@@ -64,6 +64,8 @@ export default function BackgroundWork() {
   useEffect(() => {
     if (!position) return;
     useLiveGpsStore.getState().setPosition(position);
+    // Far too rough to say where the bus is (indoors, no GPS): not sent.
+    if (Number.isFinite(position.accuracy) && position.accuracy > USELESS_ACCURACY_M) return;
     if (sinceLastSend() >= PUSH_EVERY_MS) send(position);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position, tripId]);
@@ -76,7 +78,10 @@ export default function BackgroundWork() {
     }
     const timer = setInterval(() => {
       const last = useLiveGpsStore.getState().position;
-      const fixIsRecent = last && Date.now() - new Date(last.recordedAt || 0).getTime() < FIX_TRUSTED_MS;
+      const fixIsRecent =
+        last &&
+        Date.now() - new Date(last.recordedAt || 0).getTime() < FIX_TRUSTED_MS &&
+        !(Number.isFinite(last.accuracy) && last.accuracy > USELESS_ACCURACY_M);
       if (last && fixIsRecent && sinceLastSend() >= HEARTBEAT_MS) send({ ...last, recordedAt: new Date().toISOString() });
     }, 5000);
     return () => clearInterval(timer);

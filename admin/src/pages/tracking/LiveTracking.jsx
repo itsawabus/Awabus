@@ -51,6 +51,13 @@ function FollowBus({ position, follow }) {
   return null;
 }
 
+// Distance in metres between two { lat, lng } points.
+const metresApart = (a, b) => {
+  const rad = (d) => (d * Math.PI) / 180;
+  const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+};
+
 // The trail: where the selected bus has been (dots) and where each child was
 // picked up or dropped, with the time.
 const TRAIL_COLOR = '#0d9488';
@@ -137,9 +144,16 @@ export default function LiveTracking() {
 
   useSocketEvent('bus:location', ({ tripId, location, source }) => {
     if (tripId === selectedTripId && Number.isFinite(location?.lat)) {
-      queryClient.setQueryData(['tracking-trail', tripId], (old) =>
-        old ? { ...old, path: [...(old.path || []), { lat: location.lat, lng: location.lng, at: location.updatedAt }] } : old
-      );
+      // Only when the bus really moved (the server holds a standing bus still,
+      // so the same point arrives again): no pile of dots, no false trail.
+      queryClient.setQueryData(['tracking-trail', tripId], (old) => {
+        if (!old) return old;
+        const path = old.path || [];
+        const lastPoint = path[path.length - 1];
+        if (lastPoint && metresApart(lastPoint, location) < 20) return old;
+        if (Number.isFinite(location.accuracy) && location.accuracy > 50) return old;
+        return { ...old, path: [...path, { lat: location.lat, lng: location.lng, at: location.updatedAt }] };
+      });
     }
     setLiveBuses((prev) =>
       prev.map((b) => (b.tripId === tripId ? { ...b, liveLocation: location, gpsSignal: 'ok', busOnline: true, locationSource: source || b.locationSource } : b))
