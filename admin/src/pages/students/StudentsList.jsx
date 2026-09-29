@@ -216,7 +216,7 @@ export default function StudentsList() {
                     <Td>{s.classGrade}</Td>
                     <Td>{s.primaryGuardian ? s.primaryGuardian.fullName || `${s.primaryGuardian.firstName} ${s.primaryGuardian.lastName}` : '—'}</Td>
                     <Td>{s.primaryGuardian?.phone ? formatPhone(s.primaryGuardian.phone) : '—'}</Td>
-                    <Td>{s.bus?.plateNumber || s.bus?.name || '—'}</Td>
+                    <Td title={s.bus?.plateNumber ? `Plate: ${s.bus.plateNumber}` : undefined}>{s.bus?.name || s.bus?.plateNumber || '—'}</Td>
                     <Td>
                       {s.route?.name || '—'}
                       {s.rideSession && s.rideSession !== 'both' && (

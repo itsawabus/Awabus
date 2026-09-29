@@ -156,7 +156,7 @@ export default function StudentProfile() {
           <Card>
             <CardHeader title="Transit Association" />
             <div className="space-y-5 p-5">
-              <InfoRow label="Assigned Bus" value={student.bus ? `${student.bus.plateNumber} (${student.bus.name})` : '—'} />
+              <InfoRow label="Assigned Bus" value={student.bus ? `${student.bus.name} (${student.bus.plateNumber})` : '—'} />
               <InfoRow label="Assigned Route" value={student.route?.name} />
               <InfoRow
                 label="Assigned Driver"

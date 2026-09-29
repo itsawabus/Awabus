@@ -233,7 +233,7 @@ export default function AddStudent() {
             <Row label="Student Name" value={`${created.firstName} ${created.lastName}`} />
             <Row label="Student ID" value={created.studentCode} />
             <Row label="Assigned Route" value={created.route?.name || '—'} />
-            <Row label="Assigned Bus" value={created.bus ? `${created.bus.plateNumber} (${created.bus.name})` : 'Not assigned yet'} />
+            <Row label="Assigned Bus" value={created.bus ? `${created.bus.name} (${created.bus.plateNumber})` : 'Not assigned yet'} />
             <Row
               label="Primary Contact"
               value={created.primaryGuardian ? `${created.primaryGuardian.firstName} (${formatPhone(created.primaryGuardian.phone)})` : '—'}
