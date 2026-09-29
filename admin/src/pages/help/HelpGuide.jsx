@@ -163,9 +163,10 @@ export const GUIDE = [
     summary: 'The children who ride your buses, their parents or guardians, and where they live.',
     tasks: [
       {
-        title: 'Add a student (5 steps)',
+        title: 'Add a student (6 steps)',
         steps: [
           'Student information: name, date of birth, class.',
+          'Student photo (optional): upload a picture so the driver and bus assistant can recognise the child. Skip it with Continue; you can add one later from Edit Student.',
           'Parents & guardian: pick an existing parent (for brothers and sisters) or enter a new one. Delay messages from the driver are sent to this phone.',
           'Transport: pick the route (the bus and driver follow from it), and choose when the student rides: morning & evening, morning only or evening only. They are left off the trips of a run they don\'t ride.',
           'Home location: type the GhanaPost GPS address or pin the home on the map. The green circle is the geofence around the home. Siblings can share one home location.',
