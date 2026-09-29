@@ -21,6 +21,8 @@ import LanguageSelect from '../../components/students/LanguageSelect.jsx';
 import { DEFAULT_LANGUAGE } from '../../lib/languages.js';
 import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
 import PhoneInput from '../../components/ui/PhoneInput.jsx';
+import PhotoUpload from '../../components/ui/PhotoUpload.jsx';
+import { shrinkPhoto } from '../../lib/image.js';
 import { fromStoredPhone, isValidPhone, toLocalPhone } from '../../lib/phone.js';
 import { RADIUS_MAX, RADIUS_MIN, coordsError, digitsOnly, formatCoord, formatName, ifChanged, nameError, radiusError } from '../../lib/formats.js';
 import RideSessionPicker from '../../components/students/RideSessionPicker.jsx';
@@ -68,6 +70,7 @@ export default function EditStudent() {
             geofenceRadius: student.geofenceRadius || 200,
             rideSession: student.rideSession || 'both',
             arrivalCalls: student.arrivalCalls !== false,
+            profilePhotoUrl: student.profilePhotoUrl || '',
           }
         : null,
     [student]
@@ -136,7 +139,7 @@ export default function EditStudent() {
 
       <form
         noValidate
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           if (!isValidPhone(form.guardianPhone) || (form.secondContactPhone && !isValidPhone(form.secondContactPhone))) {
             setPhoneError('Phone numbers must be 10 digits starting with 0, e.g. 024 412 3456');
@@ -160,6 +163,7 @@ export default function EditStudent() {
           };
           setErrors(next);
           if (Object.values(next).some(Boolean)) return;
+          const photoChanged = (form.profilePhotoUrl ?? baseline.profilePhotoUrl) !== baseline.profilePhotoUrl;
           updateMutation.mutate({
             firstName: form.firstName,
             lastName: form.lastName,
@@ -179,6 +183,7 @@ export default function EditStudent() {
             geofenceRadius: Number(form.geofenceRadius),
             rideSession: form.rideSession || 'both',
             arrivalCalls: (form.arrivalCalls ?? baseline.arrivalCalls) !== false,
+            ...(photoChanged ? { profilePhotoUrl: await shrinkPhoto(form.profilePhotoUrl || '') } : {}),
           });
         }}
       >
@@ -188,6 +193,10 @@ export default function EditStudent() {
             <Card className="h-full">
               <CardHeader title="Student & School Info" />
               <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Label>Student Photo (optional)</Label>
+                  <PhotoUpload value={form.profilePhotoUrl ?? baseline.profilePhotoUrl} onChange={set('profilePhotoUrl')} />
+                </div>
                 <div>
                   <Label>Student ID</Label>
                   <Input disabled value={student.studentCode} />
