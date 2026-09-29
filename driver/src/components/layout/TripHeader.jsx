@@ -12,7 +12,7 @@ export default function TripHeader({ status, isOnline, subtitle, elapsedSeconds 
           <View style={styles.titleRow}>
             <Text style={styles.title}>{status}</Text>
             <View style={[styles.pill, { backgroundColor: isOnline ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)' }]}>
-              <Text style={styles.pillText}>{isOnline ? 'ONLINE' : 'OFFLINE'}</Text>
+              <Text style={styles.pillText}>{isOnline ? 'DRIVER ONLINE' : 'DRIVER OFFLINE'}</Text>
             </View>
           </View>
           <Text style={styles.subtitle} numberOfLines={1}>

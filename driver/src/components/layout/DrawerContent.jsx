@@ -15,14 +15,14 @@ import {
 } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore.js';
 import { reportSignOut } from '../../api/driverApp.js';
-import { useConnectionStore } from '../../store/connectionStore.js';
 import { colors, radii } from '../../lib/theme.js';
 import Avatar from '../ui/Avatar.jsx';
-import Badge from '../ui/Badge.jsx';
 import Button from '../ui/Button.jsx';
 import Modal from '../ui/Modal.jsx';
 import { useOfflineQueueStore } from '../../store/offlineQueueStore.js';
-import { useConnectionStatus } from '../ConnectionStatus.jsx';
+import { useQuery } from '@tanstack/react-query';
+import { getTodaysTrip } from '../../api/driverApp.js';
+import { busLabel } from '../../lib/bus.js';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Home (pre-trip)', icon: Home },
@@ -40,8 +40,9 @@ export default function DrawerContent(props) {
   const { driver, logout } = useAuthStore();
   const unsent = useOfflineQueueStore((st) => st.queue.length);
   const [confirmLogout, setConfirmLogout] = useState(false);
-  const isOnline = useConnectionStore((s) => s.isOnline);
-  const { busOnline } = useConnectionStatus();
+  // The bus by name, from today's trip (already loaded by the home screen).
+  const { data: trip } = useQuery({ queryKey: ['todays-trip'], queryFn: getTodaysTrip, enabled: Boolean(driver) });
+  const bus = busLabel(trip?.bus) || busLabel(driver?.assignedBus);
 
   const go = (path) => {
     props.navigation.closeDrawer();
@@ -53,17 +54,11 @@ export default function DrawerContent(props) {
       <DrawerContentScrollView {...props} contentContainerStyle={styles.scroll}>
         <View style={styles.topRow}>
           <Avatar name={driver?.name} src={driver?.profilePhotoUrl} size="md" />
-          <View style={styles.drawerBadges}>
-            <Badge tone={isOnline ? 'success' : 'neutral'} style={isOnline ? undefined : styles.offlineBadge}>
-              {isOnline ? 'Online' : 'Offline'}
-            </Badge>
-            <Badge tone={busOnline ? 'success' : 'warning'}>{busOnline ? 'Bus online' : 'Bus offline'}</Badge>
-          </View>
         </View>
 
         <Text style={styles.name}>{driver?.name || 'Driver'}</Text>
         <Text style={styles.role}>
-          Primary Driver{driver?.assignedBus ? ` • Bus ${driver.assignedBus.plateNumber}` : ''}
+          Primary Driver{bus ? ` • ${bus}` : ''}
         </Text>
 
         <View style={styles.divider} />

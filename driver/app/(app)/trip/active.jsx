@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BackHandler, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
-import { AlertTriangle, ListChecks, Navigation, Search, X } from 'lucide-react-native';
+import { AlertTriangle, CheckCircle2, Circle, ListChecks, MessageSquare, Navigation, QrCode, Search, X } from 'lucide-react-native';
 import TripHeader from '../../../src/components/layout/TripHeader.jsx';
 import Card from '../../../src/components/ui/Card.jsx';
 import Button from '../../../src/components/ui/Button.jsx';
@@ -13,6 +13,7 @@ import Modal from '../../../src/components/ui/Modal.jsx';
 import ConfirmDialog from '../../../src/components/ui/ConfirmDialog.jsx';
 import StudentMeta, { guardianName } from '../../../src/components/StudentMeta.jsx';
 import MessageParentSheet from '../../../src/components/MessageParentSheet.jsx';
+import GroupMessageSheet from '../../../src/components/GroupMessageSheet.jsx';
 import { formatPhone } from '../../../src/lib/phone.js';
 import { useLiveGpsStore } from '../../../src/store/liveGpsStore.js';
 import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
@@ -27,6 +28,7 @@ import { runWords } from '../../../src/lib/runs.js';
 import { orderTrip, sectionsFor, matchesSearch, callInfo, formatDistance, CALL_IN_PROGRESS } from '../../../src/lib/nearest.js';
 import BackgroundLocationBanner from '../../../src/components/BackgroundLocationBanner.jsx';
 import { BusOfflineBanner, useConnectionStatus } from '../../../src/components/ConnectionStatus.jsx';
+import { busLabel } from '../../../src/lib/bus.js';
 
 export default function ActiveTrip() {
   // The screen stays on while the trip screen is open, so the list can be read at a glance.
@@ -47,6 +49,24 @@ export default function ActiveTrip() {
   const [endOpen, setEndOpen] = useState(false);
   const [confirm, setConfirm] = useState(null); // pending "are you sure?" request
   const [messageTo, setMessageTo] = useState(null); // { tripId, student } for the message sheet
+  // Several students picked by holding a card: their status or a message in one go.
+  const [selected, setSelected] = useState([]); // student ids
+  const [groupMessage, setGroupMessage] = useState(null); // { tripId, session, students }
+  const selecting = selected.length > 0;
+  const toggleSelected = (id) => {
+    if (!id) return;
+    if (vibrationEnabled) Haptics.selectionAsync().catch(() => {});
+    setSelected((was) => (was.includes(id) ? was.filter((x) => x !== id) : [...was, id]));
+  };
+  // Android back button leaves selection first.
+  useEffect(() => {
+    if (!selecting) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSelected([]);
+      return true;
+    });
+    return () => sub.remove();
+  }, [selecting]);
   // Position sent by the background tracker (src/components/BackgroundWork.jsx).
   const position = useLiveGpsStore((s) => s.position);
   const gpsError = useLiveGpsStore((s) => s.error);
@@ -154,7 +174,7 @@ export default function ActiveTrip() {
   // Nearest first, from the phone's position (or the last one the school has).
   // The order stays put while a dialog is open, so it never moves under a tap.
   const busPos = position || trip?.liveLocation || null;
-  const frozen = Boolean(confirm || messageTo);
+  const frozen = Boolean(confirm || messageTo || selecting || groupMessage);
   const lastOrder = useRef({ order: [], bus: null });
   const ordered = useMemo(() => {
     const bus = frozen ? lastOrder.current.bus : busPos;
@@ -169,6 +189,51 @@ export default function ActiveTrip() {
     .filter((sec) => sec.rows.length);
   const nextUp = ordered.next[0];
 
+  // Selected students' rows, and which of them each step applies to.
+  const selectedRows = progress.filter((p) => selected.includes(p.student?._id));
+  const riderRow = (p) => p.attendance !== 'Absent' && p.attendance !== 'Cancelled';
+  const waitingRow = (p) => !p.dropoffStatus || p.dropoffStatus === 'Pending' || p.dropoffStatus === 'Boarding now';
+  const BULK = {
+    'On board': (p) => riderRow(p) && (waitingRow(p) || p.dropoffStatus === 'Not on board'),
+    'Dropped off': (p) => riderRow(p) && p.dropoffStatus === 'On board',
+    'Not on board': (p) => riderRow(p) && waitingRow(p),
+  };
+  const askBulk = (dropoffStatus) => {
+    const step = STEP[dropoffStatus];
+    const rows = selectedRows.filter(BULK[dropoffStatus]);
+    const skipped = selectedRows.length - rows.length;
+    if (!rows.length) {
+      setConfirm({
+        title: `None of them can be marked ${step.verb}`,
+        message: `Only students who are ${dropoffStatus === 'Dropped off' ? words.onBus : 'still waiting'} can be marked ${step.verb}.`,
+        confirmLabel: 'OK',
+        onConfirm: () => {},
+      });
+      return;
+    }
+    setConfirm({
+      title: `Mark ${rows.length} student${rows.length === 1 ? '' : 's'} as ${step.verb}?`,
+      message: `${rows.map((p) => p.student?.firstName).filter(Boolean).join(', ')}${skipped ? `\n${skipped} other${skipped === 1 ? '' : 's'} selected can't be marked ${step.verb} and will be left as they are.` : ''}`,
+      confirmLabel: step.label,
+      danger: step.danger,
+      onConfirm: async () => {
+        setSelected([]);
+        if (vibrationEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+        // One after another: the server saves each student's step on the same
+        // trip, so sending them all at once would make them clash.
+        for (const p of rows) {
+          useOfflineQueueStore.getState().dropScansFor(trip._id, p.student._id);
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            await statusMutation.mutateAsync({ studentId: p.student._id, dropoffStatus });
+          } catch {
+            // queued for later by the mutation's onError (offline)
+          }
+        }
+      },
+    });
+  };
+
   if (isLoading || !trip) return <PageLoader label="Loading trip..." />;
 
   return (
@@ -176,7 +241,7 @@ export default function ActiveTrip() {
       <TripHeader
         status="Trip active"
         isOnline={isOnline}
-        subtitle={`${trip.session ? `${runWords(trip.session).name} · ` : ''}${trip.bus?.plateNumber || ''}, ${trip.route?.name || ''}`}
+        subtitle={`${trip.session ? `${runWords(trip.session).name} · ` : ''}${busLabel(trip.bus)}, ${trip.route?.name || ''}`}
         elapsedSeconds={elapsed}
       />
 
@@ -184,7 +249,7 @@ export default function ActiveTrip() {
         <Card>
           <Text style={styles.infoLine}>
             <Text style={styles.infoLabel}>Bus: </Text>
-            <Text style={styles.infoValue}>{trip.bus?.plateNumber}</Text>
+            <Text style={styles.infoValue}>{busLabel(trip.bus)}</Text>
           </Text>
           <Text style={styles.infoLine}>
             <Text style={styles.infoLabel}>Driver: </Text>
@@ -193,6 +258,10 @@ export default function ActiveTrip() {
             </Text>
           </Text>
           <Text style={styles.dateText}>{formatDate(trip.date)}</Text>
+          <Pressable onPress={() => router.push('/trip/assistant')} style={styles.assistBtn} accessibilityRole="button">
+            <QrCode size={16} color={colors.brand600} />
+            <Text style={styles.assistBtnText}>Bus assistant QR code</Text>
+          </Pressable>
         </Card>
 
         <Card>
@@ -200,7 +269,7 @@ export default function ActiveTrip() {
             <View style={styles.statusLeft}>
               <View style={[styles.dot, { backgroundColor: isOnline ? colors.emerald600 : colors.slate400 }]} />
               <Text style={[styles.statusText, { color: isOnline ? colors.emerald700 : colors.slate500 }]}>
-                {isOnline ? 'Online' : 'Offline'}
+                {isOnline ? 'Driver online' : 'Driver offline'}
               </Text>
               <View style={[styles.dot, { marginLeft: 10, backgroundColor: busOnline ? colors.emerald600 : colors.amber500 }]} />
               <Text style={[styles.statusText, { color: busOnline ? colors.emerald700 : colors.amber700 }]}>
@@ -301,6 +370,7 @@ export default function ActiveTrip() {
               </Pressable>
             ) : null}
           </View>
+          <Text style={styles.orderNote}>{selecting ? 'Tap students to add or remove them.' : 'Hold a student to select several at once.'}</Text>
           {!busPos && ordered.next.length > 1 ? (
             <Text style={styles.orderNote}>Waiting for the bus position to put the nearest child first.</Text>
           ) : null}
@@ -311,8 +381,13 @@ export default function ActiveTrip() {
                   {sec.title} · {sec.rows.length}
                 </Text>
                 {sec.rows.map((r) => (
-                  <StudentRow
+                  <SelectableRow
                     key={r.p.student?._id}
+                    selecting={selecting}
+                    isSelected={selected.includes(r.p.student?._id)}
+                    onToggle={() => toggleSelected(r.p.student?._id)}
+                  >
+                  <StudentRow
                     p={r.p}
                     distance={sec.key === 'next' ? (r.metres != null ? `${formatDistance(r.metres)} away` : r.noHome ? 'No home location saved' : '') : ''}
                     session={trip.session}
@@ -321,6 +396,7 @@ export default function ActiveTrip() {
                     onCall={callParent}
                     onMessage={(student) => setMessageTo({ tripId: trip._id, student })}
                   />
+                  </SelectableRow>
                 ))}
               </View>
             ))}
@@ -329,17 +405,57 @@ export default function ActiveTrip() {
         </View>
       </ScrollView>
 
-      <SafeAreaView edges={['bottom']} style={styles.footer}>
-        <Button variant="outline" style={{ flex: 1 }} onPress={() => router.push('/trip/delay-broadcast')}>
-          Delay SMS
-        </Button>
-        <Button variant="danger" style={{ flex: 1 }} onPress={() => setEndOpen(true)}>
-          End trip
-        </Button>
-      </SafeAreaView>
+{selecting ? (
+        <SafeAreaView edges={['bottom']} style={styles.selectBar}>
+          <View style={styles.selectTop}>
+            <Text style={styles.selectCount}>{selected.length} selected</Text>
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <Pressable
+                hitSlop={8}
+                onPress={() => setSelected(sections.flatMap((sec) => sec.rows.map((r) => r.p.student?._id)).filter(Boolean))}
+              >
+                <Text style={styles.selectLink}>Select all</Text>
+              </Pressable>
+              <Pressable hitSlop={8} onPress={() => setSelected([])}>
+                <Text style={styles.selectLink}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+          <View style={styles.selectActions}>
+            <SmallButton label={words.board} onPress={() => askBulk('On board')} />
+            <SmallButton label={words.drop} onPress={() => askBulk('Dropped off')} />
+            <SmallButton label={words.notHere} variant="ghost" onPress={() => askBulk('Not on board')} />
+            <Pressable
+              onPress={() => setGroupMessage({ tripId: trip._id, session: trip.session, students: selectedRows.map((p) => p.student).filter(Boolean) })}
+              style={({ pressed }) => [styles.smallBtn, styles.smallBtnGhost, styles.smsBtn, pressed && { opacity: 0.7 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Send SMS to their parents"
+            >
+              <MessageSquare size={14} color={colors.slate600} />
+              <Text style={[styles.smallBtnText, styles.smallBtnGhostText]}>SMS</Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      ) : (
+              <SafeAreaView edges={['bottom']} style={styles.footer}>
+          <Button variant="outline" style={{ flex: 1 }} onPress={() => router.push('/trip/delay-broadcast')}>
+            Delay SMS
+          </Button>
+          <Button variant="danger" style={{ flex: 1 }} onPress={() => setEndOpen(true)}>
+            End trip
+          </Button>
+        </SafeAreaView>
+      )}
 
       <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
       <MessageParentSheet target={messageTo} onClose={() => setMessageTo(null)} />
+      <GroupMessageSheet
+        target={groupMessage}
+        onClose={(sent) => {
+          setGroupMessage(null);
+          if (sent) setSelected([]);
+        }}
+      />
 
       <Modal open={endOpen} onClose={() => setEndOpen(false)}>
         <Text style={styles.modalTitle}>End today's trip?</Text>
@@ -347,7 +463,7 @@ export default function ActiveTrip() {
         <View style={styles.summaryBox}>
           <SummaryRow label="Trip duration" value={formatClock(elapsed)} />
           <SummaryRow label={words.drop} value={`${droppedCount} of ${riding.length}`} />
-          <SummaryRow label="Bus" value={trip.bus?.plateNumber} />
+          <SummaryRow label="Bus" value={busLabel(trip.bus)} />
           <SummaryRow label="Route" value={trip.route?.name} />
         </View>
         {onBoard.length > 0 && (
@@ -444,6 +560,22 @@ function StudentRow({ p, distance, session, isOnline, onSet, onCall, onMessage }
   );
 }
 
+// Hold to start selecting; while selecting, a tap adds or removes the student.
+function SelectableRow({ selecting, isSelected, onToggle, children }) {
+  return (
+    <Pressable onLongPress={onToggle} delayLongPress={350} onPress={selecting ? onToggle : undefined} accessibilityState={{ selected: isSelected }}>
+      <View pointerEvents={selecting ? 'none' : 'auto'} style={isSelected ? styles.selectedRow : undefined}>
+        {children}
+      </View>
+      {selecting ? (
+        <View style={styles.selectMark} pointerEvents="none">
+          {isSelected ? <CheckCircle2 size={22} color={colors.brand600} /> : <Circle size={22} color={colors.slate300} />}
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
 const CALL_TONE = {
   info: { color: colors.brand600 },
   good: { color: colors.emerald700 },
@@ -505,6 +637,16 @@ const styles = StyleSheet.create({
   nextName: { color: colors.white, fontSize: 16, fontWeight: '800', marginTop: 2 },
   listLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   listLinkText: { color: colors.brand600, fontSize: 13, fontWeight: '700' },
+  assistBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, alignSelf: 'flex-start' },
+  assistBtnText: { color: colors.brand600, fontSize: 13, fontWeight: '700' },
+  selectedRow: { borderRadius: radii.xl, borderWidth: 2, borderColor: colors.brand600 },
+  selectMark: { position: 'absolute', top: 8, right: 8 },
+  selectBar: { borderTopWidth: 1, borderTopColor: colors.slate200, backgroundColor: colors.white, paddingHorizontal: 16, paddingTop: 10, gap: 10 },
+  selectTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectCount: { fontSize: 15, fontWeight: '800', color: colors.slate900 },
+  selectLink: { fontSize: 14, fontWeight: '700', color: colors.brand600 },
+  selectActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 8 },
+  smsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',

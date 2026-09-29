@@ -17,6 +17,7 @@ import { colors } from '../../../../src/lib/theme.js';
 import { formatPhone } from '../../../../src/lib/phone.js';
 import { buildLine } from '../../../../src/lib/buildInfo.js';
 import { useOfflineQueueStore } from '../../../../src/store/offlineQueueStore.js';
+import { busLabel } from '../../../../src/lib/bus.js';
 
 const THEME_OPTIONS = [
   { value: 'system', label: 'Follow system' },
@@ -51,7 +52,7 @@ export default function Settings() {
           <Text style={styles.phone}>{formatPhone(driver?.phone)}</Text>
           <View style={styles.divider} />
           <Row label="License number" value={info.licenseNumber || '—'} />
-          <Row label="Assigned bus" value={info.assignedBus?.plateNumber || 'Not assigned'} />
+          <Row label="Assigned bus" value={busLabel(info.assignedBus) || 'Not assigned'} />
           <Row label="Assigned route" value={info.assignedRoute?.name || 'Not assigned'} last />
         </Card>
 

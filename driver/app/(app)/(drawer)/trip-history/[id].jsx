@@ -10,6 +10,7 @@ import { getTripById } from '../../../../src/api/driverApp.js';
 import { formatDate, formatDuration, formatTime } from '../../../../src/lib/utils.js';
 import { colors } from '../../../../src/lib/theme.js';
 import { statusLabel } from '../../../../src/lib/runs.js';
+import { busLabel } from '../../../../src/lib/bus.js';
 
 const STATUS_TONE = { Completed: 'success', Cancelled: 'danger', Delayed: 'warning' };
 const DROPOFF_TONE = { 'Dropped off': 'success', 'On board': 'warning', 'Not on board': 'danger', 'Not picked up': 'neutral' };
@@ -36,7 +37,7 @@ export default function TripHistoryDetail() {
           <View style={styles.rowBetween}>
             <View>
               <Text style={styles.routeName}>{trip.route?.name}</Text>
-              <Text style={styles.plate}>{trip.bus?.plateNumber}</Text>
+              <Text style={styles.plate}>{busLabel(trip.bus)}</Text>
             </View>
             <Badge tone={STATUS_TONE[trip.status] || 'neutral'}>{trip.status}</Badge>
           </View>

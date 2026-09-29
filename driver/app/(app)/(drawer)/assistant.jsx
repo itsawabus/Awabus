@@ -34,6 +34,11 @@ const OPEN = ['Scheduled', 'In Progress', 'Delayed'];
  * delay notices). The code works only until this trip ends.
  */
 export default function Assistant() {
+  return <AssistantScreen />;
+}
+
+/** Also opened from the trip screen (app/(app)/trip/assistant.jsx), with a back arrow. */
+export function AssistantScreen({ back = false }) {
   const qc = useQueryClient();
   const { data: trip, isLoading } = useQuery({ queryKey: ['todays-trip'], queryFn: getTodaysTrip });
   const tripId = trip && OPEN.includes(trip.status) ? trip._id : null;
@@ -89,7 +94,7 @@ export default function Assistant() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Header title="Bus assistant" right={<View style={{ width: 36 }} />} />
+      <Header title="Bus assistant" back={back} right={<View style={{ width: 36 }} />} />
       {isLoading ? (
         <PageLoader />
       ) : (

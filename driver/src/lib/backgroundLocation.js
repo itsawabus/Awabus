@@ -106,7 +106,9 @@ export async function askBackgroundPermission() {
  * ('no_permission' | 'failed'); the screen tracker keeps working either way.
  */
 export async function startTripTracking(tripId, driverId) {
+  lastStartError = '';
   try {
+    if (!TaskManager.isTaskDefined(TRIP_LOCATION_TASK)) throw new Error('The tracking task is not set up in this version of the app.');
     await AsyncStorage.setItem(TRIP_KEY, JSON.stringify({ tripId, driverId }));
     if ((await backgroundPermission()) !== 'granted') return 'no_permission';
     if (await Location.hasStartedLocationUpdatesAsync(TRIP_LOCATION_TASK).catch(() => false)) return 'running';
@@ -127,10 +129,15 @@ export async function startTripTracking(tripId, driverId) {
     });
     return 'running';
   } catch (err) {
-    console.warn('[background location] could not start:', err?.message);
+    lastStartError = err?.message || String(err);
+    console.warn('[background location] could not start:', lastStartError);
     return 'failed';
   }
 }
+
+// Why the last start failed, in the phone's own words (shown to the driver).
+let lastStartError = '';
+export const startErrorMessage = () => lastStartError;
 
 /** Stops background tracking (trip ended, signed out). Safe to call any time. */
 export async function stopTripTracking() {
