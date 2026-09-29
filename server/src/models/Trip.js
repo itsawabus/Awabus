@@ -48,6 +48,8 @@ const studentProgressSchema = new mongoose.Schema(
     // When and where the bus was at this student's last step (picked up,
     // dropped, not here), for the trail on Live Tracking.
     scannedAt: { type: Date, default: null },
+    // Marked "At school" by AwaBus when the bus reached the school (not by hand).
+    autoMarked: { type: Boolean, default: false },
     scanLat: { type: Number, default: null },
     scanLng: { type: Number, default: null },
     dropoffStatus: {
@@ -117,6 +119,9 @@ const tripSchema = new mongoose.Schema(
     // Whose phone liveLocation came from: the driver's, or the bus assistant's
     // as a backup while the driver's phone is not reporting (services/busPosition.js).
     locationSource: { type: String, enum: ['driver', 'assistant'], default: 'driver' },
+    // The bus has been well away from the school on this trip (so coming back
+    // to it means it has arrived, not that it is still leaving).
+    awayFromSchool: { type: Boolean, default: false },
     driverLocation: { lat: Number, lng: Number, heading: Number, updatedAt: Date },
     driverSeenAt: { type: Date, default: null }, // last live reading from the driver (server time)
     // sharing: the assistant's "Share my location as backup" switch (false once

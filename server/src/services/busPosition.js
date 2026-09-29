@@ -11,6 +11,7 @@ import Trip from '../models/Trip.js';
 import Bus from '../models/Bus.js';
 import { emitToSchool } from '../sockets/rooms.js';
 import { checkGeofences, metresBetween } from './parentAlerts.js';
+import { checkSchoolArrival } from './schoolArrival.js';
 
 export const DRIVER_SILENT_MS = 45 * 1000;
 export const ON_BUS_METRES = 300;
@@ -43,7 +44,10 @@ export async function publishBusLocation({ trip, location, source, io, school })
   await Bus.updateOne({ _id: trip.bus }, { $set: { lastKnownLocation: location, gpsSignal: 'ok', locationSeenAt: new Date() } });
   emitToSchool(io, school, 'bus:location', { tripId: trip._id, busId: trip.bus, location, source });
   // Near-home check after the reply, so the phone never waits on SMS / calls.
-  setImmediate(() => checkGeofences({ tripId: trip._id, position: location, school }));
+  setImmediate(() => {
+    checkGeofences({ tripId: trip._id, position: location, school });
+    checkSchoolArrival({ tripId: trip._id, position: location, school, io });
+  });
 }
 
 /** Is the assistant's phone on the bus, judging by the driver's last live reading? (null = can't tell) */

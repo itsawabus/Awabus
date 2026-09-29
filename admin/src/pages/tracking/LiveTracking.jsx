@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CircleMarker, MapContainer, Marker, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { Circle, CircleMarker, MapContainer, Marker, Polyline, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { MapLayers } from '../../components/map/GeofenceMap.jsx';
 import { AlertTriangle, CheckCircle2, Clock, Navigation2, MapPin as MapPinIcon, SignalZero } from 'lucide-react';
@@ -233,6 +233,15 @@ export default function LiveTracking() {
                 <FollowBus position={selectedPos} follow={follow} />
                 <StopFollowOnDrag onDrag={() => setFollow(false)} />
                 {selected && <BusTrail trail={trail} session={selected.session} />}
+                {data?.school && (
+                  <Circle
+                    center={[data.school.lat, data.school.lng]}
+                    radius={data.school.radius}
+                    pathOptions={{ color: '#7c3aed', weight: 2, fillColor: '#7c3aed', fillOpacity: 0.12 }}
+                  >
+                    <Tooltip direction="top">{data.school.name}: children picked up are marked at school when the bus enters this circle</Tooltip>
+                  </Circle>
+                )}
                 {filtered.map((b) => {
                   const pos = toLatLng(b.liveLocation);
                   if (!pos) return null;
@@ -258,6 +267,7 @@ export default function LiveTracking() {
               <LegendRow color={MARKER.stale} label="Last seen 2-10 min ago" />
               <LegendRow color={MARKER.lost} label="No GPS for 10+ min" />
               <LegendRow color={TRAIL_COLOR} label="Trail: where the bus passed" />
+              {data?.school && <LegendRow color="#7c3aed" label="School (arrival zone)" />}
               <LegendRow color={EVENT_COLOR['Dropped off']} label="Child dropped here (tap for time)" />
               <LegendRow color={EVENT_COLOR['On board']} label="Child picked up here" />
             </div>

@@ -1,5 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import Bus from '../models/Bus.js';
+import School from '../models/School.js';
+import { tenantContext } from '../utils/tenantContext.js';
 import Trip from '../models/Trip.js';
 import { closeStaleTrips, LIVE_TRIP_FILTER } from '../services/staleTrips.js';
 import { assistantsWithStatus } from '../services/assistPass.js';
@@ -59,7 +61,12 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
     offline: buses.filter((b) => b.gpsSignal !== 'ok').length,
   };
 
-  res.json({ success: true, data: buses, counts });
+  // The school on the map (and its arrival zone), when its location is set.
+  const school = await tenantContext.runAsSystem(() => School.findById(req.school).select('name lat lng arrivalRadius').lean());
+  const schoolPlace = school && Number.isFinite(school.lat) && Number.isFinite(school.lng)
+    ? { name: school.name, lat: school.lat, lng: school.lng, radius: school.arrivalRadius || 150 }
+    : null;
+  res.json({ success: true, data: buses, counts, school: schoolPlace });
 });
 
 // @desc    Where a bus has been on a trip, and where / when each child was

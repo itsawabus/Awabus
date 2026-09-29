@@ -19,7 +19,7 @@ function rowStatus(p, session) {
   if (p.attendance === 'Cancelled') return { text: 'Cancelled by parent', tone: 'muted' };
   if (p.attendance === 'Absent') return { text: 'Absent', tone: 'muted' };
   const text = statusLabel(session, p.dropoffStatus || 'Pending');
-  if (p.dropoffStatus === 'Dropped off') return { text, tone: 'good' };
+  if (p.dropoffStatus === 'Dropped off') return { text: p.autoMarked ? `${text} (automatic)` : text, tone: 'good' };
   if (p.dropoffStatus === 'On board') return { text, tone: 'info' };
   if (p.dropoffStatus === 'Not on board') return { text, tone: 'bad' };
   return { text, tone: 'plain' };

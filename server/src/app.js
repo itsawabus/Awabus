@@ -12,6 +12,7 @@ import guardianRoutes from './routes/guardianRoutes.js';
 import tripRoutes from './routes/tripRoutes.js';
 import trackingRoutes from './routes/trackingRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
+import schoolRoutes from './routes/schoolRoutes.js';
 import driverAppRoutes from './routes/driverAppRoutes.js';
 import superadminRoutes from './routes/superadminRoutes.js';
 import geocodeRoutes from './routes/geocodeRoutes.js';
@@ -82,6 +83,7 @@ app.use('/api/superadmin', superadminRoutes);
 app.use('/api/geocode', geocodeRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/school', schoolRoutes);
 // Results sent back by outside services (voice call status)
 app.use('/api/webhooks', webhookRoutes);
 
