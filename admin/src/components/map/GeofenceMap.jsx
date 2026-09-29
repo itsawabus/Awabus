@@ -19,8 +19,6 @@ export function MapTiles() {
 const ESRI_IMAGERY_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const ESRI_ROADS_URL =
   'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}';
-const ESRI_PLACES_URL =
-  'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 const ESRI_ATTRIBUTION = 'Imagery &copy; Esri, Maxar, Earthstar Geographics';
 
 // With a Mapbox token, Hybrid uses Mapbox "Satellite Streets", which labels roads,
@@ -31,15 +29,42 @@ const MAPBOX_HYBRID_URL = `https://api.mapbox.com/styles/v1/mapbox/satellite-str
 const MAPBOX_ATTRIBUTION =
   '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
+// Hybrid, tuned for clarity:
+// - imagery: sharper tiles on high-resolution screens (detectRetina), and
+//   past its deepest level (19) the best tiles are enlarged instead of
+//   showing "no data" squares; a light contrast lift (awabus-imagery in
+//   styles/index.css) makes roads and roofs stand out.
+// - roads: Esri's road network drawn over the photo.
+// - labels: CARTO's labels made for dark / satellite maps (light text with a
+//   dark outline), at double resolution: place, area and street names stay
+//   readable on busy imagery. Override with VITE_MAP_LABELS_URL.
+const LABELS_URL = import.meta.env.VITE_MAP_LABELS_URL || 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png';
+const LABELS_ATTRIBUTION = '&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; OpenStreetMap contributors';
+const IMAGERY_MAX_NATIVE = 19;
+const MAP_MAX_ZOOM = 21;
+
+function ImageryLayer() {
+  return (
+    <TileLayer
+      url={ESRI_IMAGERY_URL}
+      attribution={ESRI_ATTRIBUTION}
+      maxNativeZoom={IMAGERY_MAX_NATIVE}
+      maxZoom={MAP_MAX_ZOOM}
+      detectRetina
+      className="awabus-imagery"
+    />
+  );
+}
+
 function HybridLayer() {
   if (MAPBOX_TOKEN) {
-    return <TileLayer url={MAPBOX_HYBRID_URL} attribution={MAPBOX_ATTRIBUTION} tileSize={512} zoomOffset={-1} maxZoom={20} />;
+    return <TileLayer url={MAPBOX_HYBRID_URL} attribution={MAPBOX_ATTRIBUTION} tileSize={512} zoomOffset={-1} maxZoom={22} />;
   }
   return (
     <LayerGroup>
-      <TileLayer url={ESRI_IMAGERY_URL} attribution={ESRI_ATTRIBUTION} maxZoom={19} />
-      <TileLayer url={ESRI_ROADS_URL} maxZoom={19} />
-      <TileLayer url={ESRI_PLACES_URL} maxZoom={19} />
+      <ImageryLayer />
+      <TileLayer url={ESRI_ROADS_URL} maxNativeZoom={IMAGERY_MAX_NATIVE} maxZoom={MAP_MAX_ZOOM} opacity={0.9} />
+      <TileLayer url={LABELS_URL} attribution={LABELS_ATTRIBUTION} subdomains="abcd" maxNativeZoom={20} maxZoom={MAP_MAX_ZOOM} detectRetina={false} zIndex={5} />
     </LayerGroup>
   );
 }
@@ -79,7 +104,7 @@ export function MapLayers() {
           <MapTiles />
         </LayersControl.BaseLayer>
         <LayersControl.BaseLayer name="Satellite" checked={active === 'Satellite'}>
-          <TileLayer url={ESRI_IMAGERY_URL} attribution={ESRI_ATTRIBUTION} maxZoom={19} />
+          <ImageryLayer />
         </LayersControl.BaseLayer>
         <LayersControl.BaseLayer name="Hybrid" checked={active === 'Hybrid'}>
           <HybridLayer />

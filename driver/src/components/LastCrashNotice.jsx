@@ -35,7 +35,7 @@ export default function LastCrashNotice({ style }) {
 }
 
 const styles = StyleSheet.create({
-  box: { flexDirection: 'row', gap: 8, backgroundColor: colors.amber50, borderWidth: 1, borderColor: '#fcd34d', borderRadius: radii.lg, padding: 12 },
+  box: { flexDirection: 'row', gap: 8, backgroundColor: colors.amber50, borderWidth: 1, borderColor: colors.warnBorder, borderRadius: radii.lg, padding: 12 },
   title: { fontSize: 13, fontWeight: '800', color: colors.amber800 },
   text: { fontSize: 12, color: colors.amber800, marginTop: 4 },
   hint: { fontSize: 11, color: colors.amber700, marginTop: 4 },

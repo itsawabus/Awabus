@@ -16,6 +16,7 @@ import LastCrashNotice from '../src/components/LastCrashNotice.jsx';
 import { installCrashLog, saveCrash } from '../src/lib/crashLog.js';
 // Defines the screen-off location task; must load when the app starts.
 import '../src/lib/backgroundLocation.js';
+import { colors } from '../src/lib/theme.js';
 
 // Any error that would close the app is noted, so the next launch can show it.
 installCrashLog();
@@ -96,7 +97,7 @@ export default function RootLayout() {
           <StatusBar style="light" />
           {/* Sends the bus position and checks notifications on every screen, without moving between screens. */}
           {isAuthenticated && <BackgroundWork />}
-          <Stack screenOptions={{ headerShown: false }}>
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.page } }}>
             <Stack.Protected guard={!isAuthenticated}>
               <Stack.Screen name="(auth)" />
             </Stack.Protected>

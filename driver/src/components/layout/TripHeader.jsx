@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '800',
-    color: colors.white,
+    color: colors.onDark,
   },
   pill: {
     paddingHorizontal: 8,
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
   pillText: {
     fontSize: 10,
     fontWeight: '800',
-    color: colors.white,
+    color: colors.onDark,
     letterSpacing: 0.5,
   },
   subtitle: {
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   timer: {
     fontSize: 24,
     fontWeight: '800',
-    color: colors.white,
+    color: colors.onDark,
     fontVariant: ['tabular-nums'],
   },
 });

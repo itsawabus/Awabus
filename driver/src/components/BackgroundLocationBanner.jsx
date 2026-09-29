@@ -91,7 +91,7 @@ export default function BackgroundLocationBanner({ style }) {
 }
 
 const styles = StyleSheet.create({
-  box: { backgroundColor: colors.amber50, borderWidth: 1, borderColor: '#fcd34d', borderRadius: radii.lg, padding: 12 },
+  box: { backgroundColor: colors.amber50, borderWidth: 1, borderColor: colors.warnBorder, borderRadius: radii.lg, padding: 12 },
   row: { flexDirection: 'row', gap: 8 },
   title: { fontSize: 14, fontWeight: '800', color: colors.amber800 },
   text: { flex: 1, fontSize: 13, lineHeight: 18, color: colors.amber800, marginTop: 2 },

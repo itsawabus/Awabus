@@ -40,7 +40,7 @@ export default function TripCompleted() {
     <View style={{ flex: 1 }}>
       <SafeAreaView edges={['top']} style={styles.banner}>
         <View style={styles.iconWrap}>
-          <CheckCheck size={28} color={colors.white} />
+          <CheckCheck size={28} color={colors.onDark} />
         </View>
         <Text style={styles.bannerTitle}>{trip.session ? `${w.name} completed` : 'Trip completed'}</Text>
         <Text style={styles.bannerSubtitle}>
@@ -87,7 +87,7 @@ const Row = ({ label, value, last, warn }) => (
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     paddingBottom: 32,
     paddingTop: 8,
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
-  bannerTitle: { fontSize: 22, fontWeight: '800', color: colors.white },
+  bannerTitle: { fontSize: 22, fontWeight: '800', color: colors.onDark },
   bannerSubtitle: { marginTop: 4, color: 'rgba(255,255,255,0.85)', fontSize: 14 },
   content: { flex: 1, padding: 16, gap: 16 },
   sectionLabel: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', color: colors.slate400, marginBottom: 8 },

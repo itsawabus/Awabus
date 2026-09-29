@@ -103,7 +103,7 @@ export function AssistantScreen({ back = false }) {
           <Card style={styles.card}>
             <View style={styles.row}>
               <View style={styles.iconWrap}>
-                <QrCode size={18} color={colors.navy} />
+                <QrCode size={18} color={colors.ink} />
               </View>
               <Text style={styles.intro}>
                 Let the teacher on bus duty help you: they scan the code with their phone and can do the roll call, mark

@@ -33,7 +33,7 @@ export default function BroadcastHistory() {
             <Card style={styles.card}>
               <View style={styles.row}>
                 <View style={styles.iconWrap}>
-                  <Mail size={16} color={colors.navy} />
+                  <Mail size={16} color={colors.ink} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.reason}>{item.reason}</Text>

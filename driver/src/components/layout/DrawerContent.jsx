@@ -119,7 +119,7 @@ export default function DrawerContent(props) {
 
 const styles = StyleSheet.create({
   drawerBadges: { alignItems: 'flex-end', gap: 4 },
-  unsentWarning: { marginTop: 12, fontSize: 13, fontWeight: '700', color: '#b91c1c' },
+  unsentWarning: { marginTop: 12, fontSize: 13, fontWeight: '700', color: colors.red700 },
   container: {
     flex: 1,
     backgroundColor: colors.navy,
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 18,
     fontWeight: '800',
-    color: colors.white,
+    color: colors.onDark,
   },
   role: {
     marginTop: 2,
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     color: colors.slate200,
   },
   navLabelActive: {
-    color: colors.white,
+    color: colors.onDark,
   },
   footer: {
     paddingHorizontal: 20,

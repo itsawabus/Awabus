@@ -36,7 +36,7 @@ export default function Header({ title, logo = false, back = false, right }) {
   return (
     <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
       <Pressable onPress={handleMenuPress} style={styles.iconButton} hitSlop={10}>
-        {back ? <ArrowLeft size={22} color={colors.white} /> : <Menu size={22} color={colors.white} />}
+        {back ? <ArrowLeft size={22} color={colors.onDark} /> : <Menu size={22} color={colors.onDark} />}
       </Pressable>
       {logo ? (
         <View style={styles.logoWrap}>
@@ -67,7 +67,7 @@ function NotificationBell() {
       accessibilityRole="button"
       accessibilityLabel={dot ? `Notifications, ${unseen || waiting} new` : 'Notifications'}
     >
-      <Bell size={22} color={colors.white} />
+      <Bell size={22} color={colors.onDark} />
       {dot && <View style={styles.dot} />}
     </Pressable>
   );
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    color: colors.white,
+    color: colors.onDark,
     fontSize: 18,
     fontWeight: '800',
   },

@@ -9,7 +9,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: '#e2e8f0b3',
+    borderColor: colors.slate200,
     backgroundColor: colors.white,
     padding: 16,
     shadowColor: '#0f172a',

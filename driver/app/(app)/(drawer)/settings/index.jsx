@@ -68,6 +68,7 @@ export default function Settings() {
             onOpen={() => setThemeOpen(true)}
             onClose={() => setThemeOpen(false)}
           />
+          <Text style={styles.themeHint}>The app restarts for a moment to apply a new theme.</Text>
         </Card>
 
         <Text style={styles.sectionTitle}>Notifications</Text>
@@ -115,7 +116,7 @@ export default function Settings() {
         </Card>
 
         <Button variant="danger" style={styles.logoutButton} onPress={() => setConfirmLogout(true)}>
-          <LogOut size={18} color={colors.white} />
+          <LogOut size={18} color={colors.onDark} />
           <Text style={styles.logoutText}>Log out</Text>
         </Button>
         <Text style={styles.version}>AwaBus Driver v1.0.0</Text>
@@ -167,7 +168,8 @@ const ToggleRow = ({ label, value, onValueChange, last }) => (
 );
 
 const styles = StyleSheet.create({
-  unsentWarning: { marginTop: 12, fontSize: 13, fontWeight: '700', color: '#b91c1c' },
+  themeHint: { marginTop: 8, fontSize: 12, color: colors.slate500 },
+  unsentWarning: { marginTop: 12, fontSize: 13, fontWeight: '700', color: colors.red700 },
   scroll: { padding: 16, gap: 16, paddingBottom: 40 },
   profileCard: { alignItems: 'center' },
   name: { marginTop: 10, fontSize: 17, fontWeight: '800', color: colors.slate900 },
@@ -191,7 +193,7 @@ const styles = StyleSheet.create({
   },
   linkText: { fontSize: 14, fontWeight: '700', color: colors.slate800 },
   logoutButton: { marginTop: 8, flexDirection: 'row' },
-  logoutText: { color: colors.white, fontWeight: '700', fontSize: 16 },
+  logoutText: { color: colors.onDark, fontWeight: '700', fontSize: 16 },
   version: { textAlign: 'center', color: colors.slate400, fontSize: 12 },
   sheetTitle: { fontSize: 18, fontWeight: '800', color: colors.slate900 },
   sheetSubtitle: { marginTop: 6, color: colors.slate500, fontSize: 14 },

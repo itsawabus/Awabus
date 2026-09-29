@@ -218,7 +218,6 @@ export default function Home() {
 
         <View style={styles.rowBetween}>
           <Text style={styles.sectionLabel}>Student List</Text>
-          <Text style={styles.tapHint}>tap to change</Text>
         </View>
         <View style={styles.studentList}>
           {progress.map((p) => (
@@ -312,8 +311,8 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', color: colors.slate400, marginBottom: 8, marginTop: 4 },
   statsRow: { flexDirection: 'row', gap: 10 },
   statCard: { flex: 1, alignItems: 'center', paddingVertical: 14 },
-  statCardSuccess: { backgroundColor: colors.emerald50, borderColor: '#a7f3d0' },
-  statCardDanger: { backgroundColor: colors.red50, borderColor: '#fecaca' },
+  statCardSuccess: { backgroundColor: colors.emerald50, borderColor: colors.greenBorder },
+  statCardDanger: { backgroundColor: colors.red50, borderColor: colors.redBorder },
   statValue: { fontSize: 22, fontWeight: '800', color: colors.slate900 },
   statValueSuccess: { color: colors.emerald700 },
   statValueDanger: { color: colors.red600 },

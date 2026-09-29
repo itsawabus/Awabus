@@ -17,8 +17,8 @@ import { colors } from '../../../src/lib/theme.js';
 const LOOK = {
   danger: { Icon: AlertTriangle, color: colors.red600, bg: colors.red50 },
   warning: { Icon: AlertTriangle, color: colors.amber800, bg: colors.amber50 },
-  info: { Icon: Info, color: colors.navy, bg: colors.brand50 },
-  queue: { Icon: UploadCloud, color: colors.navy, bg: colors.slate100 },
+  info: { Icon: Info, color: colors.ink, bg: colors.brand50 },
+  queue: { Icon: UploadCloud, color: colors.ink, bg: colors.slate100 },
 };
 
 export default function Notifications() {
@@ -91,7 +91,7 @@ export default function Notifications() {
               style={styles.headerBtn}
               accessibilityLabel={selecting ? 'Done selecting' : 'Select notifications'}
             >
-              {selecting ? <X size={20} color={colors.white} /> : <Text style={styles.headerBtnText}>Select</Text>}
+              {selecting ? <X size={20} color={colors.onDark} /> : <Text style={styles.headerBtnText}>Select</Text>}
             </Pressable>
           ) : (
             <View style={{ width: 36 }} />
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   cardTicked: { borderColor: colors.brand600, borderWidth: 1 },
   trash: { padding: 4, alignSelf: 'flex-start' },
   headerBtn: { minWidth: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerBtnText: { color: colors.white, fontWeight: '700', fontSize: 14 },
+  headerBtnText: { color: colors.onDark, fontWeight: '700', fontSize: 14 },
   actionBar: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1, borderTopColor: colors.slate200, backgroundColor: colors.white },
   row: { flexDirection: 'row', gap: 12 },
   iconWrap: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
