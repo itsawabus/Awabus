@@ -571,7 +571,10 @@ function StudentRow({ p, photo, distance, session, isOnline, onSet, onCall, onMe
           <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
           {extra}
         </View>
-        <Text style={styles.scannedText}>{w.drop}{when}</Text>
+        <Text style={styles.scannedText}>
+          {w.drop}
+          {p.autoMarked ? ' (automatic)' : when}
+        </Text>
       </View>
     );
   }

@@ -43,6 +43,7 @@ import HelpGuide from './pages/help/HelpGuide.jsx';
 import Notifications from './pages/notifications/Notifications.jsx';
 import SystemPage from './pages/system/SystemPage.jsx';
 import AssistTrip from './pages/assist/AssistTrip.jsx';
+import SchoolSettings from './pages/school/SchoolSettings.jsx';
 
 export default function App() {
   return (
@@ -95,6 +96,7 @@ export default function App() {
 
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/help" element={<HelpGuide />} />
+          <Route path="/settings/school" element={<SchoolSettings />} />
         </Route>
       </Route>
 

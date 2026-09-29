@@ -236,6 +236,7 @@ export const GUIDE = [
           'Click a bus or a trip in the list to see where it is and which students are on board.',
           'Use the map switcher (top right of the map) for Street, Satellite, Hybrid or Terrain views.',
           '"Following bus" keeps the selected bus in the middle of the map as it moves. Drag the map to look around (following stops); click the button or a bus to follow again.',
+          'Optional: set the school\'s GPS address in School settings (account menu, top right). Then, on the morning pick-up, when the bus arrives at school every child marked picked up is marked "At school" by itself (shown as "automatic"), and the school shows on the map with its arrival zone.',
           'The selected bus leaves a trail of dots where it has passed. Bigger dots mark where each child was picked up (blue) or dropped (green): tap or hover one to see the name and the time.',
         ],
       },

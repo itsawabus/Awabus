@@ -693,7 +693,10 @@ function AzRow({ p, session, photo }) {
   let tone = 'text-slate-500 dark:text-slate-400';
   if (p.attendance === 'Cancelled') status = 'Cancelled by parent';
   else if (p.attendance === 'Absent') status = 'Absent';
-  else if (p.dropoffStatus === 'Dropped off') tone = 'text-emerald-700 dark:text-emerald-400';
+  else if (p.dropoffStatus === 'Dropped off') {
+    tone = 'text-emerald-700 dark:text-emerald-400';
+    if (p.autoMarked) status += ' (automatic)';
+  }
   else if (p.dropoffStatus === 'On board') tone = 'text-brand-600 dark:text-brand-400';
   else if (p.dropoffStatus === 'Not on board') tone = 'text-red-600 dark:text-red-400';
   return (
@@ -724,6 +727,7 @@ function StudentCard({ p, photo, directions, distance, session, live, scheduled,
   const out = ['Absent', 'Cancelled'].includes(p.attendance);
 
   let status = statusLabel(session, p.dropoffStatus);
+  if (p.dropoffStatus === 'Dropped off' && p.autoMarked) status += ' (automatic)';
   if (p.attendance === 'Cancelled') status = 'Cancelled by parent';
   else if (p.attendance === 'Absent') status = 'Not attending';
   else if (p.dropoffStatus === 'Pending' && scheduled) status = 'Attending';

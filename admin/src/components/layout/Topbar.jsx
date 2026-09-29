@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Bell, ChevronDown, CircleHelp, LogOut, Menu, Search, Settings, UserCircle } from 'lucide-react';
+import { Bell, ChevronDown, CircleHelp, LogOut, Menu, Search, Settings, UserCircle, School } from 'lucide-react';
 import { useTopbarStore } from '../../store/topbarStore.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useUiStore } from '../../store/uiStore.js';
@@ -26,6 +26,7 @@ const SECTION_LINKS = {
   'live tracking': '/live-tracking',
   'my profile': '/account/profile',
   'account settings': '/account/settings',
+  'school settings': '/settings/school',
   notifications: '/notifications',
   system: '/system',
 };
@@ -155,6 +156,13 @@ export default function Topbar() {
                 className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-navy"
               >
                 <Bell className="h-4 w-4" /> Notification settings
+              </Link>
+              <Link
+                to="/settings/school"
+                onClick={() => setMenuOpen(false)}
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-navy"
+              >
+                <School className="h-4 w-4" /> School settings
               </Link>
               <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
               <button
