@@ -10,6 +10,7 @@ import { tenantContext } from '../utils/tenantContext.js';
 import { resolvePass } from '../services/assistPass.js';
 import { assistantReading } from '../services/busPosition.js';
 import { inGhana } from '../utils/geo.js';
+import { emitToSchool } from '../sockets/rooms.js';
 import {
   STUDENT_FOR_DRIVER,
   DELAY_LIMITS,
@@ -17,6 +18,7 @@ import {
   markAttendance,
   messageParent,
   sendDelayBroadcast,
+  tripPhotos,
 } from './driverAppController.js';
 
 // A name the teacher types once, kept short and plain.
@@ -132,4 +134,22 @@ export const assistPushLocation = asyncHandler(async (req, res) => {
     school: req.school,
   });
   res.json({ success: true, data: result });
+});
+
+// @desc    Students' photos for the pass's trip (fetched once by the page)
+// @route   GET /api/assist/photos
+export const getAssistPhotos = asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'private, max-age=600');
+  res.json({ success: true, data: await tripPhotos(req.assistTrip._id) });
+});
+
+// @desc    The assistant turned "Share my location as backup" off
+// @route   DELETE /api/assist/location
+export const assistStopLocation = asyncHandler(async (req, res) => {
+  await Trip.updateOne(
+    { _id: req.assistTrip._id },
+    { $set: { 'assistantLocation.sharing': false, 'assistantLocation.stoppedAt': new Date(), 'assistantLocation.name': req.assistant.name } }
+  );
+  emitToSchool(req.app.get('io'), req.school, 'trip:assistLocation', { tripId: req.assistTrip._id, state: 'off' });
+  res.json({ success: true });
 });

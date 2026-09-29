@@ -119,7 +119,18 @@ const tripSchema = new mongoose.Schema(
     locationSource: { type: String, enum: ['driver', 'assistant'], default: 'driver' },
     driverLocation: { lat: Number, lng: Number, heading: Number, updatedAt: Date },
     driverSeenAt: { type: Date, default: null }, // last live reading from the driver (server time)
-    assistantLocation: { lat: Number, lng: Number, heading: Number, accuracy: Number, updatedAt: Date, name: String },
+    // sharing: the assistant's "Share my location as backup" switch (false once
+    // they turn it off); stoppedAt: when they turned it off.
+    assistantLocation: {
+      lat: Number,
+      lng: Number,
+      heading: Number,
+      accuracy: Number,
+      updatedAt: Date,
+      name: String,
+      sharing: Boolean,
+      stoppedAt: Date,
+    },
     // Is the assistant's phone on the bus (near the driver's)? null = not compared yet.
     assistantOnBus: { type: Boolean, default: null },
     // Where the bus has been on this trip (the trail on Live Tracking): a point

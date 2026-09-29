@@ -8,6 +8,8 @@ import { getTodaysTrip } from '../../../src/api/driverApp.js';
 import { runWords, statusLabel } from '../../../src/lib/runs.js';
 import { matchesSearch, callInfo, CALL_IN_PROGRESS } from '../../../src/lib/nearest.js';
 import { colors, radii } from '../../../src/lib/theme.js';
+import { useTripPhotos } from '../../../src/hooks/useTripPhotos.js';
+import Avatar from '../../../src/components/ui/Avatar.jsx';
 
 // A fixed A–Z list of everyone on the trip and where they are up to. Unlike
 // the trip screen, it never re-sorts by distance, so a child is always easy to find.
@@ -32,6 +34,7 @@ export default function AttendanceList() {
       query.state.data?.studentProgress?.some((p) => CALL_IN_PROGRESS.includes(p.callStatus)) ? 5000 : 20000,
   });
 
+  const photos = useTripPhotos(trip?._id);
   const rows = useMemo(
     () => [...(trip?.studentProgress || [])].sort((a, b) => nameOf(a).localeCompare(nameOf(b))),
     [trip?.studentProgress]
@@ -84,6 +87,7 @@ export default function AttendanceList() {
             const call = callInfo(p);
             return (
               <View key={p.student?._id || i} style={[styles.row, i === shown.length - 1 && { borderBottomWidth: 0 }]}>
+                <Avatar name={nameOf(p)} src={photos[p.student?._id]} size="sm" />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.name}>{nameOf(p) || 'Student'}</Text>
                   {p.student?.classGrade ? <Text style={styles.meta}>{p.student.classGrade}</Text> : null}

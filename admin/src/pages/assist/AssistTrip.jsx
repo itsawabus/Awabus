@@ -6,6 +6,7 @@ import { AlertTriangle, Bus, CheckCircle2, Clock, ListChecks, MessageSquare, Nav
 import { API_URL } from '../../api/client.js';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
+import Avatar from '../../components/ui/Avatar.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
 import Input, { Label, Textarea, Select } from '../../components/ui/Input.jsx';
@@ -131,6 +132,14 @@ function AssistBoard({ pass, name, onChangeName }) {
     retry: (count, err) => ![401, 410].includes(err?.status) && count < 2,
   });
 
+  // Students' photos: fetched once (they are large), not with every refresh.
+  const { data: photos = {} } = useQuery({
+    queryKey: ['assist-photos', pass],
+    queryFn: () => api.get('/assist/photos').then((r) => r.data.data || {}),
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+  });
+
   // The teacher's phone as a backup bus position (hooks must run before any early return).
   const backup = useBackupLocation(api, pass, ['In Progress', 'Delayed'].includes(trip?.status));
 
@@ -199,6 +208,7 @@ function AssistBoard({ pass, name, onChangeName }) {
     <StudentCard
       key={p.student?._id}
       p={p}
+      photo={photos[p.student?._id]}
       distance={distance}
       session={trip.session}
       live={live}
@@ -363,7 +373,7 @@ function AssistBoard({ pass, name, onChangeName }) {
           ) : (
             <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm dark:divide-slate-800 dark:bg-navy-light">
               {azRows.map((p) => (
-                <AzRow key={p.student?._id} p={p} session={trip.session} />
+                <AzRow key={p.student?._id} p={p} session={trip.session} photo={photos[p.student?._id]} />
               ))}
             </div>
           )}
@@ -406,7 +416,7 @@ const CALL_TONE = {
 };
 
 // One line of the fixed A–Z attendance list.
-function AzRow({ p, session }) {
+function AzRow({ p, session, photo }) {
   const s = p.student || {};
   const name = `${s.firstName || ''} ${s.lastName || ''}`.trim() || 'Student';
   const call = callInfo(p);
@@ -419,6 +429,7 @@ function AzRow({ p, session }) {
   else if (p.dropoffStatus === 'Not on board') tone = 'text-red-600 dark:text-red-400';
   return (
     <div className="flex items-center gap-3 px-4 py-3">
+      <Avatar name={name} src={photo} size="sm" className="shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{name}</p>
         {s.classGrade && <p className="truncate text-xs text-slate-400">{s.classGrade}</p>}
@@ -436,7 +447,7 @@ const Stat = ({ label, value }) => (
   </div>
 );
 
-function StudentCard({ p, distance, session, live, scheduled, busy, onAction, onMessage }) {
+function StudentCard({ p, photo, distance, session, live, scheduled, busy, onAction, onMessage }) {
   const w = runWords(session);
   const s = p.student || {};
   const g = s.primaryGuardian;
@@ -453,7 +464,8 @@ function StudentCard({ p, distance, session, live, scheduled, busy, onAction, on
   return (
     <div className={cn('rounded-2xl bg-white p-4 shadow-sm dark:bg-navy-light', out && 'opacity-70')}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <Avatar name={name} src={photo} size="md" className="shrink-0" />
+        <div className="min-w-0 flex-1">
           <p className="truncate font-bold text-slate-900 dark:text-white">{name}</p>
           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
             {[s.classGrade, g ? `${g.relation && g.relation !== 'Guardian' ? g.relation : 'Parent'}: ${g.firstName || ''} ${g.lastName || ''}`.trim() : '']

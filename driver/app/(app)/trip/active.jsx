@@ -30,6 +30,8 @@ import { orderTrip, sectionsFor, matchesSearch, callInfo, formatDistance, CALL_I
 import BackgroundLocationBanner from '../../../src/components/BackgroundLocationBanner.jsx';
 import { BusOfflineBanner, useConnectionStatus } from '../../../src/components/ConnectionStatus.jsx';
 import { busLabel } from '../../../src/lib/bus.js';
+import { useTripPhotos } from '../../../src/hooks/useTripPhotos.js';
+import Avatar from '../../../src/components/ui/Avatar.jsx';
 
 export default function ActiveTrip() {
   // The screen stays on while the trip screen is open, so the list can be read at a glance.
@@ -189,6 +191,7 @@ export default function ActiveTrip() {
     .map((sec) => ({ ...sec, rows: ordered[sec.key].filter((r) => matchesSearch(r.p, search)) }))
     .filter((sec) => sec.rows.length);
   const nextUp = ordered.next[0];
+  const photos = useTripPhotos(trip?._id);
 
   // The bus assistant (teacher): connected or not, checked every 15 seconds.
   const assist = useQuery({
@@ -404,6 +407,7 @@ export default function ActiveTrip() {
                   >
                   <StudentRow
                     p={r.p}
+                    photo={photos[r.p.student?._id]}
                     distance={sec.key === 'next' ? (r.metres != null ? `${formatDistance(r.metres)} away` : r.noHome ? 'No home location saved' : '') : ''}
                     session={trip.session}
                     isOnline={isOnline}
@@ -509,7 +513,7 @@ export default function ActiveTrip() {
 }
 
 // One student: what happened so far, and the next step as a button.
-function StudentRow({ p, distance, session, isOnline, onSet, onCall, onMessage }) {
+function StudentRow({ p, photo, distance, session, isOnline, onSet, onCall, onMessage }) {
   const w = runWords(session);
   const name = p.student ? `${p.student.firstName} ${p.student.lastName}` : 'Student';
   const when = p._offline || !isOnline ? ' (offline)' : p.alertTime ? ` at ${p.alertTime}` : '';
@@ -525,6 +529,7 @@ function StudentRow({ p, distance, session, isOnline, onSet, onCall, onMessage }
   if (p.attendance === 'Absent' || p.attendance === 'Cancelled') {
     return (
       <View style={[styles.studentRow, styles.studentRowMuted]}>
+        <Avatar name={name} src={photo} size="sm" style={{ marginRight: 10 }} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.studentName, styles.mutedName]}>{name}</Text>
           <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
@@ -537,6 +542,7 @@ function StudentRow({ p, distance, session, isOnline, onSet, onCall, onMessage }
   if (status === 'Dropped off') {
     return (
       <View style={styles.studentRow}>
+        <Avatar name={name} src={photo} size="sm" style={{ marginRight: 10 }} />
         <View style={{ flex: 1 }}>
           <Text style={styles.studentName}>{name}</Text>
           <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
@@ -549,6 +555,7 @@ function StudentRow({ p, distance, session, isOnline, onSet, onCall, onMessage }
   if (status === 'On board') {
     return (
       <View style={styles.studentRow}>
+        <Avatar name={name} src={photo} size="sm" style={{ marginRight: 10 }} />
         <View style={{ flex: 1 }}>
           <Text style={styles.studentName}>{name}</Text>
           <Text style={styles.onBoardText}>{w.board}{when}</Text>
@@ -561,6 +568,7 @@ function StudentRow({ p, distance, session, isOnline, onSet, onCall, onMessage }
   }
   return (
     <View style={styles.studentRow}>
+      <Avatar name={name} src={photo} size="sm" style={{ marginRight: 10 }} />
       <View style={{ flex: 1 }}>
         <Text style={styles.studentName}>{name}</Text>
         {status === 'Not on board' ? <Text style={styles.notHereText}>{w.notHere}{when}</Text> : <Text style={styles.waitingText}>{w.waiting}</Text>}

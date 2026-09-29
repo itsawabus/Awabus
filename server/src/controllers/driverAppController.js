@@ -1080,3 +1080,24 @@ export const reportAppCrash = asyncHandler(async (req, res) => {
   console.error(`[app crash] driver ${req.driver._id}: ${text(req.body?.message, 200)}`);
   res.status(201).json({ success: true });
 });
+
+/** Photos of the students on a trip, { studentId: photo }, only those with one. */
+export async function tripPhotos(tripId) {
+  const trip = await Trip.findById(tripId).select('studentProgress.student').lean();
+  const ids = (trip?.studentProgress || []).map((r) => r.student);
+  const students = await Student.find({ _id: { $in: ids }, profilePhotoUrl: { $nin: ['', null] } }).select('profilePhotoUrl').lean();
+  return Object.fromEntries(students.map((s) => [String(s._id), s.profilePhotoUrl]));
+}
+
+// @desc    Students' photos for a trip, fetched once per trip by the app (kept
+//          out of the trip data, which the app refreshes every few seconds)
+// @route   GET /api/driver-app/trips/:id/photos
+export const getTripPhotos = asyncHandler(async (req, res) => {
+  const trip = await Trip.findOne({ _id: req.params.id, driver: req.driver._id }).select('_id').lean();
+  if (!trip) {
+    res.status(404);
+    throw new Error('Trip not found');
+  }
+  res.set('Cache-Control', 'private, max-age=600');
+  res.json({ success: true, data: await tripPhotos(trip._id) });
+});
