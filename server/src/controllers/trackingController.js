@@ -2,6 +2,7 @@ import asyncHandler from 'express-async-handler';
 import Bus from '../models/Bus.js';
 import Trip from '../models/Trip.js';
 import { closeStaleTrips, LIVE_TRIP_FILTER } from '../services/staleTrips.js';
+import { assistantsWithStatus } from '../services/assistPass.js';
 
 const statusFromBus = (bus) => {
   if (bus.gpsSignal === 'lost') return 'GPS Signal Lost';
@@ -42,6 +43,8 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
       busOnline: Boolean(t.bus?.online),
       // 'assistant' while the bus assistant's phone covers for the driver's.
       locationSource: t.locationSource || 'driver',
+      // The bus assistant (teacher) helping on this trip: connected or not.
+      assistants: assistantsWithStatus(t),
       assistantName: t.assistantLocation?.name || '',
       driverSeenAt: t.driverSeenAt,
     }));

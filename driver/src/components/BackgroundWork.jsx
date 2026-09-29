@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { getTodaysTrip, getNotifications, pushLocation } from '../api/driverApp.js';
@@ -86,16 +87,29 @@ export default function BackgroundWork() {
   const background = useLiveGpsStore((s) => s.background);
   useEffect(() => {
     let cancelled = false;
+    let timer = null;
     if (tripId) {
-      startTripTracking(tripId, driverId).then((state) => {
-        if (!cancelled) useLiveGpsStore.getState().setBackground(state, state === 'failed' ? startErrorMessage() : '');
-      });
+      // A few seconds after the app is on screen (never during start-up), and
+      // only while it is in front: Android refuses to start it otherwise.
+      const manual = background === 'retry';
+      const start = () => {
+        if (cancelled) return;
+        if (AppState.currentState !== 'active') {
+          timer = setTimeout(start, 2000);
+          return;
+        }
+        startTripTracking(tripId, driverId, { manual }).then((state) => {
+          if (!cancelled) useLiveGpsStore.getState().setBackground(state, state === 'failed' ? startErrorMessage() : '');
+        });
+      };
+      timer = setTimeout(start, manual ? 0 : 4000);
     } else {
       stopTripTracking();
       useLiveGpsStore.getState().setBackground('off');
     }
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
     // 'retry' (set after the driver allows "all the time") starts it again.
   }, [tripId, driverId, background === 'retry']);

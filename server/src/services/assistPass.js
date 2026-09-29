@@ -13,6 +13,21 @@ import { tenantContext } from '../utils/tenantContext.js';
 export const PASS_HOURS = 12;
 const OPEN = ['Scheduled', 'In Progress', 'Delayed'];
 
+// A bus assistant counts as connected while their page reached AwaBus this recently.
+export const ASSIST_CONNECTED_MS = 45 * 1000;
+
+/** The trip's assistants with connected true / false (and the pass still working). */
+export function assistantsWithStatus(trip, now = Date.now()) {
+  const p = trip.assistPass || {};
+  const passWorks = Boolean(p.hash) && ['Scheduled', 'In Progress', 'Delayed'].includes(trip.status) && (!p.expiresAt || new Date(p.expiresAt) > new Date(now));
+  return (trip.assistants || []).map((a) => ({
+    name: a.name,
+    firstSeenAt: a.firstSeenAt,
+    lastSeenAt: a.lastSeenAt || a.firstSeenAt,
+    connected: passWorks && Boolean(a.lastSeenAt || a.firstSeenAt) && now - new Date(a.lastSeenAt || a.firstSeenAt).getTime() < ASSIST_CONNECTED_MS,
+  }));
+}
+
 const hashOf = (pass) => crypto.createHash('sha256').update(String(pass)).digest('hex');
 
 // Where the assistant page lives (the admin website), as phones must open it:

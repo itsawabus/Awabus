@@ -12,6 +12,7 @@ import Modal from '../../../src/components/ui/Modal.jsx';
 import ConfirmDialog from '../../../src/components/ui/ConfirmDialog.jsx';
 import StudentMeta, { guardianName } from '../../../src/components/StudentMeta.jsx';
 import MessageParentSheet from '../../../src/components/MessageParentSheet.jsx';
+import LastCrashNotice from '../../../src/components/LastCrashNotice.jsx';
 import BackgroundLocationBanner from '../../../src/components/BackgroundLocationBanner.jsx';
 import { ConnectionBadges, BusOfflineBanner } from '../../../src/components/ConnectionStatus.jsx';
 import { formatPhone } from '../../../src/lib/phone.js';
@@ -122,6 +123,7 @@ export default function Home() {
       <View style={{ flex: 1 }}>
         <Header logo />
         <ScrollView contentContainerStyle={styles.centerPad} refreshControl={refreshControl}>
+        <LastCrashNotice style={{ alignSelf: 'stretch', marginBottom: 12 }} />
           <Card style={styles.centerCard}>
             <AlertTriangle size={28} color={colors.red500} />
             <Text style={styles.emptyTitle}>Couldn't load your trip</Text>
@@ -140,6 +142,7 @@ export default function Home() {
       <View style={{ flex: 1 }}>
         <Header logo />
         <ScrollView contentContainerStyle={styles.centerPad} refreshControl={refreshControl}>
+        <LastCrashNotice style={{ alignSelf: 'stretch', marginBottom: 12 }} />
           <Card style={styles.centerCard}>
             <AlertTriangle size={28} color={colors.amber500} />
             <Text style={styles.emptyTitle}>No trip assigned yet</Text>
@@ -161,6 +164,7 @@ export default function Home() {
     <View style={{ flex: 1 }}>
       <Header logo />
       <ScrollView contentContainerStyle={styles.scroll} refreshControl={refreshControl}>
+        <LastCrashNotice style={{ alignSelf: 'stretch', marginBottom: 12 }} />
         <Card>
           <View style={styles.rowBetween}>
             <View>

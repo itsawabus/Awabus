@@ -5,15 +5,20 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useAuthStore } from '../src/store/authStore.js';
 import { useUiStore } from '../src/store/uiStore.js';
 import { useOfflineQueueStore } from '../src/store/offlineQueueStore.js';
 import { useOfflineSync } from '../src/hooks/useOfflineSync.js';
 import BrandSplash from '../src/components/layout/BrandSplash.jsx';
 import BackgroundWork from '../src/components/BackgroundWork.jsx';
+import LastCrashNotice from '../src/components/LastCrashNotice.jsx';
+import { installCrashLog, saveCrash } from '../src/lib/crashLog.js';
 // Defines the screen-off location task; must load when the app starts.
 import '../src/lib/backgroundLocation.js';
+
+// Any error that would close the app is noted, so the next launch can show it.
+installCrashLog();
 
 // How long the in-app splash stays up at minimum, so it doesn't just flicker.
 const MIN_SPLASH_MS = 1200;
@@ -25,6 +30,28 @@ const queryClient = new QueryClient({
     queries: { retry: 1, staleTime: 10_000 },
   },
 });
+
+/**
+ * A screen error shows this page instead of closing the app, with the reason
+ * (and it is noted for the next launch too).
+ */
+export function ErrorBoundary({ error, retry }) {
+  saveCrash(error);
+  return (
+    <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, backgroundColor: '#0a1f2a' }}>
+      <Text style={{ color: 'white', fontSize: 20, fontWeight: '800' }}>Something went wrong</Text>
+      <Text style={{ color: '#cbd5e1', fontSize: 14, marginTop: 8 }}>
+        AwaBus hit a problem on this screen. Try again; if it keeps happening, send this message to the AwaBus team:
+      </Text>
+      <Text selectable style={{ color: '#fcd34d', fontSize: 13, marginTop: 12 }}>
+        {String(error?.message || error)}
+      </Text>
+      <Pressable onPress={retry} style={{ marginTop: 24, backgroundColor: '#0d9488', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+        <Text style={{ color: 'white', fontWeight: '800', fontSize: 16 }}>Try again</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
 
 export default function RootLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);

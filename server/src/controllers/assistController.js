@@ -27,6 +27,8 @@ const cleanName = (raw) =>
     .trim()
     .slice(0, 40);
 
+const lastSeenWrite = new Map(); // "trip:name" -> last time written
+
 /** Checks the pass and sets up the request as the trip's driver would be. */
 export const requireAssistPass = asyncHandler(async (req, res, next) => {
   const found = await resolvePass(req.get('x-assist-pass'));
@@ -45,8 +47,18 @@ export const requireAssistPass = asyncHandler(async (req, res, next) => {
     // The driver handlers find the trip by its driver and word messages with
     // the actor's name; here that actor is the bus assistant.
     req.driver = { _id: trip.driver, firstName: 'Bus assistant', lastName: `(${name})` };
-    // Remember who helped on this trip (once per name).
-    await Trip.updateOne({ _id: trip._id, 'assistants.name': { $ne: name } }, { $push: { assistants: { name, firstSeenAt: new Date() } } });
+    // Remember who helped on this trip (once per name), and when their page
+    // last reached AwaBus (connected / disconnected), at most every 15 seconds.
+    const now = new Date();
+    const key = `${trip._id}:${name}`;
+    if (!lastSeenWrite.has(key) || now - lastSeenWrite.get(key) > 15000) {
+      lastSeenWrite.set(key, now);
+      const pushed = await Trip.updateOne(
+        { _id: trip._id, 'assistants.name': { $ne: name } },
+        { $push: { assistants: { name, firstSeenAt: now, lastSeenAt: now } } }
+      );
+      if (!pushed.modifiedCount) await Trip.updateOne({ _id: trip._id, 'assistants.name': name }, { $set: { 'assistants.$.lastSeenAt': now } });
+    }
     next();
   });
 });

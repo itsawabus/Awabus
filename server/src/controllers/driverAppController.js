@@ -29,7 +29,7 @@ import { sessionFor, ridesIn, runWords } from '../utils/sessions.js';
 import { alertForScan } from '../services/parentAlerts.js';
 import { driverReading } from '../services/busPosition.js';
 import { cancelledStudentIds, dateKey } from '../services/rideCancellations.js';
-import { createPass, revokePass } from '../services/assistPass.js';
+import { createPass, revokePass, assistantsWithStatus } from '../services/assistPass.js';
 
 // What the driver sees about each student: name, class and the parent to call.
 export const STUDENT_FOR_DRIVER = {
@@ -194,7 +194,8 @@ export const getAssistPass = asyncHandler(async (req, res) => {
   }
   const p = trip.assistPass || {};
   const active = Boolean(p.hash) && ASSIST_OPEN.includes(trip.status) && (!p.expiresAt || new Date(p.expiresAt) > new Date());
-  res.json({ success: true, data: { active, createdAt: p.createdAt, expiresAt: p.expiresAt, assistants: trip.assistants || [] } });
+  const assistants = assistantsWithStatus(trip);
+  res.json({ success: true, data: { active, createdAt: p.createdAt, expiresAt: p.expiresAt, assistants, connected: assistants.some((a) => a.connected) } });
 });
 
 // @desc    New bus assistant QR code for a trip (any earlier one stops working)

@@ -9,6 +9,7 @@ import Card from '../../../src/components/ui/Card.jsx';
 import Button from '../../../src/components/ui/Button.jsx';
 import ConfirmDialog from '../../../src/components/ui/ConfirmDialog.jsx';
 import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
+import { AssistantLine } from '../../../src/components/AssistantStatus.jsx';
 import { createAssistPass, getAssistPass, getTodaysTrip, stopAssistPass } from '../../../src/api/driverApp.js';
 import { colors, radii } from '../../../src/lib/theme.js';
 
@@ -175,9 +176,7 @@ export function AssistantScreen({ back = false }) {
                 <Text style={styles.helpersTitle}>Helping on this trip</Text>
               </View>
               {helpers.map((h) => (
-                <Text key={h.name} style={styles.helper}>
-                  • {h.name}
-                </Text>
+                <AssistantLine key={h.name} assistant={h} style={{ marginTop: 8 }} />
               ))}
             </Card>
           ) : null}

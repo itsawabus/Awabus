@@ -140,7 +140,11 @@ const tripSchema = new mongoose.Schema(
       expiresAt: { type: Date, default: null },
     },
     // Who used the pass, for the trip record.
-    assistants: [{ name: { type: String, default: '' }, firstSeenAt: { type: Date, default: Date.now }, _id: false }],
+    // lastSeenAt: when their page last reached AwaBus (it checks in every
+    // 10 seconds while open): connected / disconnected (services/assistPass.js).
+    assistants: [
+      { name: { type: String, default: '' }, firstSeenAt: { type: Date, default: Date.now }, lastSeenAt: { type: Date, default: null }, _id: false },
+    ],
     // Texts sent from the bus to one student's parent (driver app message button).
     parentMessages: [
       {
