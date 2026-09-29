@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SvgXml } from 'react-native-svg';
@@ -11,7 +11,7 @@ import ConfirmDialog from '../../../src/components/ui/ConfirmDialog.jsx';
 import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
 import { AssistantLine } from '../../../src/components/AssistantStatus.jsx';
 import { createAssistPass, getAssistPass, getTodaysTrip, stopAssistPass } from '../../../src/api/driverApp.js';
-import { colors, radii } from '../../../src/lib/theme.js';
+import { colors, radii, themed } from '../../../src/lib/theme.js';
 
 // The last QR code shown for a trip is kept on this phone, so reopening this
 // screen shows the same code (making a new one would cut the teacher off).
@@ -216,7 +216,7 @@ export function AssistantScreen({ back = false }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   page: { padding: 16, gap: 12 },
   card: { padding: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -231,4 +231,4 @@ const styles = StyleSheet.create({
   helpersTitle: { fontSize: 14, fontWeight: '800', color: colors.slate800 },
   helper: { marginTop: 6, fontSize: 14, color: colors.slate700 },
   note: { flex: 1, fontSize: 12, color: colors.slate400 },
-});
+}));

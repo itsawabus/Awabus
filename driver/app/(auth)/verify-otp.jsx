@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Text } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import AuthLayout from '../../src/components/layout/AuthLayout.jsx';
@@ -7,7 +7,7 @@ import OtpInput from '../../src/components/ui/OtpInput.jsx';
 import Button from '../../src/components/ui/Button.jsx';
 import { verifyOtp, resendOtp } from '../../src/api/driverApp.js';
 import { useResetFlowStore } from '../../src/store/resetFlowStore.js';
-import { colors } from '../../src/lib/theme.js';
+import { colors, themed } from '../../src/lib/theme.js';
 
 const maskPhone = (phone = '') => {
   const digits = phone.replace(/\D/g, '');
@@ -86,7 +86,7 @@ export default function VerifyOtp() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   title: { fontSize: 26, fontWeight: '800', color: colors.slate900 },
   subtitle: { marginTop: 4, fontSize: 15, color: colors.slate500, marginBottom: 28 },
   error: { marginTop: 12, textAlign: 'center', fontSize: 12, fontWeight: '600', color: colors.red500 },
@@ -95,4 +95,4 @@ const styles = StyleSheet.create({
   resendTextDisabled: { color: colors.slate400 },
   verifyButton: { marginBottom: 20 },
   backLink: { textAlign: 'center', color: colors.slate500, fontWeight: '700', fontSize: 14 },
-});
+}));

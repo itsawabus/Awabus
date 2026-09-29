@@ -1,4 +1,4 @@
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Mail, MailWarning } from 'lucide-react-native';
 import Header from '../../../src/components/layout/Header.jsx';
@@ -6,7 +6,7 @@ import Card from '../../../src/components/ui/Card.jsx';
 import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
 import { getBroadcastHistory } from '../../../src/api/driverApp.js';
 import { formatDateTime } from '../../../src/lib/utils.js';
-import { colors } from '../../../src/lib/theme.js';
+import { colors, themed } from '../../../src/lib/theme.js';
 
 export default function BroadcastHistory() {
   const { data, isLoading } = useQuery({ queryKey: ['broadcast-history'], queryFn: getBroadcastHistory });
@@ -56,7 +56,7 @@ export default function BroadcastHistory() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   list: { padding: 16, gap: 10 },
   card: { gap: 8, marginBottom: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -76,4 +76,4 @@ const styles = StyleSheet.create({
   emptyCard: { alignItems: 'center', gap: 6, paddingVertical: 40 },
   emptyTitle: { fontWeight: '800', color: colors.slate700, fontSize: 14 },
   emptyText: { color: colors.slate400, fontSize: 13, textAlign: 'center' },
-});
+}));

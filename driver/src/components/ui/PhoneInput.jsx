@@ -1,5 +1,5 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors, radii } from '../../lib/theme.js';
+import { Text, TextInput, View } from 'react-native';
+import { colors, radii, themed } from '../../lib/theme.js';
 import { sanitizePhone } from '../../lib/phone.js';
 import GhanaFlag from './GhanaFlag.jsx';
 
@@ -32,7 +32,7 @@ export default function PhoneInput({ value, onChange, error, placeholder = '055 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   wrap: {
     height: 52,
     borderRadius: radii.lg,
@@ -66,4 +66,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.slate900,
   },
-});
+}));

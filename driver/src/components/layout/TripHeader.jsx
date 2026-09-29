@@ -1,13 +1,15 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radii } from '../../lib/theme.js';
+import { colors, radii, themed } from '../../lib/theme.js';
 import { formatClock } from '../../lib/utils.js';
+import ThemeButton from '../ThemeButton.jsx';
 
 export default function TripHeader({ status, isOnline, subtitle, elapsedSeconds }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
       <View style={styles.row}>
+        <ThemeButton style={{ marginLeft: -8, marginRight: 4, marginTop: -4 }} />
         <View style={{ flex: 1 }}>
           <View style={styles.titleRow}>
             <Text style={styles.title}>{status}</Text>
@@ -25,7 +27,7 @@ export default function TripHeader({ status, isOnline, subtitle, elapsedSeconds 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   header: {
     backgroundColor: colors.navy,
     paddingHorizontal: 16,
@@ -68,4 +70,4 @@ const styles = StyleSheet.create({
     color: colors.onDark,
     fontVariant: ['tabular-nums'],
   },
-});
+}));

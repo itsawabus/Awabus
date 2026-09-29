@@ -1,8 +1,8 @@
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { HelpCircle, Mail, MessageCircle, Phone } from 'lucide-react-native';
 import Header from '../../../src/components/layout/Header.jsx';
 import Card from '../../../src/components/ui/Card.jsx';
-import { colors } from '../../../src/lib/theme.js';
+import { colors, themed } from '../../../src/lib/theme.js';
 
 const FAQS = [
   {
@@ -32,6 +32,14 @@ const FAQS = [
   {
     q: 'Does the school still see the bus if I open another screen?',
     a: 'Yes. While a trip is running the app keeps sending the bus position whichever screen you are on, as long as the app stays open.',
+  },
+  {
+    q: 'What is driving mode?',
+    a: 'On the trip screen, tap Driving mode for a big, simple screen: the next child and how far away. The whole screen is light green when the internet and location are working, and turns yellow (with a buzz) if something is wrong, such as no network or a weak GPS signal. Tap Exit to go back.',
+  },
+  {
+    q: 'How do I switch between light and dark?',
+    a: 'Tap the sun / moon button at the top left of any screen. It changes straight away. Settings > Theme can also follow your phone\'s own setting.',
   },
   {
     q: 'How do I change my password?',
@@ -88,7 +96,7 @@ export default function HelpSupport() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   scroll: { padding: 16, gap: 16, paddingBottom: 32 },
   iconWrap: {
     alignSelf: 'center',
@@ -119,4 +127,4 @@ const styles = StyleSheet.create({
   faqItem: { paddingVertical: 14 },
   faqQuestion: { fontWeight: '700', color: colors.slate800, fontSize: 14 },
   faqAnswer: { marginTop: 6, color: colors.slate500, fontSize: 13, lineHeight: 19 },
-});
+}));

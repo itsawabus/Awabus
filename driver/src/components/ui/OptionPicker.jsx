@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Check, ChevronDown } from 'lucide-react-native';
-import { colors, radii } from '../../lib/theme.js';
+import { colors, radii, themed } from '../../lib/theme.js';
 import Modal from './Modal.jsx';
 
 // A field that opens a bottom-sheet list of options — the RN stand-in for a
@@ -33,7 +33,7 @@ export function OptionField({ label, value, options, onChange, open, onOpen, onC
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   field: {
     height: 52,
     borderRadius: radii.lg,
@@ -67,6 +67,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.slate800,
   },
-});
+}));
 
 export default OptionField;

@@ -1,13 +1,13 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radii } from '../../lib/theme.js';
+import { colors, radii, themedMap } from '../../lib/theme.js';
 
-const TONES = {
+const TONES = themedMap(() => ({
   success: { bg: colors.emerald50, text: colors.emerald700 },
   danger: { bg: colors.red50, text: colors.red600 },
   warning: { bg: colors.amber50, text: colors.amber700 },
   neutral: { bg: colors.slate100, text: colors.slate600 },
   brand: { bg: 'rgba(255,255,255,0.18)', text: colors.onDark },
-};
+}));
 
 export default function Badge({ children, tone = 'success', style }) {
   const t = TONES[tone] || TONES.success;

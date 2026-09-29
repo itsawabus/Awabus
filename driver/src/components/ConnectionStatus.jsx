@@ -1,9 +1,9 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { AlertTriangle } from 'lucide-react-native';
 import Badge from './ui/Badge.jsx';
 import { useConnectionStore } from '../store/connectionStore.js';
 import { useLocationStatusStore, busOnlineFrom, busOfflineReason } from '../store/locationStatusStore.js';
-import { colors, radii } from '../lib/theme.js';
+import { colors, radii, themed } from '../lib/theme.js';
 
 /** The driver's two readings, the same ones the school sees. */
 export function useConnectionStatus() {
@@ -39,7 +39,7 @@ export function BusOfflineBanner({ style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
   banner: {
     flexDirection: 'row',
@@ -51,4 +51,4 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   bannerText: { flex: 1, color: colors.amber800, fontSize: 13, lineHeight: 18 },
-});
+}));

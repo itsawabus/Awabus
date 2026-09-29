@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View, Pressable } from 'react-native';
+import { ScrollView, Text, TextInput, View, Pressable } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Search, X } from 'lucide-react-native';
 import Header from '../../../src/components/layout/Header.jsx';
@@ -7,7 +7,7 @@ import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
 import { getTodaysTrip } from '../../../src/api/driverApp.js';
 import { runWords, statusLabel } from '../../../src/lib/runs.js';
 import { matchesSearch, callInfo, CALL_IN_PROGRESS } from '../../../src/lib/nearest.js';
-import { colors, radii } from '../../../src/lib/theme.js';
+import { colors, radii, themed, themedMap } from '../../../src/lib/theme.js';
 import { useTripPhotos } from '../../../src/hooks/useTripPhotos.js';
 import Avatar from '../../../src/components/ui/Avatar.jsx';
 
@@ -114,15 +114,15 @@ const Count = ({ label, value }) => (
   </View>
 );
 
-const TONE = {
+const TONE = themedMap(() => ({
   good: { color: colors.emerald700 },
   info: { color: colors.brand600 },
   bad: { color: colors.red600 },
   muted: { color: colors.slate400 },
   plain: { color: colors.slate500 },
-};
+}));
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   scroll: { padding: 16, gap: 12, paddingBottom: 32 },
   subtitle: { fontSize: 13, color: colors.slate500 },
   counts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -148,4 +148,4 @@ const styles = StyleSheet.create({
   call: { fontSize: 12, fontWeight: '700', marginTop: 2 },
   status: { fontSize: 13, fontWeight: '800', textAlign: 'right', maxWidth: '45%' },
   empty: { textAlign: 'center', color: colors.slate400, paddingVertical: 20, fontSize: 13 },
-});
+}));

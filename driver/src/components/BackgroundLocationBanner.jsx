@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { AppState, Linking, Platform, Text, View } from 'react-native';
 import { MapPin } from 'lucide-react-native';
 import Button from './ui/Button.jsx';
 import { backgroundPermission, askBackgroundPermission } from '../lib/backgroundLocation.js';
 import { useLiveGpsStore } from '../store/liveGpsStore.js';
-import { colors, radii } from '../lib/theme.js';
+import { colors, radii, themed } from '../lib/theme.js';
 
 /**
  * Asks the driver to set location to "Allow all the time", so the school
@@ -90,10 +90,10 @@ export default function BackgroundLocationBanner({ style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   box: { backgroundColor: colors.amber50, borderWidth: 1, borderColor: colors.warnBorder, borderRadius: radii.lg, padding: 12 },
   row: { flexDirection: 'row', gap: 8 },
   title: { fontSize: 14, fontWeight: '800', color: colors.amber800 },
   text: { flex: 1, fontSize: 13, lineHeight: 18, color: colors.amber800, marginTop: 2 },
   steps: { fontSize: 12, color: colors.amber800, marginTop: 6, fontWeight: '700' },
-});
+}));

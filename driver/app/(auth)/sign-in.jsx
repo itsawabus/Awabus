@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View, Pressable } from 'react-native';
+import { Text, View, Pressable } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { AlertCircle, ArrowLeft, Check, WifiOff } from 'lucide-react-native';
@@ -11,7 +11,7 @@ import Button from '../../src/components/ui/Button.jsx';
 import { checkPhone, login as loginApi, setPassword as setPasswordApi } from '../../src/api/driverApp.js';
 import { formatPhone, isValidPhone, toLocalPhone } from '../../src/lib/phone.js';
 import { useAuthStore } from '../../src/store/authStore.js';
-import { colors, radii } from '../../src/lib/theme.js';
+import { colors, radii, themed } from '../../src/lib/theme.js';
 
 const MAX_TRIES = 6;
 
@@ -275,7 +275,7 @@ export default function SignIn() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   buildLine: { marginTop: 16, textAlign: 'center', fontSize: 11, color: colors.slate400 },
   title: {
     fontSize: 26,
@@ -362,4 +362,4 @@ const styles = StyleSheet.create({
   ruleDotActive: { backgroundColor: colors.brand100 },
   ruleText: { fontSize: 13, color: colors.slate400 },
   ruleTextActive: { color: colors.brand700, fontWeight: '600' },
-});
+}));

@@ -1,6 +1,6 @@
 // Shared design tokens — mirrors the color system used in /admin (navy from the
 // sign-in page, mint/teal from the AwaBus logo) so both apps look the same.
-import { Appearance } from 'react-native';
+import { Appearance, StyleSheet } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 // Light palette. Each name keeps one job: "white" is a card / sheet surface,
@@ -104,8 +104,9 @@ const dark = {
   greenBorder: '#065f46',
 };
 
-// The theme is chosen when the app starts (Settings > Appearance saves it and
-// restarts the app), so every screen's styles are made with the right colours.
+// The theme is read when the app starts and can be changed at any time
+// (header sun / moon button, Settings > Appearance): the colours below are
+// swapped in place and the screens are drawn again, without restarting.
 export const THEME_KEY = 'awabus_theme';
 function startTheme() {
   let saved = null;
@@ -118,9 +119,56 @@ function startTheme() {
   return choice === 'system' ? (Appearance.getColorScheme() === 'dark' ? 'dark' : 'light') : choice;
 }
 
-export const scheme = startTheme();
-export const isDark = scheme === 'dark';
-export const colors = isDark ? dark : light;
+const PALETTES = { light, dark };
+let scheme = startTheme();
+let version = 0;
+
+// One object for the whole app; its values change with the theme.
+export const colors = { ...PALETTES[scheme] };
+
+export const currentScheme = () => scheme;
+export const themeVersion = () => version;
+
+/** Switches every colour to the light or dark palette. Returns true if it changed. */
+export function applyScheme(next) {
+  if (!PALETTES[next] || next === scheme) return false;
+  scheme = next;
+  Object.assign(colors, PALETTES[next]);
+  version += 1;
+  return true;
+}
+
+// Styles and colour tables are made from `colors` when first used and made
+// again after the theme changes, so they always use the current colours.
+function lazyObject(make) {
+  let made = null;
+  let madeFor = -1;
+  const get = () => {
+    if (madeFor !== version) {
+      made = make();
+      madeFor = version;
+    }
+    return made;
+  };
+  return new Proxy(
+    {},
+    {
+      get: (_, key) => get()[key],
+      has: (_, key) => key in get(),
+      ownKeys: () => Reflect.ownKeys(get()),
+      getOwnPropertyDescriptor: (_, key) => {
+        const d = Object.getOwnPropertyDescriptor(get(), key);
+        return d ? { ...d, configurable: true } : undefined;
+      },
+    }
+  );
+}
+
+/** Like StyleSheet.create, for styles that use theme colours: themed(() => ({ ... })). */
+export const themed = (make) => lazyObject(() => StyleSheet.create(make()));
+
+/** A plain lookup table that uses theme colours: themedMap(() => ({ ... })). */
+export const themedMap = (make) => lazyObject(make);
 
 export const spacing = (n) => n * 4;
 

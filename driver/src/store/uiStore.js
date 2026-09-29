@@ -1,8 +1,7 @@
 import { create } from 'zustand';
-import { Appearance, DevSettings, Platform } from 'react-native';
+import { Appearance } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import * as Updates from 'expo-updates';
-import { THEME_KEY, scheme } from '../lib/theme.js';
+import { THEME_KEY, applyScheme, themeVersion } from '../lib/theme.js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PREFS_KEY = 'awabus_driver_prefs';
@@ -27,8 +26,7 @@ const applyTheme = (theme) => {
   }
 };
 
-// The screens' colours are fixed when the app starts (src/lib/theme.js reads
-// this synchronously), so a new theme is saved there and the app restarts.
+// Saved for the next start too (src/lib/theme.js reads it before the first screen).
 const saveThemeForStart = (theme) => {
   try {
     SecureStore.setItem(THEME_KEY, theme);
@@ -39,21 +37,11 @@ const saveThemeForStart = (theme) => {
 
 const themeNow = (theme) => (theme === 'system' ? (Appearance.getColorScheme() === 'dark' ? 'dark' : 'light') : theme);
 
-async function restartApp() {
-  if (Platform.OS === 'web') {
-    window.location.reload();
-    return;
-  }
-  try {
-    await Updates.reloadAsync();
-  } catch {
-    DevSettings.reload();
-  }
-}
-
 export const useUiStore = create((set, get) => ({
   ...defaultPrefs,
   isHydrated: false,
+  // Goes up each time the colours change; the app draws its screens again.
+  themeVersion: themeVersion(),
 
   hydrate: async () => {
     try {
@@ -62,7 +50,12 @@ export const useUiStore = create((set, get) => ({
       applyTheme(prefs.theme);
       // Older versions kept the theme only here: copy it for the next start.
       saveThemeForStart(prefs.theme);
-      set({ ...prefs, isHydrated: true });
+      applyScheme(themeNow(prefs.theme));
+      set({ ...prefs, isHydrated: true, themeVersion: themeVersion() });
+      // "Phone setting": follow the phone when it switches light / dark.
+      Appearance.addChangeListener(() => {
+        if (get().theme === 'system' && applyScheme(themeNow('system'))) set({ themeVersion: themeVersion() });
+      });
     } catch {
       set({ isHydrated: true });
     }
@@ -76,8 +69,8 @@ export const useUiStore = create((set, get) => ({
     if (key === 'theme') {
       applyTheme(value);
       saveThemeForStart(value);
-      // Restart only when the colours actually change.
-      if (themeNow(value) !== scheme) setTimeout(restartApp, 350);
+      // New colours straight away, no restart.
+      if (applyScheme(themeNow(value))) set({ themeVersion: themeVersion() });
     }
   },
 }));

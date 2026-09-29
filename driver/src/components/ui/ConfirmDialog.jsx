@@ -1,7 +1,7 @@
-import { StyleSheet, Text } from 'react-native';
+import { Text } from 'react-native';
 import Modal from './Modal.jsx';
 import Button from './Button.jsx';
-import { colors } from '../../lib/theme.js';
+import { colors, themed } from '../../lib/theme.js';
 
 /**
  * "Are you sure?" sheet shown before an action is carried out.
@@ -36,7 +36,7 @@ export default function ConfirmDialog({ request, onClose, loading = false }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   title: { fontSize: 20, fontWeight: '800', color: colors.slate900 },
   message: { marginTop: 6, fontSize: 14, color: colors.slate500, lineHeight: 20 },
-});
+}));

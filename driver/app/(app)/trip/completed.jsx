@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { CheckCheck } from 'lucide-react-native';
@@ -9,7 +9,7 @@ import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
 import { useOfflineQueueStore } from '../../../src/store/offlineQueueStore.js';
 import { getTripById } from '../../../src/api/driverApp.js';
 import { formatDateTime, formatDuration } from '../../../src/lib/utils.js';
-import { colors } from '../../../src/lib/theme.js';
+import { colors, themed } from '../../../src/lib/theme.js';
 import { runWords } from '../../../src/lib/runs.js';
 
 export default function TripCompleted() {
@@ -85,7 +85,7 @@ const Row = ({ label, value, last, warn }) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   banner: {
     backgroundColor: colors.primary,
     alignItems: 'center',
@@ -113,4 +113,4 @@ const styles = StyleSheet.create({
   syncNote: { textAlign: 'center', color: colors.slate500, fontSize: 13 },
   footer: { padding: 16, gap: 4 },
   linkButton: { alignSelf: 'center', marginTop: 8 },
-});
+}));

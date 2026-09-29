@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { CheckCircle2 } from 'lucide-react-native';
 import Modal from './ui/Modal.jsx';
 import Button from './ui/Button.jsx';
 import { Label, Textarea } from './ui/Input.jsx';
 import { sendParentMessage } from '../api/driverApp.js';
-import { colors, radii } from '../lib/theme.js';
+import { colors, radii, themed } from '../lib/theme.js';
 
 const MAX = 140;
 
@@ -134,7 +134,7 @@ export default function GroupMessageSheet({ target, onClose }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   title: { fontSize: 20, fontWeight: '800', color: colors.slate900 },
   sub: { marginTop: 4, fontSize: 13, color: colors.slate500 },
   quick: { borderWidth: 1, borderColor: colors.slate200, borderRadius: radii.lg, paddingVertical: 10, paddingHorizontal: 12 },
@@ -145,4 +145,4 @@ const styles = StyleSheet.create({
   error: { marginTop: 4, color: colors.red600, fontSize: 13, textAlign: 'center' },
   done: { alignItems: 'center', paddingVertical: 24, gap: 8 },
   doneText: { fontSize: 15, fontWeight: '600', color: colors.slate800, textAlign: 'center' },
-});
+}));

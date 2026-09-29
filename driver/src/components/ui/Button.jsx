@@ -1,14 +1,14 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import { colors, radii } from '../../lib/theme.js';
+import { colors, radii, themedMap } from '../../lib/theme.js';
 
-const VARIANT_STYLES = {
+const VARIANT_STYLES = themedMap(() => ({
   primary: { bg: colors.primary, text: colors.onDark },
   auth: { bg: colors.brand300, text: colors.navy }, // navy on mint in both themes
   outline: { bg: colors.white, text: colors.brand700, border: colors.brand600 },
   danger: { bg: colors.dangerBg, text: colors.onDark },
   ghost: { bg: 'transparent', text: colors.slate600 },
   link: { bg: 'transparent', text: colors.brand600 },
-};
+}));
 
 const SIZE_STYLES = {
   sm: { height: 40, paddingHorizontal: 14, fontSize: 14 },

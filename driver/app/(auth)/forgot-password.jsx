@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import AuthLayout from '../../src/components/layout/AuthLayout.jsx';
@@ -9,7 +9,7 @@ import Button from '../../src/components/ui/Button.jsx';
 import { forgotPassword } from '../../src/api/driverApp.js';
 import { isValidPhone, toLocalPhone } from '../../src/lib/phone.js';
 import { useResetFlowStore } from '../../src/store/resetFlowStore.js';
-import { colors } from '../../src/lib/theme.js';
+import { colors, themed } from '../../src/lib/theme.js';
 
 export default function ForgotPassword() {
   const setPhone = useResetFlowStore((s) => s.setPhone);
@@ -58,7 +58,7 @@ export default function ForgotPassword() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   title: { fontSize: 26, fontWeight: '800', color: colors.slate900 },
   subtitle: { marginTop: 4, fontSize: 15, color: colors.slate500, marginBottom: 20 },
   field: { marginBottom: 18 },
@@ -69,4 +69,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
   },
-});
+}));

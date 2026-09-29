@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BackHandler, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { useKeepAwake } from 'expo-keep-awake';
-import { AlertTriangle, CheckCircle2, Circle, CornerUpRight, ListChecks, MessageSquare, Navigation, QrCode, Search, X } from 'lucide-react-native';
+import { useStayAwake } from '../../../src/hooks/useStayAwake.js';
+import { AlertTriangle, Car, CheckCircle2, Circle, CornerUpRight, ListChecks, MessageSquare, Navigation, QrCode, Search, X } from 'lucide-react-native';
 import TripHeader from '../../../src/components/layout/TripHeader.jsx';
 import Card from '../../../src/components/ui/Card.jsx';
 import Button from '../../../src/components/ui/Button.jsx';
@@ -24,7 +24,7 @@ import { useAuthStore } from '../../../src/store/authStore.js';
 import { getTodaysTrip, markAttendance, endTrip, getAssistPass } from '../../../src/api/driverApp.js';
 import { AssistantLine } from '../../../src/components/AssistantStatus.jsx';
 import { formatClock, formatDate, formatLat, formatLng, timeAgo } from '../../../src/lib/utils.js';
-import { colors, radii } from '../../../src/lib/theme.js';
+import { colors, radii, themed, themedMap } from '../../../src/lib/theme.js';
 import { runWords } from '../../../src/lib/runs.js';
 import { orderTrip, sectionsFor, matchesSearch, callInfo, formatDistance, CALL_IN_PROGRESS } from '../../../src/lib/nearest.js';
 import BackgroundLocationBanner from '../../../src/components/BackgroundLocationBanner.jsx';
@@ -36,7 +36,7 @@ import Avatar from '../../../src/components/ui/Avatar.jsx';
 
 export default function ActiveTrip() {
   // The screen stays on while the trip screen is open, so the list can be read at a glance.
-  useKeepAwake('awabus-trip');
+  useStayAwake('awabus-trip');
   const queryClient = useQueryClient();
   const isOnline = useConnectionStore((s) => s.isOnline);
   const { busOnline } = useConnectionStatus();
@@ -263,6 +263,19 @@ export default function ActiveTrip() {
       />
 
       <ScrollView contentContainerStyle={styles.scroll}>
+        <Pressable
+          onPress={() => router.push('/trip/driving')}
+          style={({ pressed }) => [styles.drivingButton, pressed && { opacity: 0.85 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Driving mode"
+        >
+          <Car size={22} color={colors.onDark} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.drivingTitle}>Driving mode</Text>
+            <Text style={styles.drivingHint}>Big and simple: green when all is well, yellow if there is a problem</Text>
+          </View>
+        </Pressable>
+
         <Card>
           <Text style={styles.infoLine}>
             <Text style={styles.infoLabel}>Bus: </Text>
@@ -664,12 +677,12 @@ function AssistantStatusBox({ helpers, onOpen }) {
   );
 }
 
-const CALL_TONE = {
+const CALL_TONE = themedMap(() => ({
   info: { color: colors.brand600 },
   good: { color: colors.emerald700 },
   bad: { color: colors.red600 },
   plain: { color: colors.slate500 },
-};
+}));
 
 const SmallButton = ({ label, onPress, variant = 'primary' }) => (
   <Pressable
@@ -690,7 +703,10 @@ const SummaryRow = ({ label, value }) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
+  drivingButton: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.brand600, borderRadius: radii.lg, paddingHorizontal: 16, paddingVertical: 14 },
+  drivingTitle: { color: colors.onDark, fontSize: 17, fontWeight: '800' },
+  drivingHint: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 },
   scroll: { padding: 16, gap: 16, paddingBottom: 32 },
   infoLine: { fontSize: 14, marginBottom: 2 },
   infoLabel: { color: colors.slate500 },
@@ -822,4 +838,4 @@ const styles = StyleSheet.create({
   warningText: { fontSize: 13, color: colors.amber800 },
   dangerBox: { backgroundColor: colors.red50 },
   dangerText: { fontSize: 13, fontWeight: '700', color: colors.red700 },
-});
+}));

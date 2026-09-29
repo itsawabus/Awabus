@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -11,7 +11,7 @@ import Button from '../../../src/components/ui/Button.jsx';
 import Modal from '../../../src/components/ui/Modal.jsx';
 import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
 import { getTodaysTrip, sendDelayBroadcast } from '../../../src/api/driverApp.js';
-import { colors, radii } from '../../../src/lib/theme.js';
+import { colors, radii, themed } from '../../../src/lib/theme.js';
 import { delayAffects } from '../../../src/lib/runs.js';
 
 // Same limit as the server, so the SMS stays one message.
@@ -113,7 +113,7 @@ export default function DelayBroadcast() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   scroll: { padding: 16, paddingTop: 24 },
   iconWrap: {
     alignSelf: 'center',
@@ -141,4 +141,4 @@ const styles = StyleSheet.create({
   sheetTitle: { fontSize: 18, fontWeight: '800', color: colors.slate900 },
   sheetSubtitle: { fontSize: 14, color: colors.slate500, marginTop: 6, lineHeight: 20 },
   errorText: { fontSize: 13, color: colors.red600, marginTop: 10 },
-});
+}));

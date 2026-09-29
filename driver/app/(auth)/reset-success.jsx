@@ -1,9 +1,9 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { CheckCircle2 } from 'lucide-react-native';
 import AuthLayout from '../../src/components/layout/AuthLayout.jsx';
 import Button from '../../src/components/ui/Button.jsx';
-import { colors } from '../../src/lib/theme.js';
+import { colors, themed } from '../../src/lib/theme.js';
 
 export default function ResetSuccess() {
   return (
@@ -20,9 +20,9 @@ export default function ResetSuccess() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   center: { alignItems: 'center', textAlign: 'center' },
   title: { marginTop: 16, fontSize: 20, fontWeight: '800', color: colors.slate900, textAlign: 'center' },
   subtitle: { marginTop: 8, fontSize: 14, color: colors.slate500, textAlign: 'center' },
   button: { marginTop: 32, width: '100%' },
-});
+}));

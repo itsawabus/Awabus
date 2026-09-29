@@ -1,4 +1,4 @@
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { History } from 'lucide-react-native';
@@ -8,7 +8,7 @@ import Badge from '../../../../src/components/ui/Badge.jsx';
 import { PageLoader } from '../../../../src/components/ui/Spinner.jsx';
 import { getTripHistory } from '../../../../src/api/driverApp.js';
 import { formatShortDate } from '../../../../src/lib/utils.js';
-import { colors } from '../../../../src/lib/theme.js';
+import { colors, themed } from '../../../../src/lib/theme.js';
 import { runWords } from '../../../../src/lib/runs.js';
 import { busLabel } from '../../../../src/lib/bus.js';
 
@@ -60,7 +60,7 @@ export default function TripHistory() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   list: { padding: 16, gap: 10 },
   tripCard: { gap: 6, marginBottom: 10 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -70,4 +70,4 @@ const styles = StyleSheet.create({
   emptyCard: { alignItems: 'center', gap: 6, paddingVertical: 40 },
   emptyTitle: { fontWeight: '800', color: colors.slate700, fontSize: 14 },
   emptyText: { color: colors.slate400, fontSize: 13 },
-});
+}));
