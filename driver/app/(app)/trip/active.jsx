@@ -5,7 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
-import { AlertTriangle, CheckCircle2, Circle, ListChecks, MessageSquare, Navigation, QrCode, Search, X } from 'lucide-react-native';
+import { AlertTriangle, CheckCircle2, Circle, CornerUpRight, ListChecks, MessageSquare, Navigation, QrCode, Search, X } from 'lucide-react-native';
 import TripHeader from '../../../src/components/layout/TripHeader.jsx';
 import Card from '../../../src/components/ui/Card.jsx';
 import Button from '../../../src/components/ui/Button.jsx';
@@ -30,6 +30,7 @@ import { orderTrip, sectionsFor, matchesSearch, callInfo, formatDistance, CALL_I
 import BackgroundLocationBanner from '../../../src/components/BackgroundLocationBanner.jsx';
 import { BusOfflineBanner, useConnectionStatus } from '../../../src/components/ConnectionStatus.jsx';
 import { busLabel } from '../../../src/lib/bus.js';
+import { hasHome, openDirections } from '../../../src/lib/directions.js';
 import { useTripPhotos } from '../../../src/hooks/useTripPhotos.js';
 import Avatar from '../../../src/components/ui/Avatar.jsx';
 
@@ -361,6 +362,17 @@ export default function ActiveTrip() {
                 {nextUp.metres != null ? ` · ${formatDistance(nextUp.metres)}` : nextUp.noHome ? ' · no home location saved' : ''}
               </Text>
             </View>
+            {hasHome(nextUp.p.student) ? (
+              <Pressable
+                onPress={() => openDirections(nextUp.p.student)}
+                style={({ pressed }) => [styles.nextDirections, pressed && { opacity: 0.7 }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Directions to ${nextUp.p.student?.firstName}'s home`}
+              >
+                <CornerUpRight size={16} color={colors.navy} />
+                <Text style={styles.nextDirectionsText}>Directions</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
 
@@ -408,6 +420,7 @@ export default function ActiveTrip() {
                   <StudentRow
                     p={r.p}
                     photo={photos[r.p.student?._id]}
+                    onDirections={sec.key === 'next' && hasHome(r.p.student) ? () => openDirections(r.p.student) : null}
                     distance={sec.key === 'next' ? (r.metres != null ? `${formatDistance(r.metres)} away` : r.noHome ? 'No home location saved' : '') : ''}
                     session={trip.session}
                     isOnline={isOnline}
@@ -513,7 +526,7 @@ export default function ActiveTrip() {
 }
 
 // One student: what happened so far, and the next step as a button.
-function StudentRow({ p, photo, distance, session, isOnline, onSet, onCall, onMessage }) {
+function StudentRow({ p, photo, distance, session, isOnline, onSet, onCall, onMessage, onDirections }) {
   const w = runWords(session);
   const name = p.student ? `${p.student.firstName} ${p.student.lastName}` : 'Student';
   const when = p._offline || !isOnline ? ' (offline)' : p.alertTime ? ` at ${p.alertTime}` : '';
@@ -521,7 +534,17 @@ function StudentRow({ p, photo, distance, session, isOnline, onSet, onCall, onMe
   const call = callInfo(p);
   const extra = (
     <>
-      {distance ? <Text style={styles.distanceText}>{distance}</Text> : null}
+      {distance || onDirections ? (
+        <View style={styles.distanceRow}>
+          {distance ? <Text style={styles.distanceText}>{distance}</Text> : null}
+          {onDirections ? (
+            <Pressable onPress={onDirections} hitSlop={8} accessibilityRole="button" accessibilityLabel="Directions to this home" style={styles.dirLink}>
+              <CornerUpRight size={13} color={colors.brand600} />
+              <Text style={styles.dirLinkText}>Directions</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
       {call ? <Text style={[styles.callText, CALL_TONE[call.tone]]}>{call.text}</Text> : null}
     </>
   );
@@ -686,6 +709,11 @@ const styles = StyleSheet.create({
   searchField: { flex: 1, fontSize: 14, color: colors.slate800, paddingVertical: 0 },
   orderNote: { fontSize: 12, color: colors.slate500, marginBottom: 8 },
   groupTitle: { fontSize: 12, fontWeight: '800', color: colors.slate500 },
+  distanceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 2 },
+  dirLink: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  dirLinkText: { fontSize: 12, fontWeight: '800', color: colors.brand600 },
+  nextDirections: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.white, borderRadius: radii.lg, paddingHorizontal: 10, paddingVertical: 8 },
+  nextDirectionsText: { fontSize: 13, fontWeight: '800', color: colors.navy },
   distanceText: { marginTop: 2, fontSize: 12, fontWeight: '700', color: colors.slate600 },
   callText: { marginTop: 2, fontSize: 12, fontWeight: '800' },
   searchInput: {

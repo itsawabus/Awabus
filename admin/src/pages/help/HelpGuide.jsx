@@ -182,6 +182,8 @@ export const GUIDE = [
           'What the teacher does is recorded as "Bus assistant (their name)" in notifications and on the trip.',
           'During a trip the driver and the teacher see the students nearest first: the child whose home is closest to the bus is at the top (next pick-up in the morning, next drop-off in the afternoon), and the list updates as the bus moves. Children with no home location saved are listed after them.',
           'Both can search for a student by name, class or parent, and open the Attendance list (A–Z), a fixed list that never re-sorts.',
+          'Select several students at once (driver: hold a student; teacher: tap Select) to mark them all picked up / dropped / not here, or send one SMS to their parents.',
+          'Directions: the next child\'s card has a Directions button that opens Google Maps turn-by-turn navigation to their home.',
           'The teacher can switch on "Share my location as backup". The driver\'s phone always comes first; if it stops reporting for about 45 seconds (for example its data drops), the teacher\'s phone shows the bus position until the driver\'s is back, and Live Tracking says so. The teacher\'s phone is only used while it is near the driver\'s, and only while the page stays open with the screen on.',
           'When arrival calls are switched on (Arkesel voice), each student card shows how the call to the parent went: calling, ringing, answered, call cut, declined, not picked up or didn\'t go through. If the parent doesn\'t pick up, a text is sent instead.',
         ],
