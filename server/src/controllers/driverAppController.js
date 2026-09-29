@@ -30,7 +30,7 @@ import { sessionFor, ridesIn, runWords, delayAffects } from '../utils/sessions.j
 import { alertForScan } from '../services/parentAlerts.js';
 import { driverReading } from '../services/busPosition.js';
 import { cancelledStudentIds, dateKey } from '../services/rideCancellations.js';
-import { createPass, revokePass, assistantsWithStatus } from '../services/assistPass.js';
+import { carryPass, createPass, revokePass, assistantsWithStatus } from '../services/assistPass.js';
 
 // What the driver sees about each student: name, class and the parent to call.
 export const STUDENT_FOR_DRIVER = {
@@ -429,6 +429,7 @@ export const getTodaysTrip = asyncHandler(async (req, res) => {
 
   // A run that was never started stays behind when its time has passed (the
   // morning trip at evening time): close it and get the current run ready.
+  let replaced = null;
   if (trip && trip.status === 'Scheduled' && trip.session && trip.session !== sessionFor(trip.route)) {
     await Trip.updateOne(
       { _id: trip._id, status: 'Scheduled' },
@@ -437,11 +438,14 @@ export const getTodaysTrip = asyncHandler(async (req, res) => {
         $push: { timeline: { time: timeNow(), title: 'Not driven', description: `The ${runWords(trip.session).name} was never started.` } },
       }
     );
+    replaced = trip._id;
     trip = null;
   }
 
   if (!trip) {
     trip = await provisionTodaysTrip(req.driver, start, end);
+    // The bus assistant's link follows the driver to the new run.
+    if (replaced && trip) await carryPass(replaced);
   } else {
     trip = await reconcileStudentProgress(trip);
   }
