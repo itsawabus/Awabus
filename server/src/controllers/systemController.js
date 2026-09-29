@@ -1,4 +1,5 @@
 // Developer tools for the superadmin "System" page: health, messaging and errors.
+import { voiceProviderStatus } from '../services/voice/index.js';
 import asyncHandler from 'express-async-handler';
 import mongoose from 'mongoose';
 import { readFileSync } from 'node:fs';
@@ -36,6 +37,10 @@ const CONFIG = [
   { key: 'ARKESEL_API_KEY', group: 'SMS (Arkesel)', note: 'From the Arkesel dashboard' },
   { key: 'ARKESEL_SENDER_ID', group: 'SMS (Arkesel)', note: 'Approved sender name, max 11 characters' },
   { key: 'ARKESEL_SANDBOX', group: 'SMS (Arkesel)', note: '"true" = test mode, messages are not delivered or charged' },
+  { key: 'VOICE_PROVIDER', group: 'Arrival calls (Arkesel voice)', note: 'Set to "arkesel" to call parents when the bus is near home (a text is sent if not picked up)' },
+  { key: 'ARKESEL_VOICE_FILE_URL', group: 'Arrival calls (Arkesel voice)', note: 'Address of the recorded message parents hear' },
+  { key: 'VOICE_WEBHOOK_TOKEN', group: 'Arrival calls (Arkesel voice)', note: 'Secret in the call-result webhook address: /api/webhooks/voice?token=...' },
+  { key: 'SERVER_PUBLIC_URL', group: 'Arrival calls (Arkesel voice)', note: 'This server\'s public address (for the webhook)' },
   { key: 'OTP_EXPIRES_MINUTES', group: 'Other', note: 'How long codes last (default 10)' },
   { key: 'LOG_OTP_CODES', group: 'Other', note: '"false" stops printing unsent codes in the server log' },
   { key: 'TRIP_SIMULATOR', group: 'Other', note: '"true" turns on the demo GPS simulator (never on a live system)' },
@@ -85,6 +90,7 @@ export const getHealth = asyncHandler(async (req, res) => {
       messaging: {
         sms: { ...smsProviderStatus(), balance: await smsBalance() },
         email: emailProviderStatus(),
+        voice: voiceProviderStatus(),
         last24h: { total: messages24h, failed: failed24h },
       },
       errors: { sinceStart: errors.total, latest: errors.entries[0] || null },

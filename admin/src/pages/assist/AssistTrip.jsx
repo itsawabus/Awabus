@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Bus, CheckCircle2, Clock, MessageSquare, Phone, RefreshCw, UserRound } from 'lucide-react';
+import { AlertTriangle, Bus, CheckCircle2, Clock, ListChecks, MessageSquare, Navigation, Phone, RefreshCw, Search, UserRound, X } from 'lucide-react';
 import { API_URL } from '../../api/client.js';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -12,6 +12,7 @@ import Input, { Label, Textarea, Select } from '../../components/ui/Input.jsx';
 import { formatPhone } from '../../lib/phone.js';
 import { cn } from '../../lib/utils.js';
 import { runWords, sessionLabel, statusLabel } from '../../lib/sessions.js';
+import { orderTrip, sectionsFor, matchesSearch, callInfo, formatDistance, CALL_IN_PROGRESS } from '../../lib/nearest.js';
 
 // Bus assistant page: opened by the teacher on bus duty from the driver's QR
 // code. No account; the link's pass works until the trip ends.
@@ -115,11 +116,16 @@ function AssistBoard({ pass, name, onChangeName }) {
   const [messageTo, setMessageTo] = useState(null);
   const [delayOpen, setDelayOpen] = useState(false);
   const [flash, setFlash] = useState('');
+  const [search, setSearch] = useState('');
+  const [view, setView] = useState(null); // 'nearest' | 'az' (null = pick for the trip's state)
+  const lastOrder = useRef({ order: [], bus: null });
 
   const { data: trip, error, isLoading, refetch, isFetching } = useQuery({
     queryKey: key,
     queryFn: () => api.get('/assist/trip').then((r) => r.data.data),
-    refetchInterval: (q) => (q.state.error ? false : 10000),
+    // Faster while a parent's phone is ringing, so the call result shows quickly.
+    refetchInterval: (q) =>
+      q.state.error ? false : q.state.data?.studentProgress?.some((p) => CALL_IN_PROGRESS.includes(p.callStatus)) ? 5000 : 10000,
     retry: (count, err) => ![401, 410].includes(err?.status) && count < 2,
   });
 
@@ -167,6 +173,36 @@ function AssistBoard({ pass, name, onChangeName }) {
   const dropped = riding.filter((p) => p.dropoffStatus === 'Dropped off').length;
 
   const ask = (title, message, confirmLabel, run, danger = false) => setConfirm({ title, message, confirmLabel, run, danger });
+
+  // Nearest first from the bus's last position; the order holds still while
+  // a dialog is open, so nothing moves under a tap.
+  const frozen = Boolean(confirm || messageTo);
+  const bus = frozen ? lastOrder.current.bus : trip.liveLocation || null;
+  const ordered = orderTrip({ progress: rows, session: trip.session, bus, previous: lastOrder.current.order });
+  lastOrder.current = { order: ordered.order, bus };
+  const shownView = view || (live ? 'nearest' : 'az');
+  const searching = search.trim().length > 0;
+  const sections = sectionsFor(trip.session)
+    .map((sec) => ({ ...sec, rows: ordered[sec.key].filter((r) => matchesSearch(r.p, search)) }))
+    .filter((sec) => sec.rows.length);
+  const nameOf = (p) => `${p.student?.firstName || ''} ${p.student?.lastName || ''}`.trim();
+  const azRows = [...rows].sort((a, b) => nameOf(a).localeCompare(nameOf(b))).filter((p) => matchesSearch(p, search));
+  const nextUp = ordered.next[0];
+  const renderCard = (p, distance = '') => (
+    <StudentCard
+      key={p.student?._id}
+      p={p}
+      distance={distance}
+      session={trip.session}
+      live={live}
+      scheduled={trip.status === 'Scheduled'}
+      busy={mark.isPending && mark.variables?.studentId === p.student?._id}
+      onMessage={() => setMessageTo(p.student)}
+      onAction={(label, body, confirmText, danger) =>
+        ask(label, confirmText, 'Yes', () => mark.mutate({ studentId: p.student._id, body }), danger)
+      }
+    />
+  );
 
   return (
     <Shell>
@@ -231,23 +267,95 @@ function AssistBoard({ pass, name, onChangeName }) {
         </div>
       )}
 
-      <div className="mt-4 space-y-2">
-        {rows.map((p) => (
-          <StudentCard
-            key={p.student?._id}
-            p={p}
-            session={trip.session}
-            live={live}
-            scheduled={trip.status === 'Scheduled'}
-            busy={mark.isPending && mark.variables?.studentId === p.student?._id}
-            onMessage={() => setMessageTo(p.student)}
-            onAction={(label, body, confirmText, danger) =>
-              ask(label, confirmText, 'Yes', () => mark.mutate({ studentId: p.student._id, body }), danger)
-            }
+      {live && nextUp && shownView === 'nearest' && !searching && (
+        <div className="mt-4 flex items-center gap-3 rounded-2xl bg-navy px-4 py-3 text-white">
+          <Navigation className="h-5 w-5 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-300">
+              {trip.session === 'evening' ? 'Next drop-off' : trip.session === 'morning' ? 'Next pick-up' : 'Next'}
+            </p>
+            <p className="truncate font-extrabold">
+              {nameOf(nextUp.p)}
+              {nextUp.metres != null ? ` · ${formatDistance(nextUp.metres)}` : nextUp.noHome ? ' · no home location saved' : ''}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-xl bg-white p-1 shadow-sm dark:bg-navy-light" role="tablist">
+          {[
+            { value: 'nearest', label: 'Nearest first', Icon: Navigation },
+            { value: 'az', label: 'Attendance list (A–Z)', Icon: ListChecks },
+          ].map(({ value, label, Icon }) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={shownView === value}
+              onClick={() => setView(value)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold',
+                shownView === value ? 'bg-navy text-white' : 'text-slate-600 dark:text-slate-300'
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" /> {label}
+            </button>
+          ))}
+        </div>
+        <label className="flex min-w-[12rem] flex-1 items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm dark:bg-navy-light">
+          <Search className="h-4 w-4 shrink-0 text-slate-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, class or parent..."
+            aria-label="Search students"
+            className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100"
           />
-        ))}
-        {rows.length === 0 && <p className="py-10 text-center text-sm text-slate-500">No students on this trip.</p>}
+          {searching && (
+            <button type="button" onClick={() => setSearch('')} aria-label="Clear search">
+              <X className="h-4 w-4 text-slate-400" />
+            </button>
+          )}
+        </label>
       </div>
+
+      {shownView === 'nearest' ? (
+        <div className="mt-3 space-y-4">
+          {live && !bus && ordered.next.length > 1 && (
+            <p className="text-xs text-slate-500">Waiting for the bus position to put the nearest child first.</p>
+          )}
+          {sections.map((sec) => (
+            <div key={sec.key} className="space-y-2">
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                {sec.title} · {sec.rows.length}
+              </p>
+              {sec.rows.map((r) =>
+                renderCard(r.p, sec.key === 'next' && live ? (r.metres != null ? `${formatDistance(r.metres)} away` : r.noHome ? 'No home location saved' : '') : '')
+              )}
+            </div>
+          ))}
+          {sections.length === 0 && (
+            <p className="py-10 text-center text-sm text-slate-500">{searching ? 'No student matches that search.' : 'No students on this trip.'}</p>
+          )}
+        </div>
+      ) : (
+        <div className="mt-3">
+          <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">Everyone on the trip A–Z. This list never re-sorts.</p>
+          {trip.status === 'Scheduled' ? (
+            <div className="space-y-2">{azRows.map((p) => renderCard(p))}</div>
+          ) : (
+            <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm dark:divide-slate-800 dark:bg-navy-light">
+              {azRows.map((p) => (
+                <AzRow key={p.student?._id} p={p} session={trip.session} />
+              ))}
+            </div>
+          )}
+          {azRows.length === 0 && (
+            <p className="py-10 text-center text-sm text-slate-500">{searching ? 'No student matches that search.' : 'No students on this trip.'}</p>
+          )}
+        </div>
+      )}
 
       <p className="mt-6 text-center text-xs text-slate-400">
         Helping as <span className="font-semibold">{name}</span> ·{' '}
@@ -274,6 +382,37 @@ function AssistBoard({ pass, name, onChangeName }) {
   );
 }
 
+const CALL_TONE = {
+  info: 'text-brand-600 dark:text-brand-400',
+  good: 'text-emerald-700 dark:text-emerald-400',
+  bad: 'text-red-600 dark:text-red-400',
+  plain: 'text-slate-500 dark:text-slate-400',
+};
+
+// One line of the fixed A–Z attendance list.
+function AzRow({ p, session }) {
+  const s = p.student || {};
+  const name = `${s.firstName || ''} ${s.lastName || ''}`.trim() || 'Student';
+  const call = callInfo(p);
+  let status = statusLabel(session, p.dropoffStatus || 'Pending');
+  let tone = 'text-slate-500 dark:text-slate-400';
+  if (p.attendance === 'Cancelled') status = 'Cancelled by parent';
+  else if (p.attendance === 'Absent') status = 'Absent';
+  else if (p.dropoffStatus === 'Dropped off') tone = 'text-emerald-700 dark:text-emerald-400';
+  else if (p.dropoffStatus === 'On board') tone = 'text-brand-600 dark:text-brand-400';
+  else if (p.dropoffStatus === 'Not on board') tone = 'text-red-600 dark:text-red-400';
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{name}</p>
+        {s.classGrade && <p className="truncate text-xs text-slate-400">{s.classGrade}</p>}
+        {call && <p className={cn('text-xs font-bold', CALL_TONE[call.tone])}>{call.text}</p>}
+      </div>
+      <span className={cn('shrink-0 text-right text-sm font-bold', tone)}>{status}</span>
+    </div>
+  );
+}
+
 const Stat = ({ label, value }) => (
   <div className="rounded-xl bg-slate-50 py-2 dark:bg-navy">
     <p className="text-lg font-extrabold text-slate-900 dark:text-white">{value}</p>
@@ -281,7 +420,7 @@ const Stat = ({ label, value }) => (
   </div>
 );
 
-function StudentCard({ p, session, live, scheduled, busy, onAction, onMessage }) {
+function StudentCard({ p, distance, session, live, scheduled, busy, onAction, onMessage }) {
   const w = runWords(session);
   const s = p.student || {};
   const g = s.primaryGuardian;
@@ -293,6 +432,8 @@ function StudentCard({ p, session, live, scheduled, busy, onAction, onMessage })
   else if (p.attendance === 'Absent') status = 'Not attending';
   else if (p.dropoffStatus === 'Pending' && scheduled) status = 'Attending';
 
+  const call = callInfo(p);
+
   return (
     <div className={cn('rounded-2xl bg-white p-4 shadow-sm dark:bg-navy-light', out && 'opacity-70')}>
       <div className="flex items-start justify-between gap-3">
@@ -303,6 +444,8 @@ function StudentCard({ p, session, live, scheduled, busy, onAction, onMessage })
               .filter(Boolean)
               .join(' · ')}
           </p>
+          {distance && <p className="mt-0.5 text-xs font-semibold text-slate-600 dark:text-slate-300">{distance}</p>}
+          {call && <p className={cn('mt-0.5 text-xs font-bold', CALL_TONE[call.tone])}>{call.text}</p>}
         </div>
         <Badge tone={['Dropped off', 'On board'].includes(p.dropoffStatus) && !out ? 'success' : status === 'Attending' ? 'success' : out || p.dropoffStatus === 'Not on board' ? 'danger' : 'neutral'}>
           {status}

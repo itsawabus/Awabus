@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { AlertTriangle, Search } from 'lucide-react-native';
+import { AlertTriangle, ListChecks, Navigation, Search, X } from 'lucide-react-native';
 import TripHeader from '../../../src/components/layout/TripHeader.jsx';
 import Card from '../../../src/components/ui/Card.jsx';
 import Button from '../../../src/components/ui/Button.jsx';
@@ -23,6 +23,7 @@ import { getTodaysTrip, markAttendance, endTrip } from '../../../src/api/driverA
 import { formatClock, formatDate, formatLat, formatLng, timeAgo } from '../../../src/lib/utils.js';
 import { colors, radii } from '../../../src/lib/theme.js';
 import { runWords } from '../../../src/lib/runs.js';
+import { orderTrip, sectionsFor, matchesSearch, callInfo, formatDistance, CALL_IN_PROGRESS } from '../../../src/lib/nearest.js';
 import { BusOfflineBanner, useConnectionStatus } from '../../../src/components/ConnectionStatus.jsx';
 
 export default function ActiveTrip() {
@@ -39,7 +40,6 @@ export default function ActiveTrip() {
 
   const [elapsed, setElapsed] = useState(0);
   const [search, setSearch] = useState('');
-  const [showSearch, setShowSearch] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   const [confirm, setConfirm] = useState(null); // pending "are you sure?" request
   const [messageTo, setMessageTo] = useState(null); // { tripId, student } for the message sheet
@@ -50,7 +50,9 @@ export default function ActiveTrip() {
   const { data: trip, isLoading } = useQuery({
     queryKey: ['todays-trip'],
     queryFn: getTodaysTrip,
-    refetchInterval: 20000,
+    // Faster while a parent's phone is ringing, so the call result shows quickly.
+    refetchInterval: (query) =>
+      query.state.data?.studentProgress?.some((p) => CALL_IN_PROGRESS.includes(p.callStatus)) ? 5000 : 20000,
   });
 
   // Back to the start screen when this trip is no longer running, but only
@@ -145,10 +147,23 @@ export default function ActiveTrip() {
   const notHere = riding.filter((p) => p.dropoffStatus === 'Not on board');
   const unscanned = riding.filter((p) => !p.dropoffStatus || p.dropoffStatus === 'Pending' || p.dropoffStatus === 'Boarding now');
 
-  const visibleStudents = useMemo(() => {
-    if (!search) return progress;
-    return progress.filter((p) => `${p.student?.firstName || ''} ${p.student?.lastName || ''}`.toLowerCase().includes(search.toLowerCase()));
-  }, [progress, search]);
+  // Nearest first, from the phone's position (or the last one the school has).
+  // The order stays put while a dialog is open, so it never moves under a tap.
+  const busPos = position || trip?.liveLocation || null;
+  const frozen = Boolean(confirm || messageTo);
+  const lastOrder = useRef({ order: [], bus: null });
+  const ordered = useMemo(() => {
+    const bus = frozen ? lastOrder.current.bus : busPos;
+    const result = orderTrip({ progress, session: trip?.session, bus, previous: lastOrder.current.order });
+    lastOrder.current = { order: result.order, bus };
+    return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress, trip?.session, busPos?.lat, busPos?.lng, frozen]);
+  const searching = search.trim().length > 0;
+  const sections = sectionsFor(trip?.session)
+    .map((sec) => ({ ...sec, rows: ordered[sec.key].filter((r) => matchesSearch(r.p, search)) }))
+    .filter((sec) => sec.rows.length);
+  const nextUp = ordered.next[0];
 
   if (isLoading || !trip) return <PageLoader label="Loading trip..." />;
 
@@ -243,28 +258,67 @@ export default function ActiveTrip() {
           </Text>
         </View>
 
+        {nextUp && !searching ? (
+          <View style={styles.nextCard}>
+            <Navigation size={18} color={colors.white} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.nextLabel}>{trip.session === 'evening' ? 'Next drop-off' : trip.session === 'morning' ? 'Next pick-up' : 'Next'}</Text>
+              <Text style={styles.nextName}>
+                {nextUp.p.student?.firstName} {nextUp.p.student?.lastName}
+                {nextUp.metres != null ? ` · ${formatDistance(nextUp.metres)}` : nextUp.noHome ? ' · no home location saved' : ''}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         <View>
           <View style={styles.rowBetween}>
             <Text style={styles.sectionLabel}>Students on this trip</Text>
-            <Pressable onPress={() => setShowSearch((v) => !v)} hitSlop={8}>
-              <Search size={18} color={colors.slate400} />
+            <Pressable onPress={() => router.push('/trip/attendance')} hitSlop={8} style={styles.listLink} accessibilityRole="button">
+              <ListChecks size={16} color={colors.brand600} />
+              <Text style={styles.listLinkText}>Attendance list (A–Z)</Text>
             </Pressable>
           </View>
-          {showSearch && (
+          <View style={styles.searchBox}>
+            <Search size={16} color={colors.slate400} />
             <TextInput
-              autoFocus
               value={search}
               onChangeText={setSearch}
-              placeholder="Search students..."
+              placeholder="Search name, class or parent..."
               placeholderTextColor={colors.slate400}
-              style={styles.searchInput}
+              style={styles.searchField}
+              returnKeyType="search"
             />
-          )}
-          <View style={{ gap: 8 }}>
-            {visibleStudents.map((p) => (
-              <StudentRow key={p.student?._id} p={p} session={trip.session} isOnline={isOnline} onSet={(status) => askStatus(p, status)} onCall={callParent} onMessage={(student) => setMessageTo({ tripId: trip._id, student })} />
+            {searching ? (
+              <Pressable onPress={() => setSearch('')} hitSlop={8} accessibilityLabel="Clear search">
+                <X size={16} color={colors.slate400} />
+              </Pressable>
+            ) : null}
+          </View>
+          {!busPos && ordered.next.length > 1 ? (
+            <Text style={styles.orderNote}>Waiting for the bus position to put the nearest child first.</Text>
+          ) : null}
+          <View style={{ gap: 14 }}>
+            {sections.map((sec) => (
+              <View key={sec.key} style={{ gap: 8 }}>
+                <Text style={styles.groupTitle}>
+                  {sec.title} · {sec.rows.length}
+                </Text>
+                {sec.rows.map((r) => (
+                  <StudentRow
+                    key={r.p.student?._id}
+                    p={r.p}
+                    distance={sec.key === 'next' ? (r.metres != null ? `${formatDistance(r.metres)} away` : r.noHome ? 'No home location saved' : '') : ''}
+                    session={trip.session}
+                    isOnline={isOnline}
+                    onSet={(status) => askStatus(r.p, status)}
+                    onCall={callParent}
+                    onMessage={(student) => setMessageTo({ tripId: trip._id, student })}
+                  />
+                ))}
+              </View>
             ))}
-            {visibleStudents.length === 0 && <Text style={styles.emptyListText}>No students found.</Text>}
+            {sections.length === 0 && <Text style={styles.emptyListText}>{searching ? 'No student matches that search.' : 'No students on this trip.'}</Text>}
           </View>
         </View>
       </ScrollView>
@@ -318,11 +372,18 @@ export default function ActiveTrip() {
 }
 
 // One student: what happened so far, and the next step as a button.
-function StudentRow({ p, session, isOnline, onSet, onCall, onMessage }) {
+function StudentRow({ p, distance, session, isOnline, onSet, onCall, onMessage }) {
   const w = runWords(session);
   const name = p.student ? `${p.student.firstName} ${p.student.lastName}` : 'Student';
   const when = p._offline || !isOnline ? ' (offline)' : p.alertTime ? ` at ${p.alertTime}` : '';
   const status = p.dropoffStatus;
+  const call = callInfo(p);
+  const extra = (
+    <>
+      {distance ? <Text style={styles.distanceText}>{distance}</Text> : null}
+      {call ? <Text style={[styles.callText, CALL_TONE[call.tone]]}>{call.text}</Text> : null}
+    </>
+  );
 
   if (p.attendance === 'Absent' || p.attendance === 'Cancelled') {
     return (
@@ -330,6 +391,7 @@ function StudentRow({ p, session, isOnline, onSet, onCall, onMessage }) {
         <View style={{ flex: 1 }}>
           <Text style={[styles.studentName, styles.mutedName]}>{name}</Text>
           <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
+          {extra}
         </View>
         <Text style={styles.absentText}>{p.attendance === 'Cancelled' ? 'Cancelled by parent' : 'Absent'}</Text>
       </View>
@@ -341,6 +403,7 @@ function StudentRow({ p, session, isOnline, onSet, onCall, onMessage }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.studentName}>{name}</Text>
           <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
+          {extra}
         </View>
         <Text style={styles.scannedText}>{w.drop}{when}</Text>
       </View>
@@ -353,6 +416,7 @@ function StudentRow({ p, session, isOnline, onSet, onCall, onMessage }) {
           <Text style={styles.studentName}>{name}</Text>
           <Text style={styles.onBoardText}>{w.board}{when}</Text>
           <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
+          {extra}
         </View>
         <SmallButton label={w.drop} onPress={() => onSet('Dropped off')} />
       </View>
@@ -364,6 +428,7 @@ function StudentRow({ p, session, isOnline, onSet, onCall, onMessage }) {
         <Text style={styles.studentName}>{name}</Text>
         {status === 'Not on board' ? <Text style={styles.notHereText}>{w.notHere}{when}</Text> : <Text style={styles.waitingText}>{w.waiting}</Text>}
         <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
+          {extra}
       </View>
       <View style={styles.actions}>
         {status !== 'Not on board' && <SmallButton label={w.notHere} variant="ghost" onPress={() => onSet('Not on board')} />}
@@ -372,6 +437,13 @@ function StudentRow({ p, session, isOnline, onSet, onCall, onMessage }) {
     </View>
   );
 }
+
+const CALL_TONE = {
+  info: { color: colors.brand600 },
+  good: { color: colors.emerald700 },
+  bad: { color: colors.red600 },
+  plain: { color: colors.slate500 },
+};
 
 const SmallButton = ({ label, onPress, variant = 'primary' }) => (
   <Pressable
@@ -422,6 +494,28 @@ const styles = StyleSheet.create({
   progressFill: { position: 'absolute', left: 0, top: 0, height: '100%', backgroundColor: colors.navy, borderRadius: 4 },
   progressOnBoard: { position: 'absolute', left: 0, top: 0, height: '100%', backgroundColor: colors.brand600, opacity: 0.35, borderRadius: 4 },
   progressDetail: { marginTop: 6, fontSize: 12, color: colors.slate500 },
+  nextCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.navy, borderRadius: radii.xl, padding: 14 },
+  nextLabel: { color: colors.slate300, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  nextName: { color: colors.white, fontSize: 16, fontWeight: '800', marginTop: 2 },
+  listLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  listLinkText: { color: colors.brand600, fontSize: 13, fontWeight: '700' },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 44,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    backgroundColor: colors.white,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  searchField: { flex: 1, fontSize: 14, color: colors.slate800, paddingVertical: 0 },
+  orderNote: { fontSize: 12, color: colors.slate500, marginBottom: 8 },
+  groupTitle: { fontSize: 12, fontWeight: '800', color: colors.slate500 },
+  distanceText: { marginTop: 2, fontSize: 12, fontWeight: '700', color: colors.slate600 },
+  callText: { marginTop: 2, fontSize: 12, fontWeight: '800' },
   searchInput: {
     height: 44,
     borderRadius: radii.lg,

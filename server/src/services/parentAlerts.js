@@ -7,6 +7,9 @@ import Bus from '../models/Bus.js';
 import Trip from '../models/Trip.js';
 import { sendSms } from './messaging/index.js';
 import { runWords } from '../utils/sessions.js';
+import { tenantContext } from '../utils/tenantContext.js';
+import { emitToSchool } from '../sockets/rooms.js';
+import { voiceLive, placeCall, normalizeCallStatus, callMovesTo, CALL_LABELS } from './voice/index.js';
 
 export const parentAlertsEnabled = () => process.env.PARENT_ALERTS === 'true';
 
@@ -19,6 +22,7 @@ export const ALERT_STATUS = {
   failed: 'Failed',
   callsOff: 'Not called (arrival calls are off for this student)',
   sibling: 'Not called (parent already called for a brother or sister)',
+  calling: 'Calling parent',
 };
 
 const timeNow = () => new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Accra' });
@@ -31,6 +35,12 @@ const SCAN_TEXT = {
     `AwaBus: ${name} ${runWords(session).boarded}${plate ? ` (bus ${plate})` : ''} at ${time}.`,
   'Dropped off': (name, plate, time, session) =>
     `AwaBus: ${name} ${runWords(session).dropped}${plate ? ` (bus ${plate})` : ''} at ${time}.`,
+};
+
+// The near-home text (also sent when the arrival call is not picked up).
+const nearText = (firstName, session, dropoffStatus) => {
+  const what = session ? runWords(session).near : dropoffStatus === 'On board' ? runWords('evening').near : runWords('morning').near;
+  return `AwaBus: ${firstName || 'Your child'} ${what}.`;
 };
 
 const loadStudent = (id) =>
@@ -131,6 +141,7 @@ export async function checkGeofences({ tripId, position, school }) {
       entered += 1;
       const family = familyOf(row.student);
       let status = ALERT_STATUS.off;
+      let call = null;
       if (s.arrivalCalls === false) {
         status = ALERT_STATUS.callsOff; // switched off for this student
       } else if (!parentAlertsEnabled()) {
@@ -139,16 +150,73 @@ export async function checkGeofences({ tripId, position, school }) {
         status = ALERT_STATUS.sibling; // this parent / home was already called on this trip
       } else {
         family.forEach((key) => calledFamilies.add(key));
-        const what = trip.session ? runWords(trip.session).near : row.dropoffStatus === 'On board' ? runWords('evening').near : runWords('morning').near;
+        const phone = s.primaryGuardian?.phone;
+        // A phone call when a voice provider is on (its result then shows on
+        // the student's card); otherwise, or if the call can't be placed, a text.
         // eslint-disable-next-line no-await-in-loop
-        status = await deliver(s.primaryGuardian?.phone, `AwaBus: ${s.firstName} ${what}.`, 'approaching_alert', school);
+        const placed = voiceLive() && phone ? await placeCall({ to: phone, purpose: 'approaching_call' }) : { status: 'off' };
+        if (placed.status === 'calling') {
+          call = { callId: placed.callId, callStatus: 'calling', callAt: new Date() };
+          status = ALERT_STATUS.calling;
+        } else {
+          if (placed.status === 'failed') call = { callStatus: 'failed', callAt: new Date() };
+          // eslint-disable-next-line no-await-in-loop
+          status = await deliver(phone, nearText(s.firstName, trip.session, row.dropoffStatus), 'approaching_alert', school);
+          if (call) call.callFallback = status;
+        }
       }
+      const set = { [`${at}.nearHomeAlert`]: status };
+      if (call) for (const [key, value] of Object.entries(call)) set[`${at}.${key}`] = value;
       // eslint-disable-next-line no-await-in-loop
-      await Trip.updateOne({ _id: tripId, [`${at}.student`]: row.student }, { $set: { [`${at}.nearHomeAlert`]: status } });
+      await Trip.updateOne({ _id: tripId, [`${at}.student`]: row.student }, { $set: set });
     }
     return entered;
   } catch (err) {
     console.error('[parentAlerts] geofence check failed:', err.message);
     return 0;
   }
+}
+
+// Calls that did not reach the parent: a text goes instead.
+const NOT_REACHED = ['no_answer', 'declined', 'failed'];
+
+/**
+ * A call result from the voice provider's webhook (routes/webhookRoutes.js):
+ * updates the student's card, and texts the parent when the call was not
+ * picked up. Returns { found, changed, callStatus }.
+ */
+export async function handleCallResult({ callId, status, seconds, io }) {
+  if (!callId) return { found: false };
+  return tenantContext.runAsSystem(async () => {
+    const trip = await Trip.findOne({ 'studentProgress.callId': callId }).select('school session studentProgress');
+    if (!trip) return { found: false };
+    const index = trip.studentProgress.findIndex((r) => r.callId === callId);
+    const row = trip.studentProgress[index];
+    const next = normalizeCallStatus(status, seconds);
+    if (!callMovesTo(row.callStatus, next)) return { found: true, changed: false, callStatus: row.callStatus };
+
+    const at = `studentProgress.${index}`;
+    const set = { [`${at}.callStatus`]: next, [`${at}.callAt`]: new Date(), [`${at}.nearHomeAlert`]: `Call: ${CALL_LABELS[next]}` };
+    if (seconds !== null && seconds !== undefined && Number.isFinite(Number(seconds))) set[`${at}.callSeconds`] = Number(seconds);
+    await Trip.updateOne({ _id: trip._id, [`${at}.callId`]: callId }, { $set: set });
+
+    // Not picked up: text the parent instead, once (claimed first so two
+    // webhook deliveries send one text).
+    if (NOT_REACHED.includes(next)) {
+      const claimed = await Trip.updateOne(
+        { _id: trip._id, [`${at}.callId`]: callId, [`${at}.callFallback`]: '' },
+        { $set: { [`${at}.callFallback`]: 'Sending text' } }
+      );
+      if (claimed.modifiedCount) {
+        const student = await Student.findById(row.student).select('firstName primaryGuardian').populate('primaryGuardian', 'phone').lean();
+        const sent = await deliver(student?.primaryGuardian?.phone, nearText(student?.firstName, trip.session, row.dropoffStatus), 'approaching_alert', trip.school);
+        await Trip.updateOne(
+          { _id: trip._id, [`${at}.callId`]: callId },
+          { $set: { [`${at}.callFallback`]: sent, [`${at}.nearHomeAlert`]: `Call: ${CALL_LABELS[next]} · text ${sent === ALERT_STATUS.sent ? 'sent' : sent.toLowerCase()}` } }
+        );
+      }
+    }
+    emitToSchool(io, trip.school, 'trip:call', { tripId: trip._id, studentId: row.student, callStatus: next });
+    return { found: true, changed: true, callStatus: next };
+  });
 }

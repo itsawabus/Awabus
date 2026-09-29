@@ -35,6 +35,16 @@ const studentProgressSchema = new mongoose.Schema(
     // When the bus first came within the student's notification zone on this trip.
     nearHomeAt: { type: Date, default: null },
     nearHomeAlert: { type: String, default: '' },
+    // The arrival call to the parent, when a voice provider is on
+    // (services/voice): its id at the provider, how it went
+    // (calling | ringing | answered | cut | declined | no_answer | failed),
+    // when that was last updated and how long the parent listened.
+    callId: { type: String, default: '' },
+    callStatus: { type: String, default: '' },
+    callAt: { type: Date, default: null },
+    callSeconds: { type: Number, default: null },
+    // Text sent instead when the call was not picked up ('' = none needed yet).
+    callFallback: { type: String, default: '' },
     dropoffStatus: {
       type: String,
       enum: ['Pending', 'On board', 'Dropped off', 'Not on board', 'Boarding now'],
@@ -132,6 +142,8 @@ const tripSchema = new mongoose.Schema(
 tripSchema.index({ school: 1, tripCode: 1 }, { unique: true });
 // Looking up a bus assistant pass (across schools: the pass itself says which trip).
 tripSchema.index({ 'assistPass.hash': 1 }, { sparse: true });
+// Finding the trip row for a call result (webhook, across schools).
+tripSchema.index({ 'studentProgress.callId': 1 }, { sparse: true });
 // common query pattern: "today's trips for this school"
 tripSchema.index({ school: 1, date: -1 });
 tripSchema.index({ school: 1, status: 1 });

@@ -180,6 +180,7 @@ function HealthTab({ h }) {
           <CardBody className="space-y-3">
             <ProviderLine icon={MessageSquare} label="SMS" status={messaging.sms} />
             <ProviderLine icon={MessageSquare} label="Email" status={messaging.email} />
+            {messaging.voice && <ProviderLine icon={MessageSquare} label="Arrival calls" status={messaging.voice} />}
             <Row label="Last 24 hours">{messaging.last24h.total} messages · {messaging.last24h.failed} failed</Row>
           </CardBody>
         </Card>

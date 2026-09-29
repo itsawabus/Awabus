@@ -33,7 +33,8 @@ import { createPass, revokePass } from '../services/assistPass.js';
 // What the driver sees about each student: name, class and the parent to call.
 export const STUDENT_FOR_DRIVER = {
   path: 'studentProgress.student',
-  select: 'firstName lastName studentCode classGrade primaryGuardian',
+  // lat / lng: the home, so the list can put the next child to pick up or drop first.
+  select: 'firstName lastName studentCode classGrade primaryGuardian lat lng',
   populate: { path: 'primaryGuardian', select: 'firstName lastName relation phone' },
 };
 

@@ -180,6 +180,9 @@ export const GUIDE = [
           'From there they can do the roll call, mark children as boarded, not here or dropped off, call or text a parent, and send a delay notice. The same limits as the driver apply.',
           'The page stops working when the trip ends, when the driver taps Stop sharing or New code, or after 12 hours.',
           'What the teacher does is recorded as "Bus assistant (their name)" in notifications and on the trip.',
+          'During a trip the driver and the teacher see the students nearest first: the child whose home is closest to the bus is at the top (next pick-up in the morning, next drop-off in the afternoon), and the list updates as the bus moves. Children with no home location saved are listed after them.',
+          'Both can search for a student by name, class or parent, and open the Attendance list (A–Z), a fixed list that never re-sorts.',
+          'When arrival calls are switched on (Arkesel voice), each student card shows how the call to the parent went: calling, ringing, answered, call cut, declined, not picked up or didn\'t go through. If the parent doesn\'t pick up, a text is sent instead.',
         ],
       },
       {

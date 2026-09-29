@@ -13,6 +13,7 @@ export const MESSAGE_PURPOSES = {
   parent_message: { channel: 'sms', label: 'Message from the bus to one parent', where: 'Driver app > student list > message button', wired: true },
   test: { channel: 'sms', label: 'Test message', where: 'System page > Send test SMS', wired: true },
   boarding_alert: { channel: 'sms', label: 'Child boarded / dropped off alert to parents', where: 'Driver app scan (on with PARENT_ALERTS=true)', wired: true, switch: 'PARENT_ALERTS' },
+  approaching_call: { channel: 'voice', label: 'Bus near home call to parents (text if not picked up)', where: 'Live GPS vs the student\'s notification zone (on with PARENT_ALERTS=true and VOICE_PROVIDER set)', wired: true, switch: 'PARENT_ALERTS' },
   approaching_alert: { channel: 'sms', label: 'Bus near home alert (geofence)', where: 'Live GPS vs the student\'s notification zone (on with PARENT_ALERTS=true)', wired: true, switch: 'PARENT_ALERTS' },
 };
 

@@ -11,6 +11,7 @@ import studentRoutes from './routes/studentRoutes.js';
 import guardianRoutes from './routes/guardianRoutes.js';
 import tripRoutes from './routes/tripRoutes.js';
 import trackingRoutes from './routes/trackingRoutes.js';
+import webhookRoutes from './routes/webhookRoutes.js';
 import driverAppRoutes from './routes/driverAppRoutes.js';
 import superadminRoutes from './routes/superadminRoutes.js';
 import geocodeRoutes from './routes/geocodeRoutes.js';
@@ -62,7 +63,7 @@ if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 // `features` tells apart servers running different code (e.g. the deployed
 // server vs. a Codespace on a branch): open /api/health on each to compare.
 app.get('/api/health', (req, res) =>
-  res.json({ success: true, message: 'AwaBus API is running', features: ['runs', 'arrival-calls', 'driver-online'] })
+  res.json({ success: true, message: 'AwaBus API is running', features: ['runs', 'arrival-calls', 'driver-online', 'call-status', 'nearest-first'] })
 );
 
 // Admin Portal API
@@ -81,6 +82,8 @@ app.use('/api/superadmin', superadminRoutes);
 app.use('/api/geocode', geocodeRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/notifications', notificationRoutes);
+// Results sent back by outside services (voice call status)
+app.use('/api/webhooks', webhookRoutes);
 
 // Driver App API (mobile client not built yet, API is ready)
 app.use('/api/driver-app', driverAppRoutes);
