@@ -12,6 +12,7 @@ import Modal from '../../../src/components/ui/Modal.jsx';
 import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
 import { getTodaysTrip, sendDelayBroadcast } from '../../../src/api/driverApp.js';
 import { colors, radii } from '../../../src/lib/theme.js';
+import { delayAffects } from '../../../src/lib/runs.js';
 
 // Same limit as the server, so the SMS stays one message.
 const MAX_MESSAGE = 100;
@@ -44,7 +45,8 @@ export default function DelayBroadcast() {
 
   if (isLoading || !trip) return <PageLoader />;
 
-  const attending = (trip.studentProgress || []).filter((p) => p.attendance === 'Present').length;
+  // Same rule as the server: only children still waiting on this run.
+  const attending = (trip.studentProgress || []).filter((p) => delayAffects(p, trip.session)).length;
   const preview = `AwaBus: ${trip.route?.name || 'Your route'} is running late. ${message}`.trim();
 
   return (
@@ -55,7 +57,11 @@ export default function DelayBroadcast() {
           <Mail size={28} color={colors.navy} />
         </View>
         <Text style={styles.title}>Notify attending parents</Text>
-        <Text style={styles.subtitle}>Sends one SMS to the parents of the {attending} students attending today.</Text>
+        <Text style={styles.subtitle}>
+          Sends one SMS to the parents of the {attending} student{attending === 1 ? '' : 's'} still waiting
+          {trip.session === 'morning' ? ' to be picked up' : trip.session === 'evening' ? ' to be dropped home' : ''}. Children already
+          {trip.session === 'morning' ? ' picked up' : ' dropped'} are left out.
+        </Text>
 
         <View style={styles.field}>
           <Label>Delay reason</Label>
