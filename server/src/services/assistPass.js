@@ -7,7 +7,6 @@
 //   Delayed), and never longer than PASS_HOURS.
 // - Only a SHA-256 hash of the pass is stored.
 import crypto from 'node:crypto';
-import QRCode from 'qrcode';
 import Trip from '../models/Trip.js';
 import { tenantContext } from '../utils/tenantContext.js';
 
@@ -35,6 +34,14 @@ export async function createPass(trip) {
   const expiresAt = new Date(now.getTime() + PASS_HOURS * 60 * 60 * 1000);
   await Trip.updateOne({ _id: trip._id }, { $set: { assistPass: { hash: hashOf(pass), createdAt: now, expiresAt } } });
   const url = `${assistBaseUrl()}/assist/${pass}`;
+  // Loaded only when a code is made, so the server still starts (and
+  // everything else works) if "npm install" has not been run yet.
+  let QRCode;
+  try {
+    QRCode = (await import('qrcode')).default;
+  } catch {
+    throw new Error('The QR code maker is not installed on the server. Run "npm install" in the server folder and restart it.');
+  }
   const qrSvg = await QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
   return { url, qrSvg, expiresAt };
 }

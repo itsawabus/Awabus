@@ -14,6 +14,7 @@ import Student from '../models/Student.js';
 import Guardian from '../models/Guardian.js';
 import Trip from '../models/Trip.js';
 import Driver from '../models/Driver.js';
+import '../models/Route.js'; // registers Route, used by populate('route') below
 import { tenantContext } from '../utils/tenantContext.js';
 import { ghanaPhoneVariants } from '../utils/phone.js';
 import { ridesIn, sessionFor, toMinutes } from '../utils/sessions.js';
@@ -33,11 +34,12 @@ const nextSchoolDay = (key) => {
 };
 const dayBounds = (key) => [new Date(`${key}T00:00:00.000Z`), new Date(`${key}T23:59:59.999Z`)];
 
-// Has today's run of this kind started (or finished, or been closed)?
+// Has today's run of this kind started (or finished)?
 async function runUnderway(routeId, session, key) {
   const [start, end] = dayBounds(key);
   return Boolean(
-    await Trip.exists({ route: routeId, session, date: { $gte: start, $lte: end }, status: { $ne: 'Scheduled' } })
+    // A trip closed as "not driven" (Cancelled) doesn't count: that run didn't happen.
+    await Trip.exists({ route: routeId, session, date: { $gte: start, $lte: end }, status: { $in: ['In Progress', 'Delayed', 'Completed'] } })
   );
 }
 

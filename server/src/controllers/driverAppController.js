@@ -13,7 +13,9 @@ import OtpToken from '../models/OtpToken.js';
 import generateToken from '../utils/generateToken.js';
 import { getPagination, buildPaginationMeta } from '../utils/pagination.js';
 import { nextSequentialCode } from '../utils/idGenerator.js';
-import { generateOtpCode, sendOtpSms, sendSms, getOtpExpiry } from '../utils/otp.js';
+import { generateOtpCode, sendOtpSms, getOtpExpiry } from '../utils/otp.js';
+// Parent SMS (delay notices, messages from the bus): named arguments, returns { status }.
+import { sendSms as sendMessage } from '../services/messaging/index.js';
 import { tenantContext } from '../utils/tenantContext.js';
 import { MAX_OTP_ATTEMPTS } from './authController.js';
 import { signResetToken, readResetToken } from '../utils/resetToken.js';
@@ -263,7 +265,7 @@ export const messageParent = asyncHandler(async (req, res) => {
   }
   const plate = trip.bus?.plateNumber ? ` ${trip.bus.plateNumber}` : '';
   const smsText = `AwaBus (school bus${plate}): ${text}`;
-  const result = await sendSms({ to: phone, text: smsText, purpose: 'parent_message', school: req.school });
+  const result = await sendMessage({ to: phone, text: smsText, purpose: 'parent_message', school: req.school });
   await Trip.updateOne(
     { _id: trip._id },
     {
@@ -492,8 +494,8 @@ export const endTrip = asyncHandler(async (req, res) => {
     throw refuseTrip(res, 409, 'TRIP_NOT_LIVE', trip.status === 'Cancelled' ? 'This trip was cancelled.' : 'Start the trip before ending it.');
   }
   trip.status = 'Completed';
-  // The bus assistant's link stops working with the trip.
-  trip.assistPass = { hash: '', createdAt: null, expiresAt: null };
+  // (The bus assistant's link stops working now that the trip has ended; the
+  // pass is kept so the page can say "This trip has ended".)
   trip.endedAt = new Date();
   trip.arrivalTime = timeNow();
   if (trip.startedAt) {
@@ -700,7 +702,7 @@ export const sendDelayBroadcast = asyncHandler(async (req, res) => {
   await Promise.all(
     guardianPhones.map(async (phone) => {
       try {
-        const result = await sendSms({ to: phone, text: smsText, purpose: 'delay_broadcast', school: req.school });
+        const result = await sendMessage({ to: phone, text: smsText, purpose: 'delay_broadcast', school: req.school });
         if (result?.status === 'failed') failed += 1;
         else delivered += 1;
       } catch {
