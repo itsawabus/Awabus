@@ -16,6 +16,7 @@ export default function BackgroundLocationBanner({ style }) {
   const [permission, setPermission] = useState('unknown');
   const [asking, setAsking] = useState(false);
   const background = useLiveGpsStore((s) => s.background);
+  const backgroundError = useLiveGpsStore((s) => s.backgroundError);
 
   const check = useCallback(async () => {
     const now = await backgroundPermission();
@@ -39,10 +40,17 @@ export default function BackgroundLocationBanner({ style }) {
     if (background !== 'failed') return null;
     return (
       <View style={[styles.box, style]}>
-        <MapPin size={18} color={colors.amber800} />
-        <Text style={styles.text}>
-          Screen-off tracking could not start. Keep the AwaBus app open during the trip so the school can see the bus.
-        </Text>
+        <View style={styles.row}>
+          <MapPin size={18} color={colors.amber800} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Screen-off tracking could not start</Text>
+            <Text style={styles.text}>Keep the AwaBus app open during the trip so the school can see the bus.</Text>
+            {backgroundError ? <Text style={styles.steps}>Phone says: {backgroundError}</Text> : null}
+          </View>
+        </View>
+        <Button size="sm" variant="outline" onPress={() => useLiveGpsStore.getState().setBackground('retry')} style={{ marginTop: 10 }}>
+          Try again
+        </Button>
       </View>
     );
   }

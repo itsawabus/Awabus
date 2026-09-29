@@ -9,7 +9,7 @@ import { useOfflineQueueStore } from '../store/offlineQueueStore.js';
 import { useConnectionStore } from '../store/connectionStore.js';
 import { useAuthStore } from '../store/authStore.js';
 import { useUiStore } from '../store/uiStore.js';
-import { startTripTracking, stopTripTracking, PUSH_EVERY_MS } from '../lib/backgroundLocation.js';
+import { startTripTracking, stopTripTracking, startErrorMessage, PUSH_EVERY_MS } from '../lib/backgroundLocation.js';
 
 // A new position goes to the school at most every PUSH_EVERY_MS (8 s)...
 // ...and at least this often while the trip runs, even when the bus is parked,
@@ -88,7 +88,7 @@ export default function BackgroundWork() {
     let cancelled = false;
     if (tripId) {
       startTripTracking(tripId, driverId).then((state) => {
-        if (!cancelled) useLiveGpsStore.getState().setBackground(state);
+        if (!cancelled) useLiveGpsStore.getState().setBackground(state, state === 'failed' ? startErrorMessage() : '');
       });
     } else {
       stopTripTracking();

@@ -10,6 +10,7 @@ import { getTripHistory } from '../../../../src/api/driverApp.js';
 import { formatShortDate } from '../../../../src/lib/utils.js';
 import { colors } from '../../../../src/lib/theme.js';
 import { runWords } from '../../../../src/lib/runs.js';
+import { busLabel } from '../../../../src/lib/bus.js';
 
 const STATUS_TONE = { Completed: 'success', Cancelled: 'danger', Delayed: 'warning' };
 
@@ -40,7 +41,7 @@ export default function TripHistory() {
                 <View style={styles.rowBetween}>
                   <View>
                     <Text style={styles.routeName}>{item.route?.name}</Text>
-                    <Text style={styles.plate}>{[item.session ? runWords(item.session).name : '', item.bus?.plateNumber].filter(Boolean).join(' · ')}</Text>
+                    <Text style={styles.plate}>{[item.session ? runWords(item.session).name : '', busLabel(item.bus)].filter(Boolean).join(' · ')}</Text>
                   </View>
                   <Badge tone={STATUS_TONE[item.status] || 'neutral'}>{item.status}</Badge>
                 </View>

@@ -21,6 +21,7 @@ import { getTodaysTrip, markAttendance, startTrip } from '../../../src/api/drive
 import { formatDate } from '../../../src/lib/utils.js';
 import { colors, radii } from '../../../src/lib/theme.js';
 import { runWords } from '../../../src/lib/runs.js';
+import { busLabel } from '../../../src/lib/bus.js';
 
 export default function Home() {
   const queryClient = useQueryClient();
@@ -171,7 +172,7 @@ export default function Home() {
           <View style={styles.divider} />
           <Text style={styles.infoLine}>
             <Text style={styles.infoLabel}>Bus: </Text>
-            <Text style={styles.infoValue}>{trip.bus?.plateNumber}</Text>
+            <Text style={styles.infoValue}>{busLabel(trip.bus)}</Text>
           </Text>
           <Text style={styles.infoLine}>
             <Text style={styles.infoLabel}>Route: </Text>
@@ -261,7 +262,7 @@ export default function Home() {
         </Text>
         <View style={styles.summaryBox}>
           <SummaryRow label="Attending Students" value={attending} />
-          <SummaryRow label="Bus" value={trip.bus?.plateNumber} />
+          <SummaryRow label="Bus" value={busLabel(trip.bus)} />
           <SummaryRow label="Route" value={trip.route?.name} />
           {trip.session ? <SummaryRow label="Run" value={runWords(trip.session).name} /> : null}
         </View>

@@ -9,7 +9,8 @@ export const useLiveGpsStore = create((set) => ({
   // Screen-off tracking (src/lib/backgroundLocation.js):
   // 'off' | 'running' | 'no_permission' | 'failed'
   background: 'off',
-  setBackground: (background) => set({ background }),
+  backgroundError: '', // the phone's own reason when it would not start
+  setBackground: (background, backgroundError = '') => set({ background, backgroundError }),
   setPosition: (position) => set({ position }),
   setError: (error) => set({ error }),
   markSent: () => set({ lastSentAt: Date.now() }),

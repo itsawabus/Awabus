@@ -21,7 +21,7 @@ export function ConnectionBadges({ style }) {
   const { isOnline, busOnline } = useConnectionStatus();
   return (
     <View style={[styles.badges, style]}>
-      <Badge tone={isOnline ? 'success' : 'neutral'}>{isOnline ? 'Online' : 'Offline'}</Badge>
+      <Badge tone={isOnline ? 'success' : 'neutral'}>{isOnline ? 'Driver online' : 'Driver offline'}</Badge>
       <Badge tone={busOnline ? 'success' : 'warning'}>{busOnline ? 'Bus online' : 'Bus offline'}</Badge>
     </View>
   );
