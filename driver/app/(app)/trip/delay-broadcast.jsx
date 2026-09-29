@@ -13,6 +13,9 @@ import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
 import { getTodaysTrip, sendDelayBroadcast } from '../../../src/api/driverApp.js';
 import { colors, radii } from '../../../src/lib/theme.js';
 
+// Same limit as the server, so the SMS stays one message.
+const MAX_MESSAGE = 100;
+
 const REASONS = ['Heavy traffic', 'Vehicle breakdown', 'Weather conditions', 'Road closure', 'Other'].map((r) => ({
   value: r,
   label: r,
@@ -69,7 +72,10 @@ export default function DelayBroadcast() {
 
         <View style={styles.field}>
           <Label>Additional message</Label>
-          <Textarea value={message} onChangeText={setMessage} />
+          <Textarea value={message} onChangeText={setMessage} maxLength={MAX_MESSAGE} />
+          <Text style={styles.counter}>
+            {message.length}/{MAX_MESSAGE}
+          </Text>
         </View>
 
         <View style={styles.field}>
@@ -116,6 +122,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '800', color: colors.slate900, textAlign: 'center' },
   subtitle: { marginTop: 6, fontSize: 14, color: colors.slate500, textAlign: 'center', marginBottom: 24 },
   field: { marginBottom: 20 },
+  counter: { marginTop: 4, fontSize: 12, color: colors.slate400, textAlign: 'right' },
   previewBox: { backgroundColor: colors.slate100, borderRadius: radii.lg, padding: 14 },
   previewText: { fontSize: 14, color: colors.slate700, lineHeight: 20 },
   footer: {

@@ -6,12 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Card from '../../../src/components/ui/Card.jsx';
 import Button from '../../../src/components/ui/Button.jsx';
 import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
+import { useOfflineQueueStore } from '../../../src/store/offlineQueueStore.js';
 import { getTripById } from '../../../src/api/driverApp.js';
 import { formatDateTime, formatDuration } from '../../../src/lib/utils.js';
 import { colors } from '../../../src/lib/theme.js';
 
 export default function TripCompleted() {
   const { tripId } = useLocalSearchParams();
+  const waitingToSync = useOfflineQueueStore((s) => s.queue.filter((q) => q.tripId === tripId).length);
   const { data: trip, isLoading } = useQuery({
     queryKey: ['trip', tripId],
     queryFn: () => getTripById(tripId),
@@ -21,10 +23,14 @@ export default function TripCompleted() {
   if (isLoading || !trip) return <PageLoader />;
 
   const progress = trip.studentProgress || [];
-  const attending = progress.filter((p) => p.attendance === 'Present').length;
-  const unresolved = progress.filter(
-    (p) => p.attendance === 'Present' && p.dropoffStatus !== 'On board' && p.dropoffStatus !== 'Dropped off'
-  ).length;
+  const riding = progress.filter((p) => p.attendance !== 'Absent' && p.attendance !== 'Cancelled');
+  const count = (status) => riding.filter((p) => p.dropoffStatus === status).length;
+  const droppedOff = count('Dropped off');
+  const stillOnBoard = count('On board');
+  const notHere = count('Not on board');
+  const neverScanned = riding.length - droppedOff - stillOnBoard - notHere;
+  const absent = progress.length - riding.length;
+  const allGood = stillOnBoard === 0 && neverScanned === 0;
   const broadcasts = trip.delayBroadcasts || [];
   const totalRecipients = broadcasts.reduce((sum, b) => sum + (b.recipientCount || 0), 0);
 
@@ -35,22 +41,28 @@ export default function TripCompleted() {
           <CheckCheck size={28} color={colors.white} />
         </View>
         <Text style={styles.bannerTitle}>Trip completed</Text>
-        <Text style={styles.bannerSubtitle}>Nice work. Every parent has been notified.</Text>
+        <Text style={styles.bannerSubtitle}>
+          {allGood ? 'Every student on this trip is accounted for.' : 'Some students need checking. See below.'}
+        </Text>
       </SafeAreaView>
 
       <View style={styles.content}>
         <Card>
           <Text style={styles.sectionLabel}>Trip performance summary</Text>
           <Row label="Trip duration" value={formatDuration(trip.durationMinutes)} />
-          <Row label="Students on trip" value={attending} />
-          <Row label="Alerts / check" value={unresolved} />
+          <Row label="Dropped off" value={`${droppedOff} of ${riding.length}`} />
+          {stillOnBoard > 0 && <Row label="Still marked on board" value={stillOnBoard} warn />}
+          {neverScanned > 0 && <Row label="Never boarded" value={neverScanned} warn />}
+          {notHere > 0 && <Row label="Not here at pickup" value={notHere} />}
+          {absent > 0 && <Row label="Absent" value={absent} />}
           <Row label="Delay broadcasts" value={broadcasts.length ? `${broadcasts.length} sent to ${totalRecipients} parents` : '0'} />
           <Row label="Trip ended" value={formatDateTime(trip.endedAt || trip.date)} last />
         </Card>
 
         <Text style={styles.syncNote}>
-          All offline events and background tasks successfully synchronized with the central school management
-          server.
+          {waitingToSync
+            ? `${waitingToSync} update${waitingToSync === 1 ? ' is' : 's are'} still waiting to reach the school. Keep the app open when you are back online.`
+            : 'Everything from this trip has reached the school.'}
         </Text>
       </View>
 
@@ -64,10 +76,10 @@ export default function TripCompleted() {
   );
 }
 
-const Row = ({ label, value, last }) => (
+const Row = ({ label, value, last, warn }) => (
   <View style={[styles.row, !last && styles.rowBorder]}>
     <Text style={styles.rowLabel}>{label}</Text>
-    <Text style={styles.rowValue}>{value}</Text>
+    <Text style={[styles.rowValue, warn && styles.rowWarn]}>{value}</Text>
   </View>
 );
 
@@ -95,6 +107,7 @@ const styles = StyleSheet.create({
   rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.slate100 },
   rowLabel: { color: colors.slate500, fontSize: 14 },
   rowValue: { color: colors.slate800, fontWeight: '700', fontSize: 14 },
+  rowWarn: { color: colors.red600 },
   syncNote: { textAlign: 'center', color: colors.slate500, fontSize: 13 },
   footer: { padding: 16, gap: 4 },
   linkButton: { alignSelf: 'center', marginTop: 8 },

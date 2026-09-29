@@ -35,6 +35,7 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
       etaMinutes: t.etaMinutes,
       distanceCoveredKm: t.distanceCoveredKm,
       departureTime: t.departureTime,
+      session: t.session,
     }));
 
   const counts = {

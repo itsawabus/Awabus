@@ -12,6 +12,9 @@ import Button from '../../components/ui/Button.jsx';
 import Tabs from '../../components/ui/Tabs.jsx';
 import { formatDate, formatDateTime } from '../../lib/utils.js';
 import { formatPhone } from '../../lib/phone.js';
+import { languageLabel } from '../../lib/languages.js';
+import { rideSessionLabel } from '../../lib/sessions.js';
+import RideCancellationsCard from '../../components/students/RideCancellationsCard.jsx';
 
 const InfoRow = ({ label, value }) => (
   <div>
@@ -71,6 +74,11 @@ export default function StudentProfile() {
               <InfoRow label="Gender" value={student.gender} />
               <InfoRow label="Date of Birth" value={formatDate(student.dob)} />
               <InfoRow label="Emergency Phone" value={formatPhone(student.secondContactPhone)} />
+              <InfoRow label="Rides" value={rideSessionLabel(student.rideSession)} />
+              <InfoRow
+                label="Arrival calls"
+                value={student.arrivalCalls === false ? 'Off: the parent is not called when the bus nears home' : 'On: the parent is called when the bus nears home'}
+              />
               <InfoRow label="Home Address" value={student.homeAddress} className="sm:col-span-2" />
             </div>
           </Card>
@@ -100,6 +108,12 @@ export default function StudentProfile() {
         </div>
       )}
 
+      {tab === 'info' && (
+        <div className="mt-6">
+          <RideCancellationsCard student={student} />
+        </div>
+      )}
+
       {tab === 'guardian' && (
         <Card>
           <CardHeader title="Parent / Guardian Information" />
@@ -108,6 +122,7 @@ export default function StudentProfile() {
             <InfoRow label="Relation" value={guardian?.relation} />
             <InfoRow label="Phone" value={formatPhone(guardian?.phone)} />
             <InfoRow label="Email" value={guardian?.email} />
+            <InfoRow label="Language for calls" value={guardian ? languageLabel(guardian.preferredLanguage) : '—'} />
             <InfoRow label="Second Contact" value={student.secondContactName} />
             <InfoRow label="Second Contact Phone" value={formatPhone(student.secondContactPhone)} />
             <InfoRow label="Emergency Instructions" value={student.emergencyInstructions} className="sm:col-span-2" />

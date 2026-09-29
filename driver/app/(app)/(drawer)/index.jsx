@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Linking, RefreshControl, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react-native';
 import Header from '../../../src/components/layout/Header.jsx';
@@ -9,6 +9,10 @@ import Card from '../../../src/components/ui/Card.jsx';
 import Badge from '../../../src/components/ui/Badge.jsx';
 import Button from '../../../src/components/ui/Button.jsx';
 import Modal from '../../../src/components/ui/Modal.jsx';
+import ConfirmDialog from '../../../src/components/ui/ConfirmDialog.jsx';
+import StudentMeta, { guardianName } from '../../../src/components/StudentMeta.jsx';
+import MessageParentSheet from '../../../src/components/MessageParentSheet.jsx';
+import { formatPhone } from '../../../src/lib/phone.js';
 import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
 import { useAuthStore } from '../../../src/store/authStore.js';
 import { useConnectionStore } from '../../../src/store/connectionStore.js';
@@ -21,6 +25,8 @@ export default function Home() {
   const driver = useAuthStore((s) => s.driver);
   const isOnline = useConnectionStore((s) => s.isOnline);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirm, setConfirm] = useState(null); // pending "are you sure?" request
+  const [messageTo, setMessageTo] = useState(null); // { tripId, student } for the message sheet
 
   const {
     data: trip,
@@ -35,11 +41,15 @@ export default function Home() {
     <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.trip600} colors={[colors.trip600]} />
   );
 
-  useEffect(() => {
-    if (trip?.status === 'In Progress' || trip?.status === 'Delayed') {
-      router.replace('/trip/active');
-    }
-  }, [trip]);
+  // A running trip opens its screen, but only while the driver is looking at
+  // this one. (This screen stays loaded behind others; checking only when it
+  // is in view stops background refreshes from pulling the driver away.)
+  const live = trip?.status === 'In Progress' || trip?.status === 'Delayed';
+  useFocusEffect(
+    useCallback(() => {
+      if (live) router.replace('/trip/active');
+    }, [live])
+  );
 
   const toggleMutation = useMutation({
     mutationFn: ({ studentId, attendance }) => markAttendance(trip._id, studentId, { attendance }),
@@ -66,6 +76,39 @@ export default function Home() {
       router.push('/trip/active');
     },
   });
+
+  // Changing attendance is confirmed first, so a stray tap changes nothing.
+  const askToggle = (p) => {
+    const name = p.student ? `${p.student.firstName} ${p.student.lastName}` : 'this student';
+    // Cancelled by the parent (phone line) or the school office: only the office can undo it.
+    if (p.attendance === 'Cancelled') {
+      setConfirm({
+        title: `${name}'s ride was cancelled`,
+        message: 'The parent or the school office cancelled this ride. If they are riding after all, ask the school office to undo the cancellation.',
+        confirmLabel: 'OK',
+      });
+      return;
+    }
+    const next = p.attendance === 'Present' ? 'Absent' : 'Present';
+    setConfirm({
+      title: next === 'Absent' ? `Mark ${name} as not attending?` : `Mark ${name} as attending?`,
+      message:
+        next === 'Absent'
+          ? 'They will not be expected on the bus for this trip.'
+          : 'They will be expected on the bus for this trip.',
+      confirmLabel: next === 'Absent' ? 'Yes, not attending' : 'Yes, attending',
+      danger: next === 'Absent',
+      onConfirm: () => toggleMutation.mutate({ studentId: p.student?._id, attendance: next }),
+    });
+  };
+
+  const callParent = (g) =>
+    setConfirm({
+      title: `Call ${guardianName(g) || 'the parent'}?`,
+      message: `This opens your phone app to call ${formatPhone(g.phone)}.`,
+      confirmLabel: 'Call',
+      onConfirm: () => Linking.openURL(`tel:${g.phone}`).catch(() => {}),
+    });
 
   if (isLoading) return <PageLoader label="Loading today's trip..." />;
 
@@ -107,7 +150,7 @@ export default function Home() {
   const progress = trip.studentProgress || [];
   const total = progress.length;
   const attending = progress.filter((p) => p.attendance === 'Present').length;
-  const absent = progress.filter((p) => p.attendance === 'Absent').length;
+  const absent = progress.filter((p) => p.attendance === 'Absent' || p.attendance === 'Cancelled').length;
 
   return (
     <View style={{ flex: 1 }}>
@@ -130,7 +173,16 @@ export default function Home() {
             <Text style={styles.infoLabel}>Route: </Text>
             <Text style={styles.infoValue}>{trip.route?.name}</Text>
           </Text>
-          <Text style={styles.dateText}>{formatDate(trip.date)}</Text>
+          {trip.session ? (
+            <Text style={styles.infoLine}>
+              <Text style={styles.infoLabel}>Run: </Text>
+              <Text style={styles.infoValue}>{trip.session === 'morning' ? 'Morning' : 'Evening'}</Text>
+            </Text>
+          ) : null}
+          <Text style={styles.dateText}>
+            {formatDate(trip.date)}
+            {trip.completedToday ? ` · ${trip.completedToday} trip${trip.completedToday === 1 ? '' : 's'} done today` : ''}
+          </Text>
         </Card>
 
         <Text style={styles.sectionLabel}>Attendance Summary</Text>
@@ -155,21 +207,22 @@ export default function Home() {
         </View>
         <View style={styles.studentList}>
           {progress.map((p) => (
-            <Pressable
-              key={p.student?._id}
-              onPress={() =>
-                toggleMutation.mutate({
-                  studentId: p.student?._id,
-                  attendance: p.attendance === 'Present' ? 'Absent' : 'Present',
-                })
-              }
-              style={styles.studentRow}
-            >
-              <Text style={styles.studentName}>{p.student ? `${p.student.firstName} ${p.student.lastName}` : 'Student'}</Text>
-              <Badge tone={p.attendance === 'Present' ? 'success' : 'danger'}>
-                {p.attendance === 'Present' ? 'Attending' : 'Not attending'}
-              </Badge>
-            </Pressable>
+            <View key={p.student?._id} style={styles.studentRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.studentName}>{p.student ? `${p.student.firstName} ${p.student.lastName}` : 'Student'}</Text>
+                <StudentMeta student={p.student} onCall={callParent} onMessage={(student) => setMessageTo({ tripId: trip._id, student })} />
+              </View>
+              <Pressable
+                onPress={() => askToggle(p)}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={`${p.attendance === 'Present' ? 'Attending' : p.attendance === 'Cancelled' ? 'Cancelled by parent' : 'Not attending'}. Tap to change`}
+              >
+                <Badge tone={p.attendance === 'Present' ? 'success' : p.attendance === 'Cancelled' ? 'warning' : 'danger'}>
+                  {p.attendance === 'Present' ? 'Attending' : p.attendance === 'Cancelled' ? 'Cancelled by parent' : 'Not attending'}
+                </Badge>
+              </Pressable>
+            </View>
           ))}
           {progress.length === 0 && <Text style={styles.emptyListText}>No students assigned to this route yet.</Text>}
         </View>
@@ -181,13 +234,23 @@ export default function Home() {
         </Button>
       </SafeAreaView>
 
+      <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
+      <MessageParentSheet target={messageTo} onClose={() => setMessageTo(null)} />
+
       <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <Text style={styles.modalTitle}>Start today's trip?</Text>
-        <Text style={styles.modalSubtitle}>You are about to start the morning trip.</Text>
+        <Text style={styles.modalTitle}>
+          {trip.session ? `Start the ${trip.session} run?` : trip.completedToday ? 'Start another trip?' : "Start today's trip?"}
+        </Text>
+        <Text style={styles.modalSubtitle}>
+          {trip.completedToday
+            ? `This will be trip ${trip.completedToday + 1} today. The school can follow it live.`
+            : 'The school can follow the bus live once it starts.'}
+        </Text>
         <View style={styles.summaryBox}>
           <SummaryRow label="Attending Students" value={attending} />
           <SummaryRow label="Bus" value={trip.bus?.plateNumber} />
           <SummaryRow label="Route" value={trip.route?.name} />
+          {trip.session ? <SummaryRow label="Run" value={trip.session === 'morning' ? 'Morning' : 'Evening'} /> : null}
         </View>
         <Button loading={startMutation.isPending} onPress={() => startMutation.mutate()} style={{ marginTop: 24 }}>
           Yes, start trip

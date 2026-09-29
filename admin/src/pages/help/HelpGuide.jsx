@@ -70,7 +70,23 @@ export const GUIDE = [
     to: '/routes',
     summary: 'The lines your buses run. Each route has an ID (RT-001, RT-002, ...) that AwaBus creates for you.',
     tasks: [
-      { title: 'Add a route', steps: ['Click Add Route.', 'Type the route name, e.g. "Madina - Adenta".', 'Click Create Route.'] },
+      {
+        title: 'Add a route',
+        steps: [
+          'Click Add Route.',
+          'Type the route name, e.g. "Madina - Adenta".',
+          'Set the run times: when the morning run usually leaves (before 12:00) and when the evening run leaves school (12:00 or later).',
+          'Add the stops in the order the bus drives them, then click Create Route.',
+        ],
+      },
+      {
+        title: 'Why run times matter',
+        steps: [
+          'A trip started before the halfway point between the two times is the morning run; after it, the evening run. Without times, noon is the halfway point.',
+          'Each trip only lists the students who ride that run.',
+          'To set them on many routes at once, select the routes and use Edit selected.',
+        ],
+      },
       { title: 'Edit a route', steps: ['Click the route in the list (or ⋮ then Edit route).', 'Change the name and save.'] },
       {
         title: 'Delete a route',
@@ -119,8 +135,22 @@ export const GUIDE = [
         title: 'Move a driver to another bus',
         steps: ['Open the driver, click Edit Details, pick the new bus and save. Their route changes with the bus.'],
       },
+      {
+        title: 'Give a driver their setup code',
+        steps: [
+          'After Create Driver, a setup code (e.g. ABCD-EFGH) is shown once. Give it to the driver in person or by phone.',
+          'The first time they open the driver app, they enter their phone number, this code and a new password.',
+          'Lost or expired (codes last 7 days)? Open the driver and click Create setup code under Driver App. The old code stops working.',
+          'Drivers added by bulk upload have no code yet: make one from their profile the same way.',
+        ],
+      },
     ],
-    tips: ['The driver signs in to the app with the phone number you entered. The first time, the app asks them to choose a password.'],
+    tips: [
+      'The Drivers list says "App not set up" under anyone who has not chosen a password yet.',
+      'Without the setup code nobody can claim a driver account, even if they know the phone number.',
+      'The Driver App column shows Online while the driver has the app open and signed in. Offline means they signed out, closed the app, or their phone has been off or without data for 2 minutes; "Last seen" says when the app last reached the school.',
+      'Status (Active, Idle...) is set by you; Online / Offline comes from the driver\'s phone.',
+    ],
   },
   {
     id: 'students',
@@ -134,9 +164,39 @@ export const GUIDE = [
         steps: [
           'Student information: name, date of birth, class.',
           'Parents & guardian: pick an existing parent (for brothers and sisters) or enter a new one. Delay messages from the driver are sent to this phone.',
-          'Transport: pick the route. The bus and driver follow from the route.',
+          'Transport: pick the route (the bus and driver follow from it), and choose when the student rides: morning & evening, morning only or evening only. They are left off the trips of a run they don\'t ride.',
           'Home location: type the GhanaPost GPS address or pin the home on the map. The green circle is the geofence around the home. Siblings can share one home location.',
           'Review and finish.',
+        ],
+      },
+      {
+        title: 'Bus assistant (teacher on bus duty)',
+        steps: [
+          'The driver opens Bus assistant in the driver app menu and taps Show QR code.',
+          'The teacher scans it with their own phone camera. A page opens (no app or account needed): they type their name once.',
+          'From there they can do the roll call, mark children as boarded, not here or dropped off, call or text a parent, and send a delay notice. The same limits as the driver apply.',
+          'The page stops working when the trip ends, when the driver taps Stop sharing or New code, or after 12 hours.',
+          'What the teacher does is recorded as "Bus assistant (their name)" in notifications and on the trip.',
+        ],
+      },
+      {
+        title: 'Cancel a ride (parents by phone, or the office)',
+        steps: [
+          'Parents call the AwaBus line and press: 1 to cancel the morning pick-up, 2 to cancel the afternoon drop-off, 3 to cancel both, or 4 to be put through to the driver. Calls from numbers that are not a parent on AwaBus are ended.',
+          'There is no cut-off time. A cancellation is for the next run of that kind that has not started: today\'s if the bus has not set off yet, otherwise the next school day (Monday to Friday).',
+          'A parent\'s cancellation covers all their children who ride that run.',
+          'The office can do the same on the student\'s profile: Cancel a ride, then pick the morning pick-up, the afternoon drop-off or both. Upcoming cancellations are listed there and can be undone until that run starts.',
+          'On the trip, a cancelled student shows as "Cancelled by parent" for the driver and gets no arrival call.',
+        ],
+      },
+      {
+        title: 'Switch arrival calls on or off',
+        steps: [
+          'Arrival calls ring the parent when the bus is almost at the home: before pickup in the morning, before drop-off in the evening.',
+          'They are on for new students. Untick "Call the parent when the bus is almost at the home" (Add Student, Home location step, or Edit Student) for parents who don\'t want calls.',
+          'Brothers and sisters: leave it on for one child and off for the others. When you share a home with a sibling who already has calls on, the new student starts with calls off.',
+          'Even with calls on for several children, a parent (or a shared home) is called only once per trip. The trip page shows why a child was not called.',
+          'To change many students at once, select them and use Edit selected.',
         ],
       },
       {
@@ -166,10 +226,14 @@ export const GUIDE = [
           'Open Live Tracking. Each moving bus appears on the map.',
           'Click a bus or a trip in the list to see where it is and which students are on board.',
           'Use the map switcher (top right of the map) for Street, Satellite, Hybrid or Terrain views.',
+          '"Following bus" keeps the selected bus in the middle of the map as it moves. Drag the map to look around (following stops); click the button or a bus to follow again.',
         ],
       },
     ],
-    tips: ['A bus only shows once its driver has started the trip in the driver app and the phone has GPS.'],
+    tips: [
+      'A bus only shows once its driver has started the trip in the driver app and the phone has GPS.',
+      'On a trip\'s page, the Parent alert column says whether the parent was texted when their child boarded or got off, and when the bus came near their home. Until parent alerts are switched on for your school it says "Not sent (alerts are off)".',
+    ],
   },
   {
     id: 'trip-history',
@@ -191,6 +255,7 @@ export const GUIDE = [
         steps: [
           'The number on the bell is how many you haven\'t read yet. It turns red when one of them is critical, such as a student not on board.',
           'Click the bell to see the latest ones. Click a notification to open the trip, bus or list it is about; it is then marked as read.',
+          'To delete one, point at it and click the bin. On the Notifications page, use Select to tick several and Delete them, or Delete all. Deleting only removes them for you; other admins still see theirs. Notifications are deleted automatically after 30 days.',
           'Click "View all notifications" to see everything from the last 30 days, filtered by Unread, Critical, Trips, Fleet or Uploads.',
         ],
       },
@@ -278,10 +343,10 @@ export const GUIDE = [
       {
         title: 'A driver\'s day',
         steps: [
-          'Sign in with their phone number and password (they choose it the first time).',
+          'Sign in with their phone number and password. The first time, they enter the setup code you gave them and choose a password.',
           'See today\'s trip, take the roll call (Present / Absent), then Start trip.',
           'Scan or tap students as they board and get off.',
-          'If running late, send a delay text message to the parents of the students on the trip.',
+          'If running late, send a delay text message to the parents of the students on the trip (up to 3 per trip, at least 10 minutes apart).',
           'End the trip at the end of the route.',
         ],
       },
@@ -300,7 +365,7 @@ export const GUIDE = [
         steps: [
           'Click your name at the top right, then My profile or Account settings.',
           'Changing your email or phone sends a code to the new address or number to confirm it.',
-          'Changing your password needs your current password and a code.',
+          'To reset your password, enter the new one twice and the code sent to your email or phone.',
         ],
       },
     ],

@@ -6,7 +6,7 @@ import { useEditDraft } from '../../hooks/useFormDraft.js';
 import DraftNotice from '../../components/ui/DraftNotice.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card, { CardBody, CardHeader } from '../../components/ui/Card.jsx';
-import Input, { Label, FieldError } from '../../components/ui/Input.jsx';
+import Input, { Label, FieldError, Select } from '../../components/ui/Input.jsx';
 import PhoneInput from '../../components/ui/PhoneInput.jsx';
 import { fromStoredPhone, isValidPhone, toLocalPhone } from '../../lib/phone.js';
 import Button from '../../components/ui/Button.jsx';
@@ -17,7 +17,8 @@ import { UNDO_SECONDS, useUndoDeleteStore } from '../../store/undoDeleteStore.js
 import { getDriver, getDriverOptions, updateDriver } from '../../api/drivers.js';
 import { getBusOptions } from '../../api/buses.js';
 import { busHolders, busPickerOptions, busTakenBy } from '../../lib/assignments.js';
-import { dateError, emailError, formatEmail, formatLicense, formatName, ifChanged, licenseError, nameError } from '../../lib/formats.js';
+import { dateError, emailError, formatEmail, formatName, ifChanged, licenseError, nameError } from '../../lib/formats.js';
+import { LicenseInput } from '../../components/ui/FormattedInputs.jsx';
 
 export default function EditDriver() {
   const { id } = useParams();
@@ -52,6 +53,9 @@ export default function EditDriver() {
             licenseExpiry: driver.licenseExpiry ? driver.licenseExpiry.slice(0, 10) : '',
             assignedBus: driver.assignedBus?._id || null,
             status: driver.status,
+            emergencyContactName: driver.emergencyContactName || '',
+            emergencyContactRelation: driver.emergencyContactRelation || 'Wife',
+            emergencyContactPhone: fromStoredPhone(driver.emergencyContactPhone),
           }
         : null,
     [driver]
@@ -112,6 +116,12 @@ export default function EditDriver() {
             licenseNumber: ifChanged(form.licenseNumber, baseline.licenseNumber, () => licenseError(form.licenseNumber)),
             // An unchanged old expiry can stay; a newly entered one must still be valid.
             licenseExpiry: form.licenseExpiry === baseline.licenseExpiry ? '' : dateError(form.licenseExpiry, 'licenseExpiry'),
+            emergencyContactName: nameError(form.emergencyContactName, 'Emergency contact name'),
+            emergencyContactPhone: !form.emergencyContactPhone
+              ? 'Enter the emergency contact\'s phone number'
+              : isValidPhone(form.emergencyContactPhone)
+                ? ''
+                : 'Must be 10 digits starting with 0',
             assignedBus: !form.assignedBus
               ? 'Select the bus this driver operates'
               : form.assignedBus !== baseline.assignedBus && busTakenBy(holders, form.assignedBus, id)
@@ -120,7 +130,12 @@ export default function EditDriver() {
           };
           setErrors(next);
           if (Object.values(next).some(Boolean)) return;
-          updateMutation.mutate({ ...form, phone: toLocalPhone(form.phone) });
+          updateMutation.mutate({
+            ...form,
+            phone: toLocalPhone(form.phone),
+            emergencyContactRelation: form.emergencyContactRelation || 'Wife',
+            emergencyContactPhone: toLocalPhone(form.emergencyContactPhone),
+          });
         }}
       >
         <Card>
@@ -153,11 +168,38 @@ export default function EditDriver() {
             </div>
           </CardBody>
 
+          <CardHeader title="Emergency Contact" subtitle="Required: who to call if something happens to this driver" />
+          <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <div>
+              <Label required>Contact Name</Label>
+              <Input
+                value={form.emergencyContactName ?? ''}
+                onChange={(e) => set('emergencyContactName')(formatName(e.target.value))}
+                placeholder="e.g. Abena Mensah"
+                error={Boolean(errors.emergencyContactName)}
+              />
+              <FieldError>{errors.emergencyContactName}</FieldError>
+            </div>
+            <div>
+              <Label required>Relation</Label>
+              <Select value={form.emergencyContactRelation || 'Wife'} onChange={(e) => set('emergencyContactRelation')(e.target.value)}>
+                {['Wife', 'Husband', 'Sister', 'Brother', 'Father', 'Mother', 'Other'].map((r) => (
+                  <option key={r}>{r}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label required>Contact Phone</Label>
+              <PhoneInput value={form.emergencyContactPhone ?? ''} onChange={set('emergencyContactPhone')} error={Boolean(errors.emergencyContactPhone)} placeholder="020 111 2233" />
+              <FieldError>{errors.emergencyContactPhone}</FieldError>
+            </div>
+          </CardBody>
+
           <CardHeader title="License Details" />
           <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
               <Label>License Number</Label>
-              <Input value={form.licenseNumber} onChange={(e) => set('licenseNumber')(formatLicense(e.target.value))} error={Boolean(errors.licenseNumber)} placeholder="e.g. GH-DL-29831" />
+              <LicenseInput value={form.licenseNumber} onChange={set('licenseNumber')} error={errors.licenseNumber} />
               <FieldError>{errors.licenseNumber}</FieldError>
             </div>
             <div>

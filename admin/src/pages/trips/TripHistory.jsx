@@ -17,6 +17,7 @@ import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
+import { sessionLabel } from '../../lib/sessions.js';
 
 export default function TripHistory() {
   const [search, setSearch] = useState('');
@@ -156,7 +157,10 @@ export default function TripHistory() {
               <Tbody>
                 {trips.map((t) => (
                   <Tr key={t._id} className="cursor-pointer" onClick={() => navigate(`/trip-history/${t._id}`)}>
-                    <Td className="font-bold text-slate-900 dark:text-white">{t.tripCode}</Td>
+                    <Td className="font-bold text-slate-900 dark:text-white">
+                      {t.tripCode}
+                      {t.session && <span className="block text-xs font-medium text-slate-500 dark:text-slate-400">{sessionLabel(t.session)}</span>}
+                    </Td>
                     <Td>{new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}</Td>
                     <Td>{t.route?.name}</Td>
                     <Td>{t.driver ? `${t.driver.firstName} ${t.driver.lastName}` : '—'}</Td>

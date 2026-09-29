@@ -18,6 +18,9 @@ const notificationSchema = new mongoose.Schema(
     dedupeKey: { type: String, default: '' },
     // Admins of the school who have read it (read state is per person).
     readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }],
+    // Admins who deleted it: it disappears for them only, since other admins
+    // of the school share the same notification.
+    deletedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }],
   },
   { timestamps: true }
 );

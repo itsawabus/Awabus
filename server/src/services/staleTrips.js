@@ -51,13 +51,24 @@ export async function closeStaleTrips() {
   return trips.length;
 }
 
+// Shown on the System page.
+export const sweeperStatus = { running: false, everyMinutes: SWEEP_EVERY_MS / 60000, lastRunAt: null, lastEnded: 0, totalEnded: 0, lastError: null };
+
 /** Sweep every school on start-up and then every 10 minutes. */
 export function startStaleTripSweeper() {
+  sweeperStatus.running = true;
   const sweep = () =>
     tenantContext
       .runAsSystem(closeStaleTrips)
-      .then((n) => n && console.log(`[trips] ended ${n} trip(s) left in progress for over ${STALE_TRIP_HOURS} hours`))
-      .catch((err) => console.error('[trips] could not end stale trips:', err.message));
+      .then((n) => {
+        Object.assign(sweeperStatus, { lastRunAt: new Date(), lastEnded: n, lastError: null });
+        sweeperStatus.totalEnded += n;
+        if (n) console.log(`[trips] ended ${n} trip(s) left in progress for over ${STALE_TRIP_HOURS} hours`);
+      })
+      .catch((err) => {
+        Object.assign(sweeperStatus, { lastRunAt: new Date(), lastError: err.message });
+        console.error('[trips] could not end stale trips:', err.message);
+      });
   sweep();
   return setInterval(sweep, SWEEP_EVERY_MS);
 }

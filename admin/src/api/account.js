@@ -6,4 +6,3 @@ export const requestVerification = (payload) => apiClient.post('/auth/me/verific
 export const confirmEmailChange = (code) => apiClient.post('/auth/me/email', { code }).then((r) => r.data.admin);
 export const confirmPhoneChange = (code) => apiClient.post('/auth/me/phone', { code }).then((r) => r.data.admin);
 export const changePassword = (payload) => apiClient.post('/auth/me/password', payload).then((r) => r.data);
-export const confirmPasswordReveal = (code) => apiClient.post('/auth/me/reveal-password', { code }).then((r) => r.data);

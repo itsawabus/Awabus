@@ -11,6 +11,7 @@ import Student from '../models/Student.js';
 import Guardian from '../models/Guardian.js';
 import Trip from '../models/Trip.js';
 import OtpToken from '../models/OtpToken.js';
+import Counter from '../models/Counter.js';
 
 import { tenantContext } from '../utils/tenantContext.js';
 import { SCHOOL, ADMIN, PLACES, DRIVERS, BUSES, ROUTES, buildStudents, TRIP_STATUSES } from './data.js';
@@ -32,6 +33,7 @@ const destroy = async () => {
       Guardian.deleteMany(),
       Trip.deleteMany(),
       OtpToken.deleteMany(),
+      Counter.deleteMany(),
     ]);
   });
   console.log('[seed] All collections cleared');
@@ -81,6 +83,8 @@ const seedSchoolData = async (school) => {
       assignedBus: bus._id,
       assignedDriver: driver._id,
       status: cfg.status,
+      morningStartTime: '06:00',
+      eveningStartTime: '15:00',
       stops: [
         { name: cfg.from.replace(/([A-Z])/g, ' $1').trim(), order: 1, lat: from.lat, lng: from.lng },
         {
@@ -105,7 +109,6 @@ const seedSchoolData = async (school) => {
   console.log(`[seed] ${routes.length} routes created`);
 
   // 5. Guardians + Students (attached to a route + that route's bus)
-  // Note: Guardian isn't tenant-scoped yet, so these creates are unaffected either way.
   const studentSeeds = buildStudents(36);
   const students = [];
   for (let i = 0; i < studentSeeds.length; i += 1) {
@@ -210,12 +213,12 @@ const seedSchoolData = async (school) => {
       timeline: [
         { time: '06:43', title: 'Trip started', description: 'Departure from main bus lot, vehicle check passed.' },
         { time: '06:45', title: 'GPS streaming began', description: 'Active connection established with AwaBus servers.' },
-        { time: '06:52', title: `Proximity alert — ${routeStudents[0]?.firstName || 'Student'}`, description: 'Alert notification dispatched to parents.' },
+        { time: '06:52', title: `Proximity alert — ${routeStudents[0]?.firstName || 'Student'}`, description: 'Bus entered the student\'s notification zone.' },
       ],
       studentProgress: routeStudents.map((s, idx) => ({
         student: s._id,
         attendance: idx === routeStudents.length - 1 ? 'Absent' : 'Present',
-        alertStatus: idx < 2 ? 'Alert sent' : 'Pending',
+        alertStatus: idx < 2 ? 'Not sent (alerts are off)' : 'Not yet alerted',
         alertTime: idx < 2 ? '06:5' + idx : '',
         dropoffStatus: idx < 2 ? 'Dropped off' : idx < 4 ? 'On board' : 'Pending',
       })),
@@ -232,8 +235,26 @@ const seedSchoolData = async (school) => {
   return { drivers };
 };
 
+// The seed deletes every school's data, not just the demo school. Refuse when
+// that would destroy real data, unless explicitly told to.
+const FORCE_FLAG = '--wipe-everything';
+const assertSafeToWipe = async () => {
+  if (process.argv.includes(FORCE_FLAG)) return;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(`NODE_ENV is "production". The seed deletes ALL data. Run it against a test database, or add ${FORCE_FLAG} if you are sure.`);
+  }
+  const others = await tenantContext.runAsSystem(() => School.find({ code: { $ne: SCHOOL.code } }).select('name').lean());
+  if (others.length) {
+    const names = others.slice(0, 5).map((o) => o.name).join(', ');
+    throw new Error(
+      `This database has other schools (${names}${others.length > 5 ? ', ...' : ''}). The seed would delete them. Use a separate test database, or add ${FORCE_FLAG} if you are sure.`
+    );
+  }
+};
+
 const run = async () => {
   await connectDB();
+  await assertSafeToWipe();
 
   if (process.argv.includes('--destroy')) {
     await destroy();
@@ -264,7 +285,8 @@ const run = async () => {
   await mongoose.disconnect();
 };
 
-run().catch((err) => {
-  console.error('[seed] Failed:', err);
+run().catch(async (err) => {
+  console.error('[seed] Stopped:', err.message);
+  await mongoose.disconnect().catch(() => {});
   process.exit(1);
 });

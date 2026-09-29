@@ -10,6 +10,8 @@ const defaultPrefs = {
   vibration: true,
   autoSyncOnMobileData: false,
   offlineCacheLimitTrips: 50,
+  // Newest notification time the driver has seen (for the bell's red dot).
+  notificationsSeenAt: 0,
 };
 
 // RN's Appearance.setColorScheme only accepts 'light' | 'dark' | 'unspecified'

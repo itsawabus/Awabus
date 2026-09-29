@@ -2,15 +2,22 @@
 // "244123456" (9 digits, the leading 0 is added for you). The server stores
 // them as +233XXXXXXXXX.
 
-/** Keeps digits only, capped at 10 when starting with 0 and 9 otherwise. */
+/**
+ * Keeps digits only: up to 10 when starting with 0 (0551234567), otherwise up
+ * to 9 (551234567). A number typed or pasted with the country code
+ * (+233 55 123 4567 / 233551234567) becomes 0551234567 once complete.
+ */
 export function sanitizePhone(raw) {
-  let digits = String(raw || '').replace(/\D/g, '');
-  // Pasted international formats: +233 24 412 3456 / 233244123456
-  if (digits.startsWith('233') && digits.length > 10) digits = `0${digits.slice(3)}`;
-  return digits.slice(0, digits.startsWith('0') ? 10 : 9);
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (digits.startsWith('0')) return digits.slice(0, 10);
+  // Could still be the country code being typed (233...): allow its 12 digits.
+  if (digits.startsWith('233') && digits.length > 9) {
+    return digits.length >= 12 ? `0${digits.slice(3, 12)}` : digits;
+  }
+  return digits.slice(0, 9);
 }
 
-/** Adds the missing leading 0 to a complete 9-digit number. */
+/** Adds the missing leading 0 to a complete 9-digit number (done when sending, not in the box). */
 export const toLocalPhone = (value) => {
   const digits = sanitizePhone(value);
   return digits.length === 9 && !digits.startsWith('0') ? `0${digits}` : digits;

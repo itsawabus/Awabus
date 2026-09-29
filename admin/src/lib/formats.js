@@ -6,26 +6,66 @@
 // Vehicle plate, Ghana DVLA style: region letters - number - year or series
 // letter, e.g. GR-1234-20, GC-102-21, GT-881-Z.
 export const PLATE_RE = /^[A-Z]{1,3}-\d{1,4}-(\d{2}|[A-Z])$/;
-export const formatPlate = (raw) =>
-  String(raw || '')
-    .toUpperCase()
-    .replace(/[\s_]+/g, '-')
-    .replace(/[^A-Z0-9-]/g, '')
-    .replace(/-{2,}/g, '-')
-    .slice(0, 12);
-export const plateError = (v) =>
-  !v ? 'Plate number is required' : PLATE_RE.test(v) ? '' : 'Use the plate format e.g. GR-1234-20';
+export const PLATE_MAX_LENGTH = 11; // ABC-1234-20
 
-// Driver's license number: capital letters and digits, optionally in groups
-// separated by hyphens (e.g. GH-DL-29831), 6 to 20 characters.
+// Typed as a mask, like the GPS address: the dashes are put in for you and
+// nothing that can't belong in a plate gets in.
+//   gr123420 -> GR-1234-20   gt 881 z -> GT-881-Z   gc102-21 -> GC-102-21
+// Region: 1-3 letters. Number: 1-4 digits (a 4th digit, a letter, a space or
+// a dash moves on). End: a 2-digit year or one series letter.
+export function formatPlate(raw) {
+  const chars = String(raw || '').toUpperCase().replace(/[\s_/.]/g, '-').replace(/[^A-Z0-9-]/g, '');
+  let region = '';
+  let number = '';
+  let end = '';
+  let part = 0;
+  for (const c of chars) {
+    const isLetter = /[A-Z]/.test(c);
+    const isDigit = /\d/.test(c);
+    if (part === 0) {
+      if (isLetter && region.length < 3) region += c;
+      else if (region && (isDigit || c === '-')) {
+        part = 1;
+        if (isDigit) number += c;
+      }
+    } else if (part === 1) {
+      if (isDigit && number.length < 4) number += c;
+      else if (number && (isLetter || isDigit || c === '-')) {
+        part = 2;
+        if (isLetter || isDigit) end += c;
+      }
+    } else if (end === '' ? isLetter || isDigit : /\d/.test(end) && isDigit && end.length < 2) {
+      end += c;
+    }
+  }
+  if (part === 0) return region;
+  if (part === 1) return `${region}-${number}`;
+  return `${region}-${number}-${end}`;
+}
+export const plateError = (v) =>
+  !v ? 'Plate number is required' : PLATE_RE.test(v) ? '' : 'Complete the plate, e.g. GR-1234-20 or GT-881-Z';
+
+// Driver's license number: capital letters and digits in groups separated by
+// hyphens (e.g. GH-DL-29831), 6 to 20 characters, with at least one digit.
 export const LICENSE_RE = /^(?=.*\d)[A-Z0-9]+(-[A-Z0-9]+)*$/;
-export const formatLicense = (raw) =>
-  String(raw || '')
-    .toUpperCase()
-    .replace(/[\s_/]+/g, '-')
-    .replace(/[^A-Z0-9-]/g, '')
-    .replace(/-{2,}/g, '-')
-    .slice(0, 20);
+export const LICENSE_MAX_LENGTH = 20;
+
+// Typed as a mask: capitals only, a dash is put in where letters change to
+// digits (GHDL29831 -> GHDL-29831), spaces and slashes become dashes, and a
+// group can't start with a dash or have two in a row.
+export function formatLicense(raw) {
+  let out = '';
+  for (const c of String(raw || '').toUpperCase().replace(/[\s_/.]/g, '-').replace(/[^A-Z0-9-]/g, '')) {
+    const prev = out.slice(-1);
+    if (c === '-') {
+      if (out && prev !== '-') out += '-';
+      continue;
+    }
+    if (/\d/.test(c) && /[A-Z]/.test(prev)) out += '-';
+    out += c;
+  }
+  return out.slice(0, LICENSE_MAX_LENGTH);
+}
 export const licenseError = (v) => {
   if (!v) return 'License number is required';
   if (v.length < 6 || !LICENSE_RE.test(v)) return 'Use capital letters and numbers only, e.g. GH-DL-29831';

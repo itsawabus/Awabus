@@ -41,6 +41,8 @@ import MyProfile from './pages/account/MyProfile.jsx';
 import AccountSettings from './pages/account/AccountSettings.jsx';
 import HelpGuide from './pages/help/HelpGuide.jsx';
 import Notifications from './pages/notifications/Notifications.jsx';
+import SystemPage from './pages/system/SystemPage.jsx';
+import AssistTrip from './pages/assist/AssistTrip.jsx';
 
 export default function App() {
   return (
@@ -50,6 +52,8 @@ export default function App() {
       <Route path="/verify-otp" element={<VerifyOtp />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/reset-success" element={<ResetSuccess />} />
+      {/* Bus assistant (teacher on bus duty): public, opened from the driver's QR code */}
+      <Route path="/assist/:pass" element={<AssistTrip />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AdminLayout />}>
@@ -61,6 +65,7 @@ export default function App() {
 
           <Route element={<SuperadminRoute />}>
             <Route path="/platform" element={<SuperadminDashboard />} />
+            <Route path="/system" element={<SystemPage />} />
           </Route>
 
           <Route path="/routes" element={<RoutesList />} />

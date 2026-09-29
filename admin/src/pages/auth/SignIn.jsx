@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { CheckCircle2, ArrowLeft } from 'lucide-react';
@@ -27,8 +27,24 @@ export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [setupCode, setSetupCode] = useState('');
   const [remember, setRemember] = useState(false);
-  const [formError, setFormError] = useState('');
+  // Why the last session ended, if the server said (e.g. school suspended).
+  const [formError, setFormError] = useState(() => {
+    try {
+      return sessionStorage.getItem('awabus_signout_reason') || '';
+    } catch {
+      return '';
+    }
+  });
+  // Show the reason once: forget it after this page has shown it.
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem('awabus_signout_reason');
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
   const [success, setSuccess] = useState(false);
 
   const emailValid = EMAIL_REGEX.test(email.trim());
@@ -51,11 +67,9 @@ export default function SignIn() {
       loginApi({
         email: email.trim(),
         password,
-        rememberDevice: remember,
-        deviceId: 'web-admin-portal',
       }),
     onSuccess: (data) => {
-      setAuth(data);
+      setAuth(data, { remember });
       setSuccess(true);
       const destination = data.admin?.role === 'superadmin' ? '/platform' : '/';
       setTimeout(() => navigate(destination), 900);
@@ -68,10 +82,10 @@ export default function SignIn() {
       setPasswordApi({
         email: email.trim(),
         password,
-        deviceId: 'web-admin-portal',
+        setupCode: setupCode.trim(),
       }),
     onSuccess: (data) => {
-      setAuth(data);
+      setAuth(data, { remember: true });
       setSuccess(true);
       const destination = data.admin?.role === 'superadmin' ? '/platform' : '/';
       setTimeout(() => navigate(destination), 900);
@@ -102,6 +116,10 @@ export default function SignIn() {
   const handleCreatePasswordSubmit = (e) => {
     e.preventDefault();
     setFormError('');
+    if (!setupCode.trim()) {
+      setFormError('Enter the setup code you were given');
+      return;
+    }
     if (!isStrongPassword(password, { email })) {
       setFormError('Your password doesn\'t meet all the password requirements yet');
       return;
@@ -117,6 +135,7 @@ export default function SignIn() {
     setStep(STEP.EMAIL);
     setPassword('');
     setConfirmPassword('');
+    setSetupCode('');
     setFormError('');
   };
 
@@ -216,13 +235,30 @@ export default function SignIn() {
       {step === STEP.CREATE_PASSWORD && (
         <form onSubmit={handleCreatePasswordSubmit} className="mt-6 space-y-5">
           <div>
+            <Label htmlFor="setup-code">Setup code</Label>
+            <Input
+              id="setup-code"
+              value={setupCode}
+              onChange={(e) => setSetupCode(e.target.value.toUpperCase())}
+              placeholder="e.g. ABCD-EFGH"
+              autoComplete="one-time-code"
+              autoCapitalize="characters"
+              spellCheck={false}
+              maxLength={12}
+              autoFocus
+            />
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              The code AwaBus gave you when your account was created. Lost it? Ask AwaBus support for a new one.
+            </p>
+          </div>
+
+          <div>
             <Label htmlFor="new-password">New password</Label>
             <PasswordInput
               id="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Create a password"
-              autoFocus
             />
             <PasswordChecklist password={password} email={email} />
           </div>

@@ -12,10 +12,11 @@ import {
 // Superadmins sit above all schools and have no school notifications (yet).
 const isPlatformAdmin = (req) => req.admin?.role === 'superadmin';
 
-// What this admin wants to see: every type except the ones they muted.
+// What this admin wants to see: every type except the ones they muted, and
+// not the ones they deleted.
 const visibleFilter = (req) => {
   const muted = cleanMutedTypes(req.admin.mutedNotifications);
-  return muted.length ? { type: { $nin: muted } } : {};
+  return { deletedBy: { $ne: req.admin._id }, ...(muted.length ? { type: { $nin: muted } } : {}) };
 };
 
 const unreadFilter = (req) => ({ ...visibleFilter(req), readBy: { $ne: req.admin._id } });
@@ -89,6 +90,41 @@ export const markAllRead = asyncHandler(async (req, res) => {
     await Notification.updateMany({ readBy: { $ne: req.admin._id } }, { $addToSet: { readBy: req.admin._id } });
   }
   res.json({ success: true, data: { unread: 0, critical: 0 } });
+});
+
+// @desc    Delete notifications for this admin (others still see them)
+//          body: { ids: [...] } for a selection, or { all: true } for every one
+// @route   POST /api/notifications/delete
+export const deleteNotifications = asyncHandler(async (req, res) => {
+  if (isPlatformAdmin(req)) return res.json({ success: true, deleted: 0, data: { unread: 0, critical: 0 } });
+  let filter;
+  if (req.body?.all === true) {
+    filter = { deletedBy: { $ne: req.admin._id } };
+  } else {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter((id) => mongoose.isValidObjectId(id)).slice(0, 500) : [];
+    if (!ids.length) {
+      res.status(400);
+      throw new Error('Choose the notifications to delete');
+    }
+    filter = { _id: { $in: ids }, deletedBy: { $ne: req.admin._id } };
+  }
+  const result = await Notification.updateMany(filter, { $addToSet: { deletedBy: req.admin._id, readBy: req.admin._id } });
+  res.json({ success: true, deleted: result.modifiedCount, data: await counts(req) });
+});
+
+// @desc    Delete one notification for this admin
+// @route   DELETE /api/notifications/:id
+export const deleteNotification = asyncHandler(async (req, res) => {
+  if (isPlatformAdmin(req) || !mongoose.isValidObjectId(req.params.id)) {
+    res.status(404);
+    throw new Error('Notification not found');
+  }
+  const result = await Notification.updateOne({ _id: req.params.id }, { $addToSet: { deletedBy: req.admin._id, readBy: req.admin._id } });
+  if (!result.matchedCount) {
+    res.status(404);
+    throw new Error('Notification not found');
+  }
+  res.json({ success: true, data: await counts(req) });
 });
 
 const preferencesFor = (admin) => {

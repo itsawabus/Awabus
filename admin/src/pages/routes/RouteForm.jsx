@@ -3,16 +3,36 @@ import { Label } from '../../components/ui/Input.jsx';
 import Input from '../../components/ui/Input.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import RouteStopsEditor, { stopsErrors } from '../../components/routes/RouteStopsEditor.jsx';
 
 // Routes are the root of the assignment chain — buses assign themselves to a
 // route, drivers assign themselves to a bus, and students assign themselves
 // to a route. None of that is editable from here, so this form only ever
-// collects the route's own details.
+// collects the route's own details: its name, run times and stops.
 export default function RouteForm({ mode, values, onChange, onSubmit, submitting, routeIdDisplay, error }) {
   const set = (key) => (val) => onChange({ ...values, [key]: val });
+  const [checked, setChecked] = useState(false);
+  const stops = values.stops || [];
+
+  // Same rules as the server: morning run before noon, evening run from noon.
+  const timeError =
+    values.morningStartTime && values.morningStartTime >= '12:00'
+      ? 'The morning run must start before 12:00 noon.'
+      : values.eveningStartTime && values.eveningStartTime < '12:00'
+        ? 'The evening run must start at 12:00 noon or later.'
+        : '';
+
+  const submit = (e) => {
+    e.preventDefault();
+    setChecked(true);
+    if (stopsErrors(stops).any || timeError) return;
+    // Stops are saved in the order shown, numbered from 1.
+    onSubmit(e, { ...values, stops: stops.map((st, i) => ({ name: st.name.trim(), lat: Number(st.lat), lng: Number(st.lng), order: i + 1 })) });
+  };
 
   return (
-    <form onSubmit={onSubmit}>
+    <form onSubmit={submit} noValidate>
       <Card>
         <CardHeader title="Route details" />
         {error && (
@@ -35,6 +55,50 @@ export default function RouteForm({ mode, values, onChange, onSubmit, submitting
             />
           </div>
         </CardBody>
+
+        <div className="border-t border-slate-100 p-5 dark:border-slate-800">
+          <h4 className="text-sm font-bold text-slate-900 dark:text-white">Run times</h4>
+          <p className="mb-4 mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+            When each run usually sets off. They decide whether a trip is the morning or evening run, so it only lists the
+            students riding that run.
+          </p>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="morningStartTime">Morning run starts (estimated)</Label>
+              <Input
+                id="morningStartTime"
+                type="time"
+                value={values.morningStartTime || ''}
+                onChange={(e) => set('morningStartTime')(e.target.value)}
+                max="11:59"
+              />
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Before 12:00, e.g. 06:00</p>
+            </div>
+            <div>
+              <Label htmlFor="eveningStartTime">Evening run starts (estimated)</Label>
+              <Input
+                id="eveningStartTime"
+                type="time"
+                value={values.eveningStartTime || ''}
+                onChange={(e) => set('eveningStartTime')(e.target.value)}
+                min="12:00"
+              />
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">When the bus leaves school, e.g. 15:00</p>
+            </div>
+          </div>
+          {timeError && <p className="mt-3 text-sm font-medium text-red-600">{timeError}</p>}
+        </div>
+
+        <div className="border-t border-slate-100 p-5 dark:border-slate-800">
+          <h4 className="text-sm font-bold text-slate-900 dark:text-white">Stops</h4>
+          <p className="mb-4 mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+            Where the bus stops, in the order it drives them. Used by the driver app, Live Tracking and the route map.
+          </p>
+          <RouteStopsEditor stops={stops} onChange={set('stops')} showErrors={checked} />
+          {checked && stopsErrors(stops).any && (
+            <p className="mt-3 text-sm font-medium text-red-600">Fix the highlighted stops before saving.</p>
+          )}
+        </div>
 
         <div className="flex justify-end gap-3 border-t border-slate-100 p-5 dark:border-slate-800">
           <Button as={Link} to="/routes" variant="outline" type="button">

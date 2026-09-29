@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useViewSchoolStore } from '../../store/viewSchoolStore.js';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Inbox, ExternalLink } from 'lucide-react';
-import { getPlatformInsights, createSchool, updateSchoolStatus } from '../../api/superadmin.js';
+import { getPlatformInsights, createSchool, updateSchoolStatus, createAdminSetupCode } from '../../api/superadmin.js';
+import SetupCodeBox from '../../components/account/SetupCodeBox.jsx';
 import PhoneInput from '../../components/ui/PhoneInput.jsx';
 import { isValidPhone } from '../../lib/phone.js';
 import usePageHeader from '../../hooks/usePageHeader.js';
@@ -38,6 +39,7 @@ export default function SuperadminDashboard() {
   const [form, setForm] = useState({ schoolName: '', adminName: '', adminEmail: '', adminPhone: '' });
   const [formError, setFormError] = useState('');
   const [statusTarget, setStatusTarget] = useState(null); // school being suspended/reactivated
+  const [setupResult, setSetupResult] = useState(null); // { schoolName, adminName, adminEmail, setupCode, setupCodeExpires }
 
   usePageHeader({ breadcrumb: ['AwaBus', 'Platform'] });
 
@@ -59,13 +61,32 @@ export default function SuperadminDashboard() {
 
   const createMutation = useMutation({
     mutationFn: () => createSchool(form),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['superadmin'] });
+      setSetupResult({
+        schoolName: res.school?.name,
+        adminName: res.admin?.name,
+        adminEmail: res.admin?.email,
+        setupCode: res.setupCode,
+        setupCodeExpires: res.setupCodeExpires,
+      });
       setForm({ schoolName: '', adminName: '', adminEmail: '', adminPhone: '' });
       setShowForm(false);
       setFormError('');
     },
     onError: (err) => setFormError(err.message),
+  });
+
+  const setupCodeMutation = useMutation({
+    mutationFn: (school) => createAdminSetupCode(school.id).then((res) => ({ ...res, school })),
+    onSuccess: (res) =>
+      setSetupResult({
+        schoolName: res.school.name,
+        adminName: res.admin?.name,
+        adminEmail: res.admin?.email,
+        setupCode: res.setupCode,
+        setupCodeExpires: res.setupCodeExpires,
+      }),
   });
 
   const statusMutation = useMutation({
@@ -271,6 +292,15 @@ export default function SuperadminDashboard() {
                     >
                       Open
                     </button>
+                    {s.adminsPending > 0 && (
+                      <button
+                        onClick={() => setupCodeMutation.mutate(s)}
+                        disabled={setupCodeMutation.isPending}
+                        className="mr-4 text-sm font-semibold text-brand-600 hover:underline disabled:opacity-50 dark:text-brand-400"
+                      >
+                        Setup code
+                      </button>
+                    )}
                     <button
                       onClick={() => setStatusTarget(s)}
                       className="text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400"
@@ -286,6 +316,26 @@ export default function SuperadminDashboard() {
           <EmptyState icon={Inbox} title="No schools yet" description="Create your first school to get started." />
         )}
       </Card>
+
+      {setupCodeMutation.isError && (
+        <p className="mt-3 text-sm text-red-600" role="alert">
+          {setupCodeMutation.error.message}
+        </p>
+      )}
+
+      <Modal
+        open={Boolean(setupResult)}
+        onClose={() => setSetupResult(null)}
+        title={`Setup code for ${setupResult?.schoolName || 'the school'}`}
+        footer={<Button onClick={() => setSetupResult(null)}>Done</Button>}
+      >
+        {setupResult && (
+          <SetupCodeBox code={setupResult.setupCode} expires={setupResult.setupCodeExpires}>
+            Give this code to {setupResult.adminName} ({setupResult.adminEmail}). They sign in with their email, enter the code and
+            choose their own password. Making a new code cancels any older one.
+          </SetupCodeBox>
+        )}
+      </Modal>
 
       <Modal
         open={Boolean(statusTarget)}

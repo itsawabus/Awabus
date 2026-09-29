@@ -1,52 +1,59 @@
+// Creates the platform superadmin (the developers' account).
+//
+//   MONGO_URI=... SEED_SUPERADMIN_EMAIL=you@example.com SEED_SUPERADMIN_PASSWORD='...' \
+//   SEED_SUPERADMIN_NAME='Your Name' SEED_SUPERADMIN_PHONE=0241234567 node src/scripts/seedSuperadmin.js
+//
+// Everything comes from the environment (or server/.env). There are no
+// built-in defaults: no database address, and the account is created WITH a
+// password, so nobody can claim it by typing its email on the sign-in page.
 import 'dotenv/config';
 import mongoose from 'mongoose';
 import Admin from '../models/Admin.js';
 import { tenantContext } from '../utils/tenantContext.js';
+import { checkPasswordStrength } from '../utils/password.js';
+import { normalizeGhanaPhone } from '../utils/phone.js';
 
-const SUPERADMIN_NAME = process.env.SEED_SUPERADMIN_NAME || 'Dave';
-const SUPERADMIN_EMAIL = process.env.SEED_SUPERADMIN_EMAIL || '@gmail.com';
-const SUPERADMIN_PHONE = process.env.SEED_SUPERADMIN_PHONE || '+233557625112';
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://itsawabus_db_user:TNLRgCyRjH9MwtWK@cluster0.pozplzv.mongodb.net/?appName=Cluster0';
+const need = (key) => {
+  const v = (process.env[key] || '').trim();
+  if (!v) {
+    console.error(`${key} is not set. See the comment at the top of this script.`);
+    process.exit(1);
+  }
+  return v;
+};
 
 async function run() {
-  if (!MONGO_URI) {
-    console.error('MONGO_URI is not set in your environment');
+  const uri = need('MONGO_URI');
+  const email = need('SEED_SUPERADMIN_EMAIL').toLowerCase();
+  const password = need('SEED_SUPERADMIN_PASSWORD');
+  const name = need('SEED_SUPERADMIN_NAME');
+  const phone = normalizeGhanaPhone(need('SEED_SUPERADMIN_PHONE'));
+  if (!phone) {
+    console.error('SEED_SUPERADMIN_PHONE must be a Ghana number, e.g. 0241234567');
+    process.exit(1);
+  }
+  const weak = checkPasswordStrength(password, { email, name });
+  if (weak) {
+    console.error(`SEED_SUPERADMIN_PASSWORD is too weak: ${weak}`);
     process.exit(1);
   }
 
-  await mongoose.connect(MONGO_URI);
-  console.log('Connected to MongoDB');
-
-  const email = SUPERADMIN_EMAIL.toLowerCase().trim();
-
-  const existing = await tenantContext.runAsSystem(async () => {
-    return Admin.findOne({ email });
-  });
-
+  await mongoose.connect(uri);
+  const existing = await tenantContext.runAsSystem(() => Admin.findOne({ email }));
   if (existing) {
-    console.log(`A superadmin with email "${email}" already exists (id: ${existing._id}). Nothing to do.`);
+    console.log(`An account with email "${email}" already exists. Nothing to do.`);
     await mongoose.disconnect();
     return;
   }
 
-  const admin = await tenantContext.runAsSystem(async () => {
-    return Admin.create({
-      school: null,
-      name: SUPERADMIN_NAME,
-      email,
-      phone: SUPERADMIN_PHONE,
-      role: 'superadmin',
-    });
-  });
-
-  console.log('Superadmin created successfully:');
-  console.log({ id: admin._id.toString(), name: admin.name, email: admin.email, role: admin.role });
-  console.log(`\nSign in at your app's /sign-in page with email "${email}" to set a password.`);
-
+  const admin = await tenantContext.runAsSystem(() =>
+    Admin.create({ school: null, name, email, phone, password, role: 'superadmin' })
+  );
+  console.log(`Superadmin created: ${admin.email}. Sign in at /sign-in with this email and password.`);
   await mongoose.disconnect();
 }
 
 run().catch((err) => {
-  console.error('Failed to seed superadmin:', err);
+  console.error('Failed to create the superadmin:', err.message);
   process.exit(1);
 });

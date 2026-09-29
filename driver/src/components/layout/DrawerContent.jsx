@@ -7,23 +7,29 @@ import {
   Waypoints,
   History,
   MessageSquare,
+  Bell,
   Settings,
   HelpCircle,
   LogOut,
+  QrCode,
 } from 'lucide-react-native';
 import { useAuthStore } from '../../store/authStore.js';
+import { reportSignOut } from '../../api/driverApp.js';
 import { useConnectionStore } from '../../store/connectionStore.js';
 import { colors, radii } from '../../lib/theme.js';
 import Avatar from '../ui/Avatar.jsx';
 import Badge from '../ui/Badge.jsx';
 import Button from '../ui/Button.jsx';
 import Modal from '../ui/Modal.jsx';
+import { useOfflineQueueStore } from '../../store/offlineQueueStore.js';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Home (pre-trip)', icon: Home },
   { path: '/trip/active', label: 'Active trip', icon: Waypoints },
   { path: '/trip-history', label: 'Trip history', icon: History },
+  { path: '/assistant', label: 'Bus assistant', icon: QrCode },
   { path: '/broadcast-history', label: 'Broadcast history', icon: MessageSquare },
+  { path: '/notifications', label: 'Notifications', icon: Bell },
   { path: '/settings', label: 'Settings', icon: Settings },
   { path: '/help', label: 'Help & support', icon: HelpCircle },
 ];
@@ -31,6 +37,7 @@ const NAV_ITEMS = [
 export default function DrawerContent(props) {
   const pathname = usePathname();
   const { driver, logout } = useAuthStore();
+  const unsent = useOfflineQueueStore((st) => st.queue.length);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const isOnline = useConnectionStore((s) => s.isOnline);
 
@@ -85,7 +92,21 @@ export default function DrawerContent(props) {
       <Modal open={confirmLogout} onClose={() => setConfirmLogout(false)}>
         <Text style={styles.sheetTitle}>Log out?</Text>
         <Text style={styles.sheetSubtitle}>You'll need your phone number and password to sign back in.</Text>
-        <Button variant="danger" onPress={logout} style={{ marginTop: 16 }}>
+        {unsent > 0 && (
+          <Text style={styles.unsentWarning}>
+            {unsent} update{unsent === 1 ? ' has' : 's have'} not reached the school yet and will be lost. Connect to the internet
+            and wait a moment before logging out.
+          </Text>
+        )}
+        <Button
+          variant="danger"
+          onPress={() => {
+            useOfflineQueueStore.getState().clear();
+            reportSignOut(useAuthStore.getState().token);
+            logout();
+          }}
+          style={{ marginTop: 16 }}
+        >
           Log out
         </Button>
         <Button variant="ghost" onPress={() => setConfirmLogout(false)} style={{ marginTop: 8 }}>
@@ -97,6 +118,7 @@ export default function DrawerContent(props) {
 }
 
 const styles = StyleSheet.create({
+  unsentWarning: { marginTop: 12, fontSize: 13, fontWeight: '700', color: '#b91c1c' },
   container: {
     flex: 1,
     backgroundColor: colors.navy,

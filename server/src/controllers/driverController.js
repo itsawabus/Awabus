@@ -1,15 +1,27 @@
 import asyncHandler from 'express-async-handler';
-import { normalizeGhanaPhone } from '../utils/phone.js';
-import Driver from '../models/Driver.js';
+import { isValidGhanaPhone, normalizeGhanaPhone } from '../utils/phone.js';
+import Driver, { ONLINE_WINDOW_MS } from '../models/Driver.js';
 import Bus from '../models/Bus.js';
 import Route from '../models/Route.js';
 import { getPagination, buildPaginationMeta } from '../utils/pagination.js';
-import { assertFormats, formatProblem, ifChanged, normalizeCode } from '../utils/formats.js';
+import { assertFormats, formatProblem, ifChanged, normalizeLicense } from '../utils/formats.js';
+import { searchPattern } from '../utils/search.js';
+import { issueSetupCode } from '../utils/setupCode.js';
 
 const populateDriver = (query) =>
   query
     .populate('assignedBus', 'plateNumber name capacity')
     .populate('assignedRoute', 'routeId name');
+
+// Which of these drivers have chosen a password (signed in to the driver app
+// at least once). The password itself never leaves the server.
+async function withAccountState(drivers) {
+  const ids = drivers.map((d) => d._id);
+  const pending = new Set(
+    (await Driver.find({ _id: { $in: ids }, password: { $in: ['', null] } }).select('_id').lean()).map((d) => String(d._id))
+  );
+  return drivers.map((d) => ({ ...d.toJSON(), accountSetUp: !pending.has(String(d._id)) }));
+}
 
 // A bus (and so its route) has exactly one driver. The drivers collection is
 // the source of truth, so look for any other driver already holding the bus.
@@ -34,32 +46,51 @@ export const getDrivers = asyncHandler(async (req, res) => {
   const filter = {};
   if (q) {
     filter.$or = [
-      { firstName: { $regex: q, $options: 'i' } },
-      { lastName: { $regex: q, $options: 'i' } },
-      { licenseNumber: { $regex: q, $options: 'i' } },
-      { phone: { $regex: q, $options: 'i' } },
+      { firstName: { $regex: searchPattern(q), $options: 'i' } },
+      { lastName: { $regex: searchPattern(q), $options: 'i' } },
+      { licenseNumber: { $regex: searchPattern(q), $options: 'i' } },
+      { phone: { $regex: searchPattern(q), $options: 'i' } },
     ];
   }
 
   // Licenses expiring within 30 days (or already expired) need renewing soon.
   const soon = new Date();
   soon.setDate(soon.getDate() + 30);
-  const [drivers, total, totalDrivers, active, withoutBus, licenseAlerts] = await Promise.all([
+  const [drivers, total, totalDrivers, active, withoutBus, licenseAlerts, recentlySeen] = await Promise.all([
     populateDriver(Driver.find(filter)).sort({ createdAt: 1 }).skip(skip).limit(limit),
     Driver.countDocuments(filter),
     Driver.countDocuments(),
     Driver.countDocuments({ status: 'Active' }),
     Driver.countDocuments({ assignedBus: null }),
     Driver.countDocuments({ licenseExpiry: { $ne: null, $lte: soon } }),
+    Driver.find({ lastSeenAt: { $gte: new Date(Date.now() - ONLINE_WINDOW_MS) } }).select('lastSeenAt signedOutAt'),
   ]);
 
   res.json({
     success: true,
-    data: drivers,
+    data: await withAccountState(drivers),
     meta: buildPaginationMeta(total, page, limit),
-    stats: { totalDrivers, active, withoutBus, licenseAlerts },
+    stats: { totalDrivers, active, withoutBus, licenseAlerts, online: recentlySeen.filter((d) => d.online).length },
   });
 });
+
+// Every driver needs someone to call in an emergency: a name, how they are
+// related, and a valid phone number.
+function assertEmergencyContact(res, { emergencyContactName, emergencyContactRelation, emergencyContactPhone }) {
+  const missing = [
+    !String(emergencyContactName || '').trim() && 'name',
+    !String(emergencyContactRelation || '').trim() && 'relation',
+    !String(emergencyContactPhone || '').trim() && 'phone number',
+  ].filter(Boolean);
+  if (missing.length) {
+    res.status(400);
+    throw new Error(`The emergency contact is required: add their ${missing.join(', ')}`);
+  }
+  if (!isValidGhanaPhone(emergencyContactPhone)) {
+    res.status(400);
+    throw new Error('The emergency contact phone must be 10 digits starting with 0, e.g. 020 111 2233');
+  }
+}
 
 // @desc    Get driver profile (details + assignment history)
 // @route   GET /api/drivers/:id
@@ -77,7 +108,7 @@ export const getDriverById = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Driver not found');
   }
-  res.json({ success: true, data: driver });
+  res.json({ success: true, data: (await withAccountState([driver]))[0] });
 });
 
 // @desc    Check the license details entered in the Add Driver wizard (step 3).
@@ -85,7 +116,7 @@ export const getDriverById = asyncHandler(async (req, res) => {
 //          another driver in this school) - AwaBus does not contact the DVLA.
 // @route   POST /api/drivers/validate-license
 export const validateLicense = asyncHandler(async (req, res) => {
-  const licenseNumber = normalizeCode(req.body.licenseNumber);
+  const licenseNumber = normalizeLicense(req.body.licenseNumber);
   const { licenseExpiry } = req.body;
 
   if (!licenseNumber) {
@@ -145,6 +176,7 @@ export const createDriver = asyncHandler(async (req, res) => {
     throw new Error('First name, last name, phone, license number and license expiry are required');
   }
   assertFormats(res, { licenseNumber, email, driverDob: dob, licenseExpiry });
+  assertEmergencyContact(res, { emergencyContactName, emergencyContactRelation, emergencyContactPhone });
   if (!assignedBus) {
     res.status(400);
     throw new Error('A driver must be assigned to a bus — register a bus first if none exist yet');
@@ -174,7 +206,7 @@ export const createDriver = asyncHandler(async (req, res) => {
     dob,
     gender,
     profilePhotoUrl,
-    licenseNumber: normalizeCode(licenseNumber),
+    licenseNumber: normalizeLicense(licenseNumber),
     licenseExpiry,
     licenseClass,
     licenseValidation: licenseValidation || { status: 'verified', message: 'License details saved', checkedAt: new Date() },
@@ -187,12 +219,34 @@ export const createDriver = asyncHandler(async (req, res) => {
     residentialAddress,
     status: status || 'Active',
   });
+  // The driver needs this code to choose a password in the driver app.
+  // It is shown to the admin once, here, and only a hash is stored.
+  const setup = issueSetupCode(driver);
+  await driver.save();
 
   await Bus.findByIdAndUpdate(assignedBus, { assignedDriver: driver._id });
   await Route.findByIdAndUpdate(assignedRoute, { assignedDriver: driver._id });
 
   const populated = await populateDriver(Driver.findById(driver._id));
-  res.status(201).json({ success: true, data: populated });
+  res.status(201).json({ success: true, data: { ...populated.toJSON(), accountSetUp: false }, ...setup });
+});
+
+// @desc    New setup code for a driver who has not chosen a password yet
+//          (lost the first one, it expired, or they were added by bulk upload)
+// @route   POST /api/drivers/:id/setup-code
+export const createDriverSetupCode = asyncHandler(async (req, res) => {
+  const driver = await Driver.findById(req.params.id).select('+password firstName lastName phone');
+  if (!driver) {
+    res.status(404);
+    throw new Error('Driver not found');
+  }
+  if (driver.password) {
+    res.status(409);
+    throw new Error('This driver has already set up the app. If they forgot their password, they can use "Forgot password" in the app.');
+  }
+  const setup = issueSetupCode(driver);
+  await driver.save();
+  res.json({ success: true, ...setup });
 });
 
 // @desc    Update driver
@@ -229,10 +283,15 @@ export const updateDriver = asyncHandler(async (req, res) => {
     driverDob: ifChanged(req.body.dob, driver.dob),
     licenseExpiry: ifChanged(req.body.licenseExpiry, driver.licenseExpiry),
   });
+  // Changes may not leave the emergency contact incomplete.
+  const emergencyChange = ['emergencyContactName', 'emergencyContactRelation', 'emergencyContactPhone'];
+  if (emergencyChange.some((f) => req.body[f] !== undefined)) {
+    assertEmergencyContact(res, Object.fromEntries(emergencyChange.map((f) => [f, req.body[f] !== undefined ? req.body[f] : driver[f]])));
+  }
   fields.forEach((f) => {
     if (req.body[f] !== undefined) driver[f] = req.body[f];
   });
-  if (req.body.licenseNumber !== undefined) driver.licenseNumber = normalizeCode(req.body.licenseNumber);
+  if (req.body.licenseNumber !== undefined) driver.licenseNumber = normalizeLicense(req.body.licenseNumber);
   if (req.body.phone !== undefined) driver.phone = normalizeGhanaPhone(req.body.phone);
   if (req.body.emergencyContactPhone !== undefined) {
     driver.emergencyContactPhone = normalizeGhanaPhone(req.body.emergencyContactPhone);
@@ -305,10 +364,10 @@ export const getDriverOptions = asyncHandler(async (req, res) => {
   const filter = {};
   if (q) {
     filter.$or = [
-      { firstName: { $regex: q, $options: 'i' } },
-      { lastName: { $regex: q, $options: 'i' } },
-      { phone: { $regex: q, $options: 'i' } },
-      { licenseNumber: { $regex: q, $options: 'i' } },
+      { firstName: { $regex: searchPattern(q), $options: 'i' } },
+      { lastName: { $regex: searchPattern(q), $options: 'i' } },
+      { phone: { $regex: searchPattern(q), $options: 'i' } },
+      { licenseNumber: { $regex: searchPattern(q), $options: 'i' } },
     ];
   }
   const drivers = await Driver.find(filter)

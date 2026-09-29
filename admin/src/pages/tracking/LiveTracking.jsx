@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { MapContainer, Marker, Polyline, useMap } from 'react-leaflet';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { MapContainer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import { MapTiles } from '../../components/map/GeofenceMap.jsx';
-import { Layers, Navigation2, MapPin as MapPinIcon } from 'lucide-react';
+import { MapLayers } from '../../components/map/GeofenceMap.jsx';
+import { AlertTriangle, CheckCircle2, Clock, Navigation2, MapPin as MapPinIcon, SignalZero } from 'lucide-react';
 import usePageHeader from '../../hooks/usePageHeader.js';
 import { useSocketEvent } from '../../hooks/useSocket.js';
 import { getTrackingOverview } from '../../api/tracking.js';
@@ -14,8 +14,10 @@ import Button from '../../components/ui/Button.jsx';
 import { PillTabs } from '../../components/ui/Tabs.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
-import { timeAgo } from '../../lib/utils.js';
+import { gpsFreshness } from '../../lib/gps.js';
+import useNow from '../../hooks/useNow.js';
 import { formatPhone } from '../../lib/phone.js';
+import { sessionLabel } from '../../lib/sessions.js';
 
 const busIcon = (color) =>
   L.divIcon({
@@ -25,22 +27,32 @@ const busIcon = (color) =>
     iconAnchor: [15, 15],
   });
 
-const colorForStatus = (item) => {
-  if (item.gpsSignal !== 'ok') return '#94a3b8';
-  if (item.status === 'Delayed') return '#f59e0b';
-  return '#0d9488';
+// Marker colour: how fresh the position is first, then whether the trip is delayed.
+const MARKER = { live: '#0d9488', delayed: '#f59e0b', stale: '#64748b', lost: '#94a3b8' };
+const markerColor = (b) => {
+  if (b.gps.state === 'lost' || b.gps.state === 'none') return MARKER.lost;
+  if (b.gps.state === 'stale') return MARKER.stale;
+  return b.status === 'Delayed' ? MARKER.delayed : MARKER.live;
 };
+const isOffline = (b) => b.gps.state !== 'live';
 
 // Trips without a GPS fix yet have an empty liveLocation ({}), so only treat a
 // location as usable when both coordinates are real numbers.
 const toLatLng = (loc) =>
   loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng) ? [loc.lat, loc.lng] : null;
 
-function RecenterOnSelect({ position }) {
+// While following, keep the selected bus in the middle of the map as it moves.
+function FollowBus({ position, follow }) {
   const map = useMap();
   useEffect(() => {
-    if (position) map.setView(position, map.getZoom(), { animate: true });
-  }, [position, map]);
+    if (follow && position) map.setView(position, map.getZoom(), { animate: true });
+  }, [position, follow, map]);
+  return null;
+}
+
+// Dragging the map means the admin wants to look around: stop following.
+function StopFollowOnDrag({ onDrag }) {
+  useMapEvents({ dragstart: onDrag });
   return null;
 }
 
@@ -50,6 +62,8 @@ export default function LiveTracking() {
   const [filter, setFilter] = useState('all');
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [liveBuses, setLiveBuses] = useState([]);
+  const [follow, setFollow] = useState(true);
+  const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ['tracking-overview'],
@@ -68,16 +82,30 @@ export default function LiveTracking() {
   useSocketEvent('bus:location', ({ tripId, location }) => {
     setLiveBuses((prev) => prev.map((b) => (b.tripId === tripId ? { ...b, liveLocation: location, gpsSignal: 'ok' } : b)));
   });
+  // A trip starting or ending changes which buses are on the map: reload now
+  // instead of waiting for the next 15-second refresh.
+  const reload = () => queryClient.invalidateQueries({ queryKey: ['tracking-overview'] });
+  useSocketEvent('trip:started', reload);
+  useSocketEvent('trip:ended', reload);
+
+  // Every bus gets its GPS freshness, re-worked out as time passes (useNow).
+  const now = useNow(15000);
+  const buses = useMemo(() => liveBuses.map((b) => ({ ...b, gps: gpsFreshness(b.liveLocation, now) })), [liveBuses, now]);
 
   const filtered = useMemo(() => {
-    if (filter === 'active') return liveBuses.filter((b) => b.status !== 'Delayed' && b.gpsSignal === 'ok');
-    if (filter === 'delayed') return liveBuses.filter((b) => b.status === 'Delayed');
-    if (filter === 'offline') return liveBuses.filter((b) => b.gpsSignal !== 'ok');
-    return liveBuses;
-  }, [liveBuses, filter]);
+    if (filter === 'active') return buses.filter((b) => b.status !== 'Delayed' && !isOffline(b));
+    if (filter === 'delayed') return buses.filter((b) => b.status === 'Delayed');
+    if (filter === 'offline') return buses.filter(isOffline);
+    return buses;
+  }, [buses, filter]);
 
-  const counts = data?.counts || { all: 0, active: 0, delayed: 0, offline: 0 };
-  const selected = liveBuses.find((b) => b.tripId === selectedTripId);
+  const counts = {
+    all: buses.length,
+    active: buses.filter((b) => b.status !== 'Delayed' && !isOffline(b)).length,
+    delayed: buses.filter((b) => b.status === 'Delayed').length,
+    offline: buses.filter(isOffline).length,
+  };
+  const selected = buses.find((b) => b.tripId === selectedTripId);
   const selectedLat = selected?.liveLocation?.lat;
   const selectedLng = selected?.liveLocation?.lng;
   // Memoised so the map only recentres when the selected bus actually moves.
@@ -91,7 +119,9 @@ export default function LiveTracking() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">Live Tracking</h1>
-          <Badge tone={liveBuses.length ? 'success' : 'neutral'}>{liveBuses.length} buses active</Badge>
+          <Badge tone={buses.length ? 'success' : 'neutral'}>
+            {buses.length} {buses.length === 1 ? 'trip' : 'trips'} running{counts.offline ? ` · ${counts.offline} not reporting` : ''}
+          </Badge>
         </div>
         <p className="text-sm text-slate-400">Monitoring: positions refresh every 15s</p>
       </div>
@@ -102,7 +132,7 @@ export default function LiveTracking() {
           { value: 'all', label: `All buses (${counts.all})` },
           { value: 'active', label: `Active (${counts.active})` },
           { value: 'delayed', label: `Delayed (${counts.delayed})` },
-          { value: 'offline', label: `Offline (${counts.offline})` },
+          { value: 'offline', label: `Not reporting (${counts.offline})` },
         ]}
         active={filter}
         onChange={setFilter}
@@ -120,17 +150,24 @@ export default function LiveTracking() {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.6fr_1fr]">
           <Card className="relative overflow-hidden">
             <div className="absolute left-4 top-4 z-[400] flex gap-2">
-              <button className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-semibold shadow dark:bg-navy-light dark:text-slate-200">
-                <Layers className="h-3.5 w-3.5" /> Layers
-              </button>
-              <button className="flex items-center gap-1.5 rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white shadow">
-                <Navigation2 className="h-3.5 w-3.5" /> Follow bus
+              <button
+                type="button"
+                onClick={() => setFollow((f) => !f)}
+                aria-pressed={follow}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold shadow ${
+                  follow ? 'bg-slate-700 text-white' : 'bg-white text-slate-700 dark:bg-navy-light dark:text-slate-200'
+                }`}
+                title={follow ? 'The map keeps the selected bus in the middle. Click to stop.' : 'Keep the selected bus in the middle of the map'}
+              >
+                <Navigation2 className="h-3.5 w-3.5" /> {follow ? 'Following bus' : 'Follow bus'}
               </button>
             </div>
             <div className="h-[520px] w-full">
               <MapContainer center={center} zoom={13} className="h-full w-full" zoomControl={false}>
-                <MapTiles />
-                <RecenterOnSelect position={selectedPos} />
+                {/* Street / Satellite / Hybrid / Terrain switcher, top right */}
+                <MapLayers />
+                <FollowBus position={selectedPos} follow={follow} />
+                <StopFollowOnDrag onDrag={() => setFollow(false)} />
                 {filtered.map((b) => {
                   const pos = toLatLng(b.liveLocation);
                   if (!pos) return null;
@@ -140,8 +177,9 @@ export default function LiveTracking() {
                       {routePath.length > 1 && <Polyline positions={routePath} color="#cbd5e1" weight={3} />}
                       <Marker
                         position={pos}
-                        icon={busIcon(colorForStatus(b))}
-                        eventHandlers={{ click: () => setSelectedTripId(b.tripId) }}
+                        icon={busIcon(markerColor(b))}
+                        opacity={b.gps.state === 'live' ? 1 : 0.75}
+                        eventHandlers={{ click: () => { setSelectedTripId(b.tripId); setFollow(true); } }}
                       />
                     </div>
                   );
@@ -150,10 +188,10 @@ export default function LiveTracking() {
             </div>
             <div className="absolute bottom-4 left-4 z-[400] rounded-xl bg-white p-3 text-xs shadow dark:bg-navy-light">
               <p className="mb-2 font-bold text-slate-600 dark:text-slate-200">MAP LEGEND</p>
-              <LegendRow color="#0d9488" label="Active Trip" />
-              <LegendRow color="#f59e0b" label="Delayed" />
-              <LegendRow color="#94a3b8" label="GPS Signal Lost" />
-              <LegendRow color="#334155" label="Offline" />
+              <LegendRow color={MARKER.live} label="Live position" />
+              <LegendRow color={MARKER.delayed} label="Live, trip delayed" />
+              <LegendRow color={MARKER.stale} label="Last seen 2-10 min ago" />
+              <LegendRow color={MARKER.lost} label="No GPS for 10+ min" />
             </div>
           </Card>
 
@@ -163,7 +201,7 @@ export default function LiveTracking() {
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Selected Bus</p>
                 <div className="mt-1 flex items-center justify-between">
                   <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">{selected.bus?.name}</h3>
-                  <Badge tone={selected.gpsSignal === 'ok' ? 'success' : 'neutral'}>{selected.status}</Badge>
+                  <Badge tone={selected.status === 'Delayed' ? 'warning' : 'success'}>{selected.status}</Badge>
                 </div>
                 <p className="text-sm text-slate-400">
                   Plate: {selected.bus?.plateNumber} · {selected.bus?.capacity} Seater
@@ -181,15 +219,14 @@ export default function LiveTracking() {
                   <p className="font-bold text-slate-800 dark:text-slate-100">{selected.route?.name}</p>
                   <span className="text-sm font-semibold text-brand-600 dark:text-brand-400">{selected.etaMinutes || 0}m running</span>
                 </div>
-                <p className="text-sm text-slate-400">Departure: {selected.departureTime || '—'}</p>
+                <p className="text-sm text-slate-400">
+                  {selected.session ? `${sessionLabel(selected.session)} · ` : ''}Departure: {selected.departureTime || '—'}
+                </p>
 
                 <div className="my-4 h-px bg-slate-100 dark:bg-slate-800" />
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">GPS Signal</p>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  {selected.gpsSignal === 'ok'
-                    ? `Last GPS update: ${timeAgo(selected.liveLocation?.updatedAt)}`
-                    : 'No signal reported'}
-                </p>
+                <GpsState gps={selected.gps} />
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{selected.gps.detail}</p>
 
                 <Button className="mt-6 w-full" onClick={() => navigate(`/live-tracking/${selected.tripId}`)}>
                   View Trip Details →
@@ -205,6 +242,21 @@ export default function LiveTracking() {
         </div>
       )}
     </div>
+  );
+}
+
+/** GPS freshness as icon + words (never colour alone). */
+export function GpsState({ gps }) {
+  const look = {
+    live: { Icon: CheckCircle2, cls: 'text-emerald-700 dark:text-emerald-400' },
+    stale: { Icon: Clock, cls: 'text-amber-700 dark:text-amber-400' },
+    lost: { Icon: SignalZero, cls: 'text-red-600 dark:text-red-400' },
+    none: { Icon: AlertTriangle, cls: 'text-slate-500' },
+  }[gps.state];
+  return (
+    <p className={`mt-1 flex items-center gap-1.5 text-sm font-semibold ${look.cls}`}>
+      <look.Icon className="h-4 w-4 shrink-0" /> {gps.label}
+    </p>
   );
 }
 

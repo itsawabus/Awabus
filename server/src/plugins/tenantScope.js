@@ -30,16 +30,7 @@ export function tenantScope(schema) {
   if (!schema.path('school')) return; // not a tenant-scoped model, skip entirely
 
   const injectFilter = function injectFilter(next) {
-  console.log(
-    `[TENANT] ${this.model.modelName}.${this.op}`,
-    {
-      isSystem: tenantContext.isSystem(),
-      school: tenantContext.getSchool(),
-      filter: this.getFilter(),
-    }
-  );
-
-  if (tenantContext.isSystem()) return next();
+    if (tenantContext.isSystem()) return next();
     if (this.getOptions().skipTenantScope) return next();
 
     const filter = this.getFilter();

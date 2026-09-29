@@ -25,6 +25,12 @@ const studentSchema = new mongoose.Schema(
     bus: { type: mongoose.Schema.Types.ObjectId, ref: 'Bus', default: null },
     pickupPoint: { type: String, trim: true },
     dropoffPoint: { type: String, trim: true },
+    // Phone call to the parent when the bus is almost at the home (pickup or
+    // drop-off). Parents can opt out; siblings sharing a home usually need it
+    // on for one child only.
+    arrivalCalls: { type: Boolean, default: true },
+    // Which runs the student rides: 'both', 'morning' or 'evening'.
+    rideSession: { type: String, enum: ['both', 'morning', 'evening'], default: 'both' },
     pickupTime: { type: String, trim: true }, // "07:15 AM"
     dropoffTime: { type: String, trim: true }, // "03:45 PM"
 

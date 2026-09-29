@@ -10,7 +10,7 @@ import { cn } from '../../lib/utils.js';
  * Change the same fields on several selected items at once.
  *
  * fields: [{
- *   key, label, type: 'select' | 'text' | 'number',
+ *   key, label, type: 'select' | 'text' | 'number' | 'time',
  *   options?: string[] | [{ value, label }],        // for select
  *   loadOptions?: () => Promise<[{ value, label }]>, // for select, fetched when opened
  *   queryKey?: string,                               // cache key for loadOptions
@@ -40,7 +40,7 @@ export default function BulkEditModal({ open, onClose, items, fields, noun, sing
   const errors = Object.fromEntries(
     chosen.map((f) => {
       const v = values[f.key] ?? '';
-      if (v === '' && f.type !== 'text') return [f.key, 'Choose a value'];
+      if (v === '' && f.type !== 'text' && f.type !== 'time') return [f.key, 'Choose a value'];
       return [f.key, f.validate?.(v) || ''];
     })
   );
@@ -150,12 +150,13 @@ function FieldRow({ field, items, open, on, value, error, onToggle, onChange }) 
             </Select>
           ) : (
             <Input
-              type={field.type === 'number' ? 'number' : 'text'}
+              type={field.type === 'number' ? 'number' : field.type === 'time' ? 'time' : 'text'}
               inputMode={field.type === 'number' ? 'numeric' : undefined}
               value={value}
               onChange={(e) => onChange(e.target.value)}
               error={Boolean(error)}
               placeholder={field.type === 'text' ? 'Leave empty to clear it' : undefined}
+              aria-label={field.label}
             />
           )}
           <FieldError>{error}</FieldError>

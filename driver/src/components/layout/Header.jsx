@@ -2,6 +2,10 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Bell, Menu } from 'lucide-react-native';
 import { router, useNavigation } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
+import { getNotifications } from '../../api/driverApp.js';
+import { useUiStore } from '../../store/uiStore.js';
+import { useOfflineQueueStore } from '../../store/offlineQueueStore.js';
 import { colors } from '../../lib/theme.js';
 
 const LOGO = require('../../../assets/awabus-logo.png');
@@ -43,12 +47,29 @@ export default function Header({ title, logo = false, back = false, right }) {
           {title}
         </Text>
       )}
-      {right || (
-        <View style={styles.iconButton}>
-          <Bell size={22} color={colors.white} />
-        </View>
-      )}
+      {right || <NotificationBell />}
     </View>
+  );
+}
+
+// Opens Notifications; a red dot means something new since the driver last looked.
+function NotificationBell() {
+  const { data } = useQuery({ queryKey: ['driver-notifications'], queryFn: getNotifications, staleTime: 60000 });
+  const seenAt = useUiStore((s) => s.notificationsSeenAt) || 0;
+  const waiting = useOfflineQueueStore((s) => s.queue.length);
+  const unseen = (data || []).filter((n) => new Date(n.at).getTime() > seenAt).length;
+  const dot = unseen > 0 || waiting > 0;
+  return (
+    <Pressable
+      onPress={() => router.push('/notifications')}
+      style={styles.iconButton}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel={dot ? `Notifications, ${unseen || waiting} new` : 'Notifications'}
+    >
+      <Bell size={22} color={colors.white} />
+      {dot && <View style={styles.dot} />}
+    </Pressable>
   );
 }
 
@@ -66,6 +87,17 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  dot: {
+    position: 'absolute',
+    top: 6,
+    right: 7,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: colors.red500,
+    borderWidth: 1.5,
+    borderColor: colors.navy,
   },
   logoWrap: {
     flex: 1,

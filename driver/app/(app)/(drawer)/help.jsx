@@ -18,6 +18,22 @@ const FAQS = [
     a: 'Yes, but the app will warn you first so you can double check the roster before confirming.',
   },
   {
+    q: 'Can I do more than one trip in a day?',
+    a: 'Yes. After you end a trip, the home screen has a new trip ready. Each trip you start is shown live to the school and kept in your trip history.',
+  },
+  {
+    q: 'Why does the app ask "Are you sure?"',
+    a: 'Every change (boarding, drop off, not here, attending, calling a parent) is confirmed first, so a stray tap never changes a record. Tap Cancel to leave it as it was.',
+  },
+  {
+    q: 'How do I reach a student’s parent?',
+    a: 'Each student shows their class and their parent or guardian. Tap the phone button next to the parent to call them.',
+  },
+  {
+    q: 'Does the school still see the bus if I open another screen?',
+    a: 'Yes. While a trip is running the app keeps sending the bus position whichever screen you are on, as long as the app stays open.',
+  },
+  {
     q: 'How do I change my password?',
     a: 'Use "Forgot password" on the sign in screen — you’ll get a one-time code by SMS to reset it.',
   },

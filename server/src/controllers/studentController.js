@@ -8,6 +8,9 @@ import { getPagination, buildPaginationMeta } from '../utils/pagination.js';
 import { nextYearCode } from '../utils/idGenerator.js';
 import { assertFormats, ifChanged } from '../utils/formats.js';
 import Trip from '../models/Trip.js';
+import { normalizeLanguage } from '../utils/languages.js';
+import { searchPattern } from '../utils/search.js';
+import { normalizeRideSession } from '../utils/sessions.js';
 
 const populateStudent = (query) =>
   query
@@ -53,7 +56,7 @@ async function tidyHousehold(householdId) {
 const getHouseholdMembers = (student) =>
   student.household
     ? Student.find({ household: student.household, _id: { $ne: student._id } })
-        .select('firstName lastName studentCode classGrade')
+        .select('firstName lastName studentCode classGrade arrivalCalls')
         .sort({ createdAt: 1 })
     : [];
 
@@ -108,9 +111,9 @@ export const getStudents = asyncHandler(async (req, res) => {
   const filter = {};
   if (q) {
     filter.$or = [
-      { firstName: { $regex: q, $options: 'i' } },
-      { lastName: { $regex: q, $options: 'i' } },
-      { studentCode: { $regex: q, $options: 'i' } },
+      { firstName: { $regex: searchPattern(q), $options: 'i' } },
+      { lastName: { $regex: searchPattern(q), $options: 'i' } },
+      { studentCode: { $regex: searchPattern(q), $options: 'i' } },
     ];
   }
 
@@ -143,6 +146,25 @@ export const getStudentById = asyncHandler(async (req, res) => {
   const [householdMembers, today] = await Promise.all([getHouseholdMembers(student), todayStatuses([student])]);
   res.json({ success: true, data: { ...student.toJSON(), householdMembers, todayStatus: today.get(String(student._id)) } });
 });
+
+// On/off settings arrive as true/false, or "On"/"Off"/"Yes"/"No" from bulk tools.
+const readOnOff = (value, res) => {
+  if (typeof value === 'boolean') return value;
+  const v = String(value).trim().toLowerCase();
+  if (['on', 'yes', 'true', '1'].includes(v)) return true;
+  if (['off', 'no', 'false', '0'].includes(v)) return false;
+  res.status(400);
+  throw new Error('Arrival calls must be on or off');
+};
+
+// A parent picked on the form must be one of this school's parents (the lookup
+// is school-scoped), so an id from another school is refused rather than linked.
+const assertOwnGuardian = async (id, res) => {
+  if (!mongoose.isValidObjectId(id) || !(await Guardian.exists({ _id: id }))) {
+    res.status(400);
+    throw new Error('The selected parent was not found');
+  }
+};
 
 // @desc    Create student (final step of Add Student wizard)
 // @route   POST /api/students
@@ -180,6 +202,11 @@ export const createStudent = asyncHandler(async (req, res) => {
   }
   if (!linkLocationWith) assertFormats(res, { lat, lng, geofenceRadius });
   assertFormats(res, { studentDob: dob, email: guardian?.email });
+  const rideSession = normalizeRideSession(req.body.rideSession);
+  if (rideSession === null) {
+    res.status(400);
+    throw new Error('Choose when the student rides: morning & evening, morning only or evening only');
+  }
 
   const routeDoc = await Route.findById(route);
   if (!routeDoc) {
@@ -199,7 +226,15 @@ export const createStudent = asyncHandler(async (req, res) => {
     household = source.household;
   }
 
+  const language = normalizeLanguage(guardian?.preferredLanguage);
+  if (language === null) {
+    res.status(400);
+    throw new Error('Choose the parent\'s language from the list');
+  }
   let guardianId = guardian?.id || null;
+  if (guardianId) await assertOwnGuardian(guardianId, res);
+  // Linking an existing parent: a language chosen on this form updates their profile.
+  if (guardianId && language) await Guardian.findByIdAndUpdate(guardianId, { preferredLanguage: language });
   if (!guardianId && guardian?.phone) {
     const created = await Guardian.create({
       firstName: guardian.firstName,
@@ -207,6 +242,7 @@ export const createStudent = asyncHandler(async (req, res) => {
       relation: guardian.relation || 'Guardian',
       phone: guardian.phone,
       email: guardian.email,
+      ...(language ? { preferredLanguage: language } : {}),
     });
     guardianId = created._id;
   }
@@ -231,6 +267,8 @@ export const createStudent = asyncHandler(async (req, res) => {
     dropoffPoint,
     pickupTime,
     dropoffTime,
+    ...(rideSession ? { rideSession } : {}),
+    ...(req.body.arrivalCalls !== undefined ? { arrivalCalls: readOnOff(req.body.arrivalCalls, res) } : {}),
     ...location,
     household,
   });
@@ -270,6 +308,15 @@ export const updateStudent = asyncHandler(async (req, res) => {
     'lng',
     'status',
   ];
+  if (req.body.arrivalCalls !== undefined) student.arrivalCalls = readOnOff(req.body.arrivalCalls, res);
+  if (req.body.rideSession !== undefined) {
+    const rideSession = normalizeRideSession(req.body.rideSession);
+    if (!rideSession) {
+      res.status(400);
+      throw new Error('Choose when the student rides: morning & evening, morning only or evening only');
+    }
+    student.rideSession = rideSession;
+  }
   // Only new or changed values are checked (see ifChanged).
   assertFormats(res, {
     studentDob: ifChanged(req.body.dob, student.dob),
@@ -316,12 +363,19 @@ export const updateStudent = asyncHandler(async (req, res) => {
 
   if (req.body.guardian) {
     const g = req.body.guardian;
+    const language = normalizeLanguage(g.preferredLanguage);
+    if (language === null) {
+      res.status(400);
+      throw new Error('Choose the parent\'s language from the list');
+    }
     if (g.id) {
+      await assertOwnGuardian(g.id, res);
       await Guardian.findByIdAndUpdate(g.id, {
         firstName: g.firstName,
         lastName: g.lastName,
         phone: normalizeGhanaPhone(g.phone),
         email: g.email,
+        ...(language ? { preferredLanguage: language } : {}),
       });
       student.primaryGuardian = g.id;
     } else if (g.phone) {
@@ -331,6 +385,7 @@ export const updateStudent = asyncHandler(async (req, res) => {
         relation: g.relation || 'Guardian',
         phone: g.phone,
         email: g.email,
+        ...(language ? { preferredLanguage: language } : {}),
       });
       student.primaryGuardian = created._id;
     }
@@ -374,13 +429,13 @@ export const getStudentOptions = asyncHandler(async (req, res) => {
   if (exclude && mongoose.isValidObjectId(exclude)) filter._id = { $ne: exclude };
   if (q) {
     filter.$or = [
-      { firstName: { $regex: q, $options: 'i' } },
-      { lastName: { $regex: q, $options: 'i' } },
-      { studentCode: { $regex: q, $options: 'i' } },
+      { firstName: { $regex: searchPattern(q), $options: 'i' } },
+      { lastName: { $regex: searchPattern(q), $options: 'i' } },
+      { studentCode: { $regex: searchPattern(q), $options: 'i' } },
     ];
   }
   const students = await Student.find(filter)
-    .select('firstName lastName studentCode classGrade route primaryGuardian household homeAddress geofenceRadius lat lng')
+    .select('firstName lastName studentCode classGrade route primaryGuardian household homeAddress geofenceRadius lat lng arrivalCalls')
     .sort({ createdAt: 1 })
     .limit(50);
   res.json({ success: true, data: students });

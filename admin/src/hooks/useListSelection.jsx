@@ -208,7 +208,9 @@ export default function useListSelection({ items, getLabel, deletePath, noun, si
   const names = [...selected.values()].map(getLabel);
 
   const bar = selecting ? (
-    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4 lg:pl-64">
+    // In the middle of the page (of the content area, beside the sidebar), so
+    // it never sits on top of the Undo box in the bottom corner.
+    <div className="pointer-events-none fixed inset-x-0 top-1/2 z-40 flex -translate-y-1/2 justify-center px-4 lg:pl-64">
       <div className="pointer-events-auto flex w-full max-w-3xl flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-2xl dark:border-slate-700 dark:bg-navy-light">
         <span className="mr-auto text-sm font-semibold text-slate-800 dark:text-slate-100">
           {count ? `${count} selected` : `Tap ${noun} to select them`}

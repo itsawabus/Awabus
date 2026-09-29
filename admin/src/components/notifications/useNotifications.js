@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { getUnreadCount, markAllNotificationsRead, markNotificationRead } from '../../api/notifications.js';
+import {
+  deleteNotification,
+  deleteNotifications,
+  getUnreadCount,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from '../../api/notifications.js';
 
 // How often the bell checks for new notifications.
 export const NOTIFICATION_POLL_MS = 30 * 1000;
@@ -14,7 +20,7 @@ export function useUnreadCount() {
   });
 }
 
-/** Mark-read helpers shared by the bell panel and the Notifications page. */
+/** Mark-read and delete helpers shared by the bell panel and the Notifications page. */
 export function useNotificationActions() {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -22,6 +28,9 @@ export function useNotificationActions() {
 
   const readOne = useMutation({ mutationFn: markNotificationRead, onSettled: refresh });
   const readAll = useMutation({ mutationFn: markAllNotificationsRead, onSettled: refresh });
+  // Deleting only hides them for this admin.
+  const removeOne = useMutation({ mutationFn: deleteNotification, onSettled: refresh });
+  const removeMany = useMutation({ mutationFn: deleteNotifications, onSettled: refresh });
 
   // Mark as read (if needed) and go to the page it is about.
   const open = (item, after) => {
@@ -30,5 +39,5 @@ export function useNotificationActions() {
     if (item.link) navigate(item.link);
   };
 
-  return { open, readAll };
+  return { open, readAll, removeOne, removeMany };
 }

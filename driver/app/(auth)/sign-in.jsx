@@ -5,7 +5,8 @@ import { useMutation } from '@tanstack/react-query';
 import { AlertCircle, ArrowLeft, Check, WifiOff } from 'lucide-react-native';
 import AuthLayout from '../../src/components/layout/AuthLayout.jsx';
 import PhoneInput from '../../src/components/ui/PhoneInput.jsx';
-import { PasswordInput, Label, FieldError } from '../../src/components/ui/Input.jsx';
+import { buildLine } from '../../src/lib/buildInfo.js';
+import { Input, PasswordInput, Label, FieldError } from '../../src/components/ui/Input.jsx';
 import Button from '../../src/components/ui/Button.jsx';
 import { checkPhone, login as loginApi, setPassword as setPasswordApi } from '../../src/api/driverApp.js';
 import { formatPhone, isValidPhone, toLocalPhone } from '../../src/lib/phone.js';
@@ -37,6 +38,7 @@ export default function SignIn() {
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [setupCode, setSetupCode] = useState('');
   const [createError, setCreateError] = useState('');
 
   // Sent as 0XXXXXXXXX; the server normalizes it to +233XXXXXXXXX.
@@ -81,7 +83,7 @@ export default function SignIn() {
   });
 
   const createPasswordMutation = useMutation({
-    mutationFn: () => setPasswordApi(fullPhone, newPassword),
+    mutationFn: () => setPasswordApi(fullPhone, newPassword, setupCode.trim()),
     onSuccess: async (data) => {
       await setAuth(data);
       router.replace('/');
@@ -98,6 +100,7 @@ export default function SignIn() {
     setTriesLeft(MAX_TRIES);
     setNewPassword('');
     setConfirmPassword('');
+    setSetupCode('');
     setCreateError('');
   };
 
@@ -115,6 +118,10 @@ export default function SignIn() {
 
   const handleCreateSubmit = () => {
     setCreateError('');
+    if (!setupCode.trim()) {
+      setCreateError('Enter the setup code from your school');
+      return;
+    }
     if (!allRulesValid) {
       setCreateError('Please meet all password requirements');
       return;
@@ -165,6 +172,7 @@ export default function SignIn() {
         <Text style={styles.terms}>
           By signing in, you agree to our <Text style={styles.termsLink}>Terms and Conditions.</Text>
         </Text>
+        <Text style={styles.buildLine}>{buildLine()}</Text>
       </AuthLayout>
     );
   }
@@ -179,9 +187,20 @@ export default function SignIn() {
 
         <Text style={styles.title}>Create your password</Text>
         <Text style={styles.subtitle}>
-          This is your first time signing in on this device. Create a password for your driver account.
+          This is your first time signing in. Enter the setup code your school gave you, then create a password.
         </Text>
 
+        <View style={styles.field}>
+          <Label>Setup code</Label>
+          <Input
+            value={setupCode}
+            onChangeText={(v) => setSetupCode(v.toUpperCase())}
+            placeholder="ABCD-EFGH"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={12}
+          />
+        </View>
         <View style={styles.field}>
           <Label>New password</Label>
           <PasswordInput value={newPassword} onChangeText={setNewPassword} placeholder="••••••••" />
@@ -257,6 +276,7 @@ export default function SignIn() {
 }
 
 const styles = StyleSheet.create({
+  buildLine: { marginTop: 16, textAlign: 'center', fontSize: 11, color: colors.slate400 },
   title: {
     fontSize: 26,
     fontWeight: '800',

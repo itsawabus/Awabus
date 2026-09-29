@@ -10,8 +10,9 @@ import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import RouteForm from './RouteForm.jsx';
 import { createRoute } from '../../api/routes.js';
+import { formatRunTime } from '../../lib/sessions.js';
 
-const initialValues = { name: '' };
+const initialValues = { name: '', morningStartTime: '', eveningStartTime: '', stops: [] };
 
 export default function AddRoute() {
   usePageHeader({ breadcrumb: ['AwaBus', 'Routes', 'Add route'] });
@@ -28,9 +29,9 @@ export default function AddRoute() {
     },
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e, payload) => {
     e.preventDefault();
-    mutation.mutate(values);
+    mutation.mutate(payload || values);
   };
 
   if (created) {
@@ -46,6 +47,9 @@ export default function AddRoute() {
           <div className="mt-6 space-y-3 rounded-xl bg-slate-50 p-4 text-left text-sm dark:bg-navy">
             <Row label="Route ID" value={created.routeId} />
             <Row label="Route" value={created.name} />
+            <Row label="Stops" value={created.stops?.length || 'None yet'} />
+            <Row label="Morning run" value={formatRunTime(created.morningStartTime)} />
+            <Row label="Evening run" value={formatRunTime(created.eveningStartTime)} />
             <Row label="Status" value={created.status} />
           </div>
           <p className="mt-4 text-xs text-slate-400">

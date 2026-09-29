@@ -15,7 +15,7 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const { data: count } = useUnreadCount();
-  const { open: openItem, readAll } = useNotificationActions();
+  const { open: openItem, readAll, removeOne } = useNotificationActions();
   const unread = count?.unread || 0;
 
   const list = useQuery({
@@ -111,7 +111,13 @@ export default function NotificationBell() {
               </div>
             ) : (
               items.map((item) => (
-                <NotificationItem key={item._id} item={item} compact onOpen={(n) => openItem(n, close)} />
+                <NotificationItem
+                  key={item._id}
+                  item={item}
+                  compact
+                  onOpen={(n) => openItem(n, close)}
+                  onDelete={(n) => removeOne.mutate(n._id)}
+                />
               ))
             )}
           </div>

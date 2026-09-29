@@ -25,8 +25,13 @@ import GpsAddressInput from '../../components/ui/GpsAddressInput.jsx';
 import HouseholdLinkPicker from '../../components/students/HouseholdLinkPicker.jsx';
 import { getRouteOptions } from '../../api/routes.js';
 import { getGuardians } from '../../api/guardians.js';
+import LanguageSelect from '../../components/students/LanguageSelect.jsx';
+import { DEFAULT_LANGUAGE, languageLabel } from '../../lib/languages.js';
 import { createStudent } from '../../api/students.js';
 import { CLASS_GRADE_OPTIONS } from '../../lib/options.js';
+import RideSessionPicker from '../../components/students/RideSessionPicker.jsx';
+import { formatRunTime, rideSessionLabel } from '../../lib/sessions.js';
+import ArrivalCallsToggle, { arrivalCallsLabel } from '../../components/students/ArrivalCallsToggle.jsx';
 
 const STEPS = ['Student Information', 'Parents & Guardian', 'Transport Assignment', 'Home Location', 'Review & Finalize'];
 
@@ -44,18 +49,22 @@ const initial = {
   guardianRelation: 'Father',
   guardianPhone: '',
   guardianEmail: '',
+  guardianLanguage: DEFAULT_LANGUAGE,
   secondContactName: '',
   secondContactPhone: '',
   emergencyInstructions: '',
   route: null,
   pickupPoint: '',
   dropoffPoint: '',
+  rideSession: 'both',
   homeAddress: '',
   geofenceRadius: 200,
   lat: '',
   lng: '',
   linkLocationWith: null, // sibling/neighbour whose home location is shared
   linkedLocationName: '',
+  arrivalCalls: true,
+  arrivalCallsNote: '',
 };
 
 export default function AddStudent() {
@@ -185,8 +194,9 @@ export default function AddStudent() {
       classGrade: form.classGrade,
       profilePhotoUrl,
       guardian: form.guardianId
-        ? { id: form.guardianId }
+        ? { id: form.guardianId, preferredLanguage: form.guardianLanguage || DEFAULT_LANGUAGE }
         : {
+            preferredLanguage: form.guardianLanguage || DEFAULT_LANGUAGE,
             firstName: form.guardianFirst,
             lastName: form.guardianLast,
             relation: form.guardianRelation,
@@ -199,11 +209,13 @@ export default function AddStudent() {
       route: form.route,
       pickupPoint: form.pickupPoint,
       dropoffPoint: form.dropoffPoint,
+      rideSession: form.rideSession || 'both',
       homeAddress: form.homeAddress,
       geofenceRadius: Number(form.geofenceRadius),
       lat: form.lat ? Number(form.lat) : undefined,
       lng: form.lng ? Number(form.lng) : undefined,
       linkLocationWith: form.linkLocationWith || undefined,
+      arrivalCalls: form.arrivalCalls !== false,
     });
   };
 
@@ -328,6 +340,7 @@ export default function AddStudent() {
                       set('guardianLast')(g.lastName);
                       set('guardianPhone')(fromStoredPhone(g.phone));
                       set('guardianEmail')(g.email || '');
+                      set('guardianLanguage')(g.preferredLanguage || DEFAULT_LANGUAGE);
                     }
                   }}
                   options={guardianOptions.map((g) => ({ value: g._id, label: `${g.firstName} ${g.lastName}`, description: formatPhone(g.phone) }))}
@@ -357,7 +370,8 @@ export default function AddStudent() {
                   <Label required>Guardian Phone</Label>
                   <PhoneInput value={form.guardianPhone} onChange={set('guardianPhone')} />
                 </div>
-                <div className="sm:col-span-2">
+                <LanguageSelect value={form.guardianLanguage} onChange={set('guardianLanguage')} />
+                <div>
                   <Label>Guardian Email</Label>
                   <Input type="email" value={form.guardianEmail} onChange={(e) => set('guardianEmail')(formatEmail(e.target.value))} placeholder="kofi.osei@gmail.com" error={Boolean(errors.guardianEmail)} />
                   <FieldError>{errors.guardianEmail}</FieldError>
@@ -415,6 +429,13 @@ export default function AddStudent() {
                   <Label>Drop-off Point</Label>
                   <Input value={form.dropoffPoint} onChange={(e) => set('dropoffPoint')(e.target.value)} placeholder="e.g. East Legon Starbites Station" />
                 </div>
+                <div className="sm:col-span-2">
+                  <Label>Rides</Label>
+                  <RideSessionPicker value={form.rideSession} onChange={set('rideSession')} />
+                  <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    Students who ride one run only are left off the other run's trip.
+                  </p>
+                </div>
               </div>
 
               {selectedRoute && (
@@ -424,6 +445,8 @@ export default function AddStudent() {
                     <SummaryStat label="Stops On Route" value={`${selectedRoute.stops?.length || 0} Scheduled Stops`} />
                     <SummaryStat label="Bus Driver" value={selectedRoute.assignedDriver ? `${selectedRoute.assignedDriver.firstName} ${selectedRoute.assignedDriver.lastName}` : 'Not assigned yet'} />
                     <SummaryStat label="Seats Available" value={selectedBus ? `${selectedBus.capacity} Seats` : '—'} />
+                    <SummaryStat label="Morning run" value={formatRunTime(selectedRoute.morningStartTime)} />
+                    <SummaryStat label="Evening run" value={formatRunTime(selectedRoute.eveningStartTime)} />
                   </CardBody>
                 </Card>
               )}
@@ -454,7 +477,7 @@ export default function AddStudent() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => setForm((f) => ({ ...f, linkLocationWith: null, linkedLocationName: '' }))}
+                        onClick={() => setForm((f) => ({ ...f, linkLocationWith: null, linkedLocationName: '', arrivalCallsNote: '' }))}
                       >
                         <Unlink className="h-4 w-4" />
                         Unlink
@@ -472,6 +495,14 @@ export default function AddStudent() {
                           lat: s.lat != null ? String(s.lat) : '',
                           lng: s.lng != null ? String(s.lng) : '',
                           geofenceRadius: s.geofenceRadius || f.geofenceRadius,
+                          // One call per home is enough: when the sibling already
+                          // gets arrival calls, start this one switched off.
+                          ...(s.arrivalCalls !== false
+                            ? {
+                                arrivalCalls: false,
+                                arrivalCallsNote: `Switched off because ${s.firstName} already gets arrival calls at this home. Turn it on if this parent wants a call for each child.`,
+                              }
+                            : { arrivalCallsNote: '' }),
                         }))
                       }
                     />
@@ -551,6 +582,14 @@ export default function AddStudent() {
                 radius={form.geofenceRadius}
                 onConfirm={(lat, lng) => setForm((f) => ({ ...f, lat: String(lat), lng: String(lng) }))}
               />
+              <div className="mt-6">
+                <Label>Arrival calls</Label>
+                <ArrivalCallsToggle
+                  value={form.arrivalCalls}
+                  onChange={(on) => setForm((f) => ({ ...f, arrivalCalls: on, arrivalCallsNote: '' }))}
+                  note={form.arrivalCallsNote}
+                />
+              </div>
             </div>
           )}
 
@@ -571,12 +610,14 @@ export default function AddStudent() {
                   <SummaryStat label="Guardian" value={`${form.guardianFirst} ${form.guardianLast} (${form.guardianRelation})`} />
                   <SummaryStat label="Phone" value={form.guardianPhone ? formatPhone(form.guardianPhone) : '—'} />
                   <SummaryStat label="Email" value={form.guardianEmail || '—'} />
+                  <SummaryStat label="Language for calls" value={languageLabel(form.guardianLanguage)} />
                 </div>
               </section>
               <section>
                 <p className="mb-3 text-sm font-bold text-brand-700 dark:text-brand-400">Transit Assignments</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <SummaryStat label="Route" value={selectedRoute?.name || '—'} />
+                  <SummaryStat label="Rides" value={rideSessionLabel(form.rideSession)} />
                   <SummaryStat label="Bus" value={selectedBus ? `${selectedBus.name} (${selectedBus.plateNumber})` : 'Not assigned yet'} />
                   <SummaryStat label="Pick-up Point" value={form.pickupPoint || '—'} />
                 </div>
@@ -588,6 +629,7 @@ export default function AddStudent() {
                   <SummaryStat label="Geofence" value={`${form.geofenceRadius}m`} />
                   <SummaryStat label="Coordinates" value={form.lat && form.lng ? `${form.lat}, ${form.lng}` : '—'} />
                   <SummaryStat label="Shares home with" value={form.linkedLocationName || '—'} />
+                  <SummaryStat label="Arrival calls" value={arrivalCallsLabel(form.arrivalCalls)} />
                 </div>
               </section>
             </div>

@@ -5,8 +5,10 @@ import Driver from '../models/Driver.js';
 import Student from '../models/Student.js';
 import Guardian from '../models/Guardian.js';
 import { ghanaPhoneVariants, isValidGhanaPhone, normalizeGhanaPhone } from '../utils/phone.js';
-import { EMAIL_RE, formatProblem, normalizeCode } from '../utils/formats.js';
+import { EMAIL_RE, formatProblem, normalizeCode, normalizeLicense, normalizePlate } from '../utils/formats.js';
 import { MAX_ROWS, SPECS } from './specs.js';
+import { normalizeLanguage } from '../utils/languages.js';
+import { parseTime } from '../utils/sessions.js';
 
 const DATA_ROWS = MAX_ROWS; // rows 2..MAX_ROWS+1 carry the Excel rules
 const BRAND = 'FF0D9488';
@@ -35,10 +37,11 @@ async function loadRefs(names) {
   const refs = {};
   if (names.has('allRoutes') || names.has('routesWithoutBus')) {
     const routes = await Route.find().select('routeId name assignedBus').sort({ routeId: 1 }).lean();
-    refs.allRoutes = routes.map((r) => ({ id: r._id, code: r.routeId, label: routeLabel(r), taken: false }));
+    refs.allRoutes = routes.map((r) => ({ id: r._id, code: r.routeId, name: r.name, label: routeLabel(r), taken: false }));
     refs.routesWithoutBus = routes.map((r) => ({
       id: r._id,
       code: r.routeId,
+      name: r.name,
       label: routeLabel(r),
       taken: Boolean(r.assignedBus),
       takenMessage: 'already has a bus. A route can only have one bus',
@@ -129,12 +132,13 @@ const KIND_HELP = {
   ref: 'Pick from the dropdown',
   phone: '10 digits starting with 0',
   email: 'Email address',
-  plate: 'Format GR-1234-20',
+  plate: 'Format GR-1234-20 or GT-881-Z',
   license: 'Capital letters and numbers',
   gps: 'Format GA-543-0125',
   int: 'Whole number',
   decimal: 'Number',
   date: 'Date, DD/MM/YYYY',
+  time: 'Time, e.g. 06:00',
 };
 
 export async function buildTemplate(entity, schoolName = '') {
@@ -302,8 +306,16 @@ function checkCell(c, raw, refs) {
       return hit ? { value: hit } : { error: `must be one of: ${c.options.join(', ')}` };
     }
     case 'ref': {
+      const options = refs[c.ref] || [];
       const code = normalizeCode(text.split(' - ')[0]);
-      const hit = (refs[c.ref] || []).find((o) => normalizeCode(o.code) === code);
+      let hit = options.find((o) => normalizeCode(o.code) === code);
+      if (!hit) {
+        // A route can also be given by its name alone (e.g. "Adenta - Madina"),
+        // so files can be prepared before the route IDs are known.
+        const byName = options.filter((o) => o.name && o.name.trim().toLowerCase() === text.replace(/\s+/g, ' ').toLowerCase());
+        if (byName.length > 1) return { error: `more than one route is called "${text}". Pick from the dropdown` };
+        [hit] = byName;
+      }
       if (!hit) return { error: `"${text}" was not found in AwaBus. Pick from the dropdown` };
       if (hit.taken) return { error: `${hit.label} ${hit.takenMessage}` };
       return { value: hit.id, label: hit.label };
@@ -316,7 +328,7 @@ function checkCell(c, raw, refs) {
     }
     case 'plate':
     case 'license': {
-      const s = normalizeCode(text);
+      const s = c.kind === 'plate' ? normalizePlate(text) : normalizeLicense(text);
       const problem = formatProblem(c.kind === 'plate' ? 'plateNumber' : 'licenseNumber', s);
       return problem ? { error: problem.replace(/^(Plate number|License number) /, '') } : { value: s };
     }
@@ -331,6 +343,10 @@ function checkCell(c, raw, refs) {
     case 'decimal': {
       const n = Number(text);
       return Number.isFinite(n) && n >= c.min && n <= c.max ? { value: n } : { error: `must be a number from ${c.min} to ${c.max}` };
+    }
+    case 'time': {
+      const t = parseTime(raw instanceof Date ? raw : typeof raw === 'number' ? raw : text);
+      return t ? { value: t } : { error: 'must be a time of day, e.g. 06:00 or 3:30 PM' };
     }
     case 'date': {
       const iso = parseDate(raw);
@@ -433,7 +449,12 @@ export async function readUpload(entity, buffer) {
 
   const clean = (h) => String(cellValue(h) ?? '').replace(/\*/g, '').trim().toLowerCase();
   const header = ws.getRow(1);
-  const mismatch = spec.columns.find((c, i) => clean(header.getCell(i + 1).value) !== c.header.toLowerCase());
+  // Columns added to a template later may be missing from files made with an
+  // older copy of it; those are simply treated as blank.
+  const mismatch = spec.columns.find((c, i) => {
+    const h = clean(header.getCell(i + 1).value);
+    return !(c.addedLater && h === '') && h !== c.header.toLowerCase();
+  });
   if (mismatch) {
     return { fileError: `The columns have been changed (expected "${mismatch.header}" in column ${colLetter(spec.columns.indexOf(mismatch) + 1)}). Download a fresh template and copy your rows into it.` };
   }
@@ -489,7 +510,7 @@ export function describeRow(entity, r) {
 
 // Turns a checked row into the body the normal create endpoint expects.
 export async function toCreateBody(entity, d) {
-  if (entity === 'routes') return { name: d.name, status: d.status };
+  if (entity === 'routes') return { name: d.name, status: d.status, morningStartTime: d.morningStartTime, eveningStartTime: d.eveningStartTime };
   if (entity === 'buses') {
     return { plateNumber: d.plateNumber, name: d.name, type: d.type, capacity: d.capacity, assignedRoute: d.route, status: d.status };
   }
@@ -503,14 +524,16 @@ export async function toCreateBody(entity, d) {
   }
   // students: reuse the parent if one with this phone already exists (siblings)
   const existing = await Guardian.findOne({ phone: { $in: ghanaPhoneVariants(d.guardianPhone) } }).select('_id');
+  const language = d.guardianLanguage ? normalizeLanguage(d.guardianLanguage) : undefined;
   const guardian = existing
-    ? { id: existing._id }
+    ? { id: existing._id, preferredLanguage: language }
     : {
         firstName: d.guardianFirst,
         lastName: d.guardianLast,
         relation: d.guardianRelation || 'Guardian',
         phone: d.guardianPhone,
         email: d.guardianEmail,
+        preferredLanguage: language,
       };
   return {
     firstName: d.firstName,
@@ -529,5 +552,7 @@ export async function toCreateBody(entity, d) {
     lng: d.lng,
     geofenceRadius: d.geofenceRadius ?? 200,
     emergencyInstructions: d.emergencyInstructions,
+    rideSession: d.rideSession,
+    ...(d.arrivalCalls ? { arrivalCalls: d.arrivalCalls } : {}),
   };
 }

@@ -12,7 +12,8 @@ import Button from '../../components/ui/Button.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
 import { SearchableSelect } from '../../components/ui/SearchableSelect.jsx';
-import { CAPACITY_MAX, capacityError, digitsOnly, formatPlate, plateError } from '../../lib/formats.js';
+import { CAPACITY_MAX, capacityError, digitsOnly, plateError } from '../../lib/formats.js';
+import { PlateInput } from '../../components/ui/FormattedInputs.jsx';
 import { getRouteOptions } from '../../api/routes.js';
 import { createBus } from '../../api/buses.js';
 
@@ -126,9 +127,8 @@ export default function RegisterBus() {
           <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
               <Label required>Bus Plate Number</Label>
-              <Input value={form.plateNumber} onChange={(e) => set('plateNumber')(formatPlate(e.target.value))} error={Boolean(errors.plateNumber)} placeholder="e.g. GC-102-21" required />
+              <PlateInput value={form.plateNumber} onChange={set('plateNumber')} error={errors.plateNumber} required />
               <FieldError>{errors.plateNumber}</FieldError>
-              {!errors.plateNumber && <p className="mt-1.5 text-xs text-slate-400">Format: region letters, number, year, e.g. GR-1234-20</p>}
             </div>
             <div>
               <Label required>Bus Name/Nickname</Label>

@@ -20,17 +20,18 @@ import { SearchableSelect } from '../../components/ui/SearchableSelect.jsx';
 import Spinner, { PageLoader } from '../../components/ui/Spinner.jsx';
 import { getBusOptions } from '../../api/buses.js';
 import { createDriver, getDriverOptions, validateLicense } from '../../api/drivers.js';
+import SetupCodeBox from '../../components/account/SetupCodeBox.jsx';
 import { busAvailable, busHolders, busPickerOptions, busTakenBy } from '../../lib/assignments.js';
 import {
   DATE_LIMITS,
   dateError,
   emailError,
   formatEmail,
-  formatLicense,
   formatName,
   licenseError,
   nameError,
 } from '../../lib/formats.js';
+import { LicenseInput } from '../../components/ui/FormattedInputs.jsx';
 
 const STEPS = [
   'Personal Information',
@@ -136,9 +137,10 @@ export default function AddDriver() {
     }
     if (n === 4) {
       next = {
-        emergencyContactName: nameError(form.emergencyContactName, 'Contact name', { required: false }),
-        emergencyContactPhone:
-          form.emergencyContactPhone && !isValidPhone(form.emergencyContactPhone)
+        emergencyContactName: nameError(form.emergencyContactName, 'Emergency contact name'),
+        emergencyContactPhone: !form.emergencyContactPhone
+          ? 'Enter the emergency contact\'s phone number'
+          : !isValidPhone(form.emergencyContactPhone)
             ? 'Must be 10 digits starting with 0'
             : '',
       };
@@ -258,6 +260,14 @@ export default function AddDriver() {
             <Row label="Assigned Route" value={created.assignedRoute?.name || '—'} />
             <Row label="Contact Phone" value={formatPhone(created.phone)} />
           </div>
+          {created.setupCode && (
+            <div className="mt-4">
+              <SetupCodeBox code={created.setupCode} expires={created.setupCodeExpires}>
+                Give this code to {created.firstName}. They enter it with their phone number the first time they open the AwaBus
+                driver app, then choose their own password.
+              </SetupCodeBox>
+            </div>
+          )}
           <div className="mt-6 flex justify-center gap-3">
             <Button as={Link} to="/drivers" variant="outline">
               Back to Drivers
@@ -347,9 +357,8 @@ export default function AddDriver() {
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
                   <Label required>License Number</Label>
-                  <Input value={form.licenseNumber} onChange={(e) => set('licenseNumber')(formatLicense(e.target.value))} placeholder="e.g. GH-DL-29831" error={Boolean(errors.licenseNumber)} required />
+                  <LicenseInput value={form.licenseNumber} onChange={set('licenseNumber')} error={errors.licenseNumber} required />
                   <FieldError>{errors.licenseNumber}</FieldError>
-                  {!errors.licenseNumber && <p className="mt-1.5 text-xs text-slate-400">Capital letters and numbers, as printed on the license.</p>}
                 </div>
                 <div>
                   <Label required>License Expiry Date</Label>
@@ -412,11 +421,7 @@ export default function AddDriver() {
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <div>
                       <Label>License Number</Label>
-                      <Input
-                        value={form.licenseNumber}
-                        onChange={(e) => set('licenseNumber')(formatLicense(e.target.value))}
-                        error={Boolean(validation.errors?.licenseNumber)}
-                      />
+                      <LicenseInput value={form.licenseNumber} onChange={set('licenseNumber')} error={validation.errors?.licenseNumber} />
                       <FieldError>{validation.errors?.licenseNumber}</FieldError>
                     </div>
                     <div>
@@ -469,12 +474,12 @@ export default function AddDriver() {
 
               <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
                 <div>
-                  <Label>Emergency Contact Name</Label>
+                  <Label required>Emergency Contact Name</Label>
                   <Input value={form.emergencyContactName} onChange={(e) => set('emergencyContactName')(formatName(e.target.value))} placeholder="e.g. Abena Mensah" error={Boolean(errors.emergencyContactName)} />
                   <FieldError>{errors.emergencyContactName}</FieldError>
                 </div>
                 <div>
-                  <Label>Relation</Label>
+                  <Label required>Relation</Label>
                   <Select value={form.emergencyContactRelation} onChange={(e) => set('emergencyContactRelation')(e.target.value)}>
                     {['Wife', 'Husband', 'Sister', 'Brother', 'Father', 'Mother', 'Other'].map((r) => (
                       <option key={r}>{r}</option>
@@ -482,7 +487,7 @@ export default function AddDriver() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Emergency Contact Phone</Label>
+                  <Label required>Emergency Contact Phone</Label>
                   <PhoneInput value={form.emergencyContactPhone} onChange={set('emergencyContactPhone')} error={Boolean(errors.emergencyContactPhone)} />
                   <FieldError>{errors.emergencyContactPhone}</FieldError>
                 </div>

@@ -11,7 +11,7 @@ import { formatDate, formatDuration, formatTime } from '../../../../src/lib/util
 import { colors } from '../../../../src/lib/theme.js';
 
 const STATUS_TONE = { Completed: 'success', Cancelled: 'danger', Delayed: 'warning' };
-const DROPOFF_TONE = { 'Dropped off': 'success', 'On board': 'warning', 'Not picked up': 'neutral' };
+const DROPOFF_TONE = { 'Dropped off': 'success', 'On board': 'warning', 'Not on board': 'danger', 'Not picked up': 'neutral' };
 
 export default function TripHistoryDetail() {
   const { id } = useLocalSearchParams();

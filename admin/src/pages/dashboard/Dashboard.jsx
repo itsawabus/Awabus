@@ -69,14 +69,14 @@ export default function Dashboard() {
         <StatCard
           label="Total Students"
           value={stats.totalStudents ?? 0}
-          hint={`Across ${stats.activeRouteCount ?? 0} operational lines`}
+          hint={`Across ${stats.activeRouteCount ?? 0} active route${stats.activeRouteCount === 1 ? '' : 's'}`}
           icon={GraduationCap}
           tone="amber"
         />
         <StatCard
           label="Active Trips"
           value={stats.activeTrips ?? 0}
-          hint={`${stats.completedToday ?? 0} trips completed since 7 AM`}
+          hint={`${stats.completedToday ?? 0} trip${stats.completedToday === 1 ? '' : 's'} completed today`}
           icon={Navigation}
         />
       </div>

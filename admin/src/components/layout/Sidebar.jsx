@@ -13,10 +13,12 @@ import {
   X,
   Building2,
   BookOpen,
+  Wrench,
 } from 'lucide-react';
 import { useUiStore } from '../../store/uiStore.js';
 import { useAuthStore } from '../../store/authStore.js';
 import useConfirmSignOut from './useConfirmSignOut.jsx';
+import { API_URL } from '../../api/client.js';
 import { cn } from '../../lib/utils.js';
 
 const NAV_ITEMS = [
@@ -31,6 +33,7 @@ const NAV_ITEMS = [
 ];
 
 const SUPERADMIN_NAV_ITEM = { to: '/platform', label: 'Platform', icon: Building2, end: true };
+const SYSTEM_NAV_ITEM = { to: '/system', label: 'System', icon: Wrench };
 
 export default function Sidebar() {
   const { darkMode, toggleDarkMode } = useUiStore();
@@ -39,7 +42,11 @@ export default function Sidebar() {
   const admin = useAuthStore((s) => s.admin);
   const [requestSignOut, signOutDialog] = useConfirmSignOut();
 
-  const navItems = admin?.role === 'superadmin' ? [SUPERADMIN_NAV_ITEM, ...NAV_ITEMS] : NAV_ITEMS;
+  // Superadmins are the developers: they get the System page instead of Help & Guide.
+  const navItems =
+    admin?.role === 'superadmin'
+      ? [SUPERADMIN_NAV_ITEM, ...NAV_ITEMS.filter((i) => i.to !== '/help'), SYSTEM_NAV_ITEM]
+      : NAV_ITEMS;
 
   return (
     <>
@@ -128,6 +135,13 @@ export default function Sidebar() {
           >
             <LogOut className="h-4 w-4" /> Sign out
           </button>
+          {import.meta.env.DEV && (
+            // Development only: which server this portal talks to, so it can be
+            // matched with the driver app's EXPO_PUBLIC_API_URL.
+            <p className="mt-3 truncate text-center text-[11px] text-white/50" title={API_URL}>
+              Server: {API_URL.startsWith('/') ? 'this Codespace / computer' : API_URL.replace(/^https?:\/\//, '').replace(/\/api$/, '')}
+            </p>
+          )}
         </div>
       </aside>
       {signOutDialog}

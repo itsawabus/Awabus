@@ -21,6 +21,7 @@ import ListToolbar from '../../components/ui/ListToolbar.jsx';
 import { ROUTE_STATUSES } from '../../lib/options.js';
 import { UNDO_SECONDS, usePendingDeleteIds, useUndoDeleteStore } from '../../store/undoDeleteStore.js';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
+import { formatRunTime } from '../../lib/sessions.js';
 
 export default function RoutesList() {
   const [search, setSearch] = useState('');
@@ -62,7 +63,25 @@ export default function RoutesList() {
     invalidate,
     bulkEdit: {
       updateOne: updateRoute,
-      fields: [{ key: 'status', label: 'Status', type: 'select', options: ROUTE_STATUSES, get: (r) => r.status || '' }],
+      fields: [
+        { key: 'status', label: 'Status', type: 'select', options: ROUTE_STATUSES, get: (r) => r.status || '' },
+        {
+          key: 'morningStartTime',
+          label: 'Morning run starts',
+          type: 'time',
+          get: (r) => formatRunTime(r.morningStartTime),
+          validate: (v) => (v && v >= '12:00' ? 'Must be before 12:00 noon' : ''),
+          hint: 'Leave empty to clear it.',
+        },
+        {
+          key: 'eveningStartTime',
+          label: 'Evening run starts',
+          type: 'time',
+          get: (r) => formatRunTime(r.eveningStartTime),
+          validate: (v) => (v && v < '12:00' ? 'Must be 12:00 noon or later' : ''),
+          hint: 'Leave empty to clear it.',
+        },
+      ],
     },
   });
   const confirmDelete = (item) => {
@@ -79,7 +98,7 @@ export default function RoutesList() {
   const hasAnyRoutes = meta && (meta.total > 0 || debouncedSearch);
 
   return (
-    <div className={selection.selecting ? 'pb-24' : undefined}>
+    <div>
       <PageHeader
         title="Routes"
         subtitle="Manage operational lines, assign drivers, and monitor service capacity."
@@ -138,6 +157,8 @@ export default function RoutesList() {
                 <Th>Route Name</Th>
                 <Th>Assigned Driver</Th>
                 <Th>Students</Th>
+                <Th>Stops</Th>
+                <Th>Runs</Th>
                 <Th>Status</Th>
                 <Th className="text-right">Actions</Th>
               </Thead>
@@ -153,6 +174,17 @@ export default function RoutesList() {
                         : '—'}
                     </Td>
                     <Td>{route.studentCount ?? route.students?.length ?? 0}</Td>
+                    <Td>{route.stops?.length ? route.stops.length : <span className="text-amber-600 dark:text-amber-400">None yet</span>}</Td>
+                    <Td className="whitespace-nowrap text-sm">
+                      {route.morningStartTime || route.eveningStartTime ? (
+                        <>
+                          <span className="block">Morning {formatRunTime(route.morningStartTime, '—')}</span>
+                          <span className="block text-slate-500 dark:text-slate-400">Evening {formatRunTime(route.eveningStartTime, '—')}</span>
+                        </>
+                      ) : (
+                        <span className="text-amber-600 dark:text-amber-400">Not set</span>
+                      )}
+                    </Td>
                     <Td>
                       <Badge tone={route.status === 'Active' ? 'success' : 'neutral'}>{route.status}</Badge>
                     </Td>

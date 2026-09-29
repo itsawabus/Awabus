@@ -5,11 +5,13 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
+    "start:codespace": "sh scripts/start-codespace.sh",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "rebuild:android": "expo prebuild --clean --platform android && expo run:android",
     "rebuild:ios": "expo prebuild --clean --platform ios && expo run:ios",
     "build:dev:android": "npx -y eas-cli@latest build --profile development --platform android",
+    "build:preview:android": "node scripts/build-preview.mjs android",
     "build:dev:ios": "npx -y eas-cli@latest build --profile development --platform ios",
     "lint": "expo lint",
     "doctor": "expo-doctor",

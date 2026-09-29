@@ -4,11 +4,15 @@ import app from './app.js';
 import connectDB from './config/db.js';
 import initSocket from './sockets/index.js';
 import { startStaleTripSweeper } from './services/staleTrips.js';
+import { assignGuardianSchools } from './migrations/guardianSchools.js';
+import { fixAlertLabels } from './migrations/honestAlertStatus.js';
 
 const PORT = process.env.PORT || 5000;
 
 const start = async () => {
   await connectDB();
+  await assignGuardianSchools();
+  await fixAlertLabels();
 
   const server = http.createServer(app);
   const io = initSocket(server, process.env.CLIENT_URL || '*');

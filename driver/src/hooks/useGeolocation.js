@@ -23,7 +23,8 @@ export function useGeolocation(active) {
         }
 
         subscriptionRef.current = await Location.watchPositionAsync(
-          { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 10 },
+          // distanceInterval 0: keep reporting while parked too (every ~5 s on Android).
+          { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 0 },
           (loc) => {
             if (cancelled) return;
             setError(null);
@@ -31,6 +32,8 @@ export function useGeolocation(active) {
               lat: loc.coords.latitude,
               lng: loc.coords.longitude,
               heading: loc.coords.heading || 0,
+              // When the phone took the reading, so a queued one is not shown as current.
+              recordedAt: new Date(loc.timestamp || Date.now()).toISOString(),
             });
           }
         );

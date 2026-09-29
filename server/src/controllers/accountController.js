@@ -6,11 +6,12 @@ import { ghanaPhoneVariants, isValidGhanaPhone, normalizeGhanaPhone } from '../u
 import { checkPasswordStrength } from '../utils/password.js';
 import { tenantContext } from '../utils/tenantContext.js';
 import { MAX_OTP_ATTEMPTS } from './authController.js';
+import generateToken from '../utils/generateToken.js';
 
 // Account settings for the signed-in admin (req.admin, set by protectAdmin).
 // Changing the email or phone needs a code sent to the NEW address, proving the
-// admin controls it; changing the password needs the current password plus a
-// code sent to the email or phone already on the account.
+// admin controls it; resetting the password needs a code sent to the email or
+// phone already on the account.
 
 const RESEND_COOLDOWN_MS = 60 * 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -40,8 +41,16 @@ async function issueCode(res, admin, { purpose, target, newValue, channel }) {
 
   const code = generateOtpCode();
   await OtpToken.create({ admin: admin._id, purpose, target, newValue, code, expiresAt: getOtpExpiry() });
-  if (channel === 'email') await sendOtpEmail(target, code);
-  else await sendOtpSms(target, code);
+  const delivered =
+    channel === 'email'
+      ? await sendOtpEmail(target, code, { purpose: 'account_verification', school: admin.school })
+      : await sendOtpSms(target, code, { purpose: 'account_verification', school: admin.school });
+  if (!delivered) {
+    // Cancel the unsent code so the admin can ask again straight away.
+    await OtpToken.updateMany({ admin: admin._id, purpose, consumed: false }, { consumed: true });
+    res.status(502);
+    throw new Error("We couldn't send the code right now. Please try again in a few minutes.");
+  }
 }
 
 async function consumeCode(res, admin, purpose, code) {
@@ -141,28 +150,8 @@ export const requestVerification = asyncHandler(async (req, res) => {
     return res.json({ success: true, sentTo: channel === 'email' ? maskEmail(target) : maskPhone(target) });
   }
 
-  if (purpose === 'reveal_password') {
-    // Showing a typed password on screen is confirmed by email only.
-    if (!admin.email) {
-      res.status(400);
-      throw new Error('There is no email on this account to send a code to');
-    }
-    await issueCode(res, admin, { purpose, target: admin.email, channel: 'email' });
-    return res.json({ success: true, sentTo: maskEmail(admin.email) });
-  }
-
   res.status(400);
   throw new Error('Unknown verification purpose');
-});
-
-// How long a verified "show password" lasts before a new code is needed.
-const REVEAL_WINDOW_MS = 5 * 60 * 1000;
-
-// @desc    Confirm the emailed code before showing a typed password on screen
-// @route   POST /api/auth/me/reveal-password
-export const confirmPasswordReveal = asyncHandler(async (req, res) => {
-  await consumeCode(res, req.admin, 'reveal_password', req.body.code);
-  res.json({ success: true, allowedUntil: new Date(Date.now() + REVEAL_WINDOW_MS).toISOString() });
 });
 
 // @desc    Confirm a new email address with the code sent to it
@@ -193,16 +182,13 @@ export const confirmPhoneChange = asyncHandler(async (req, res) => {
   res.json({ success: true, admin: admin.toSafeObject() });
 });
 
-// @desc    Change password (current password + verification code)
+// @desc    Reset password while signed in: new password + the code sent to the
+//          account's email or phone (the code is the proof, like Forgot password)
 // @route   POST /api/auth/me/password
 export const changePassword = asyncHandler(async (req, res) => {
-  const { currentPassword, newPassword, code } = req.body;
+  const { newPassword, code } = req.body;
   const admin = req.admin;
 
-  if (admin.password && !(await admin.matchPassword(currentPassword || ''))) {
-    res.status(400);
-    throw new Error('Your current password is incorrect');
-  }
   const weak = checkPasswordStrength(newPassword, { email: admin.email, name: admin.name });
   if (weak) {
     res.status(400);
@@ -216,5 +202,10 @@ export const changePassword = asyncHandler(async (req, res) => {
   await consumeCode(res, admin, 'change_password', code);
   admin.password = newPassword;
   await admin.save();
-  res.json({ success: true, message: 'Your password has been changed' });
+  // Other sessions are now signed out; this one continues with a fresh token.
+  res.json({
+    success: true,
+    message: 'Your password has been changed. Other devices have been signed out.',
+    token: generateToken(admin._id, 'admin', { school: admin.school, role: admin.role }),
+  });
 });

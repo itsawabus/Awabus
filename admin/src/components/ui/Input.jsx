@@ -39,9 +39,9 @@ export const Input = forwardRef(({ className, error, icon: Icon, wrapperClassNam
 ));
 Input.displayName = 'Input';
 
-// Pass `visible` + `onToggleVisible` to control the eye button yourself (e.g. to
-// require verification before showing); otherwise it toggles freely.
-export const PasswordInput = forwardRef(({ className, error, visible: visibleProp, onToggleVisible, value, ...props }, ref) => {
+// Pass `visible` + `onToggleVisible` to control the eye button yourself;
+// otherwise it toggles freely. `noReveal` hides the eye button altogether.
+export const PasswordInput = forwardRef(({ className, error, visible: visibleProp, onToggleVisible, noReveal, value, ...props }, ref) => {
   const [visibleState, setVisibleState] = useState(false);
   const controlled = visibleProp !== undefined;
   const visible = controlled ? visibleProp : visibleState;
@@ -70,24 +70,27 @@ export const PasswordInput = forwardRef(({ className, error, visible: visiblePro
     <div className="relative">
       <input
         ref={setRefs}
-        type={visible ? 'text' : 'password'}
+        type={visible && !noReveal ? 'text' : 'password'}
         className={cn(
           baseInputClasses,
-          'h-11 pr-10',
+          'h-11',
+          !noReveal && 'pr-10',
           error ? 'border-red-400 focus:border-red-400 focus:ring-red-100' : 'border-slate-200 dark:border-slate-700',
           className
         )}
         {...props}
       />
-      <button
-        type="button"
-        tabIndex={-1}
-        onClick={toggle}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-        aria-label={visible ? 'Hide password' : 'Show password'}
-      >
-        {visible ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
-      </button>
+      {!noReveal && (
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={toggle}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+          aria-label={visible ? 'Hide password' : 'Show password'}
+        >
+          {visible ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+        </button>
+      )}
     </div>
   );
 });

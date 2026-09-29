@@ -25,6 +25,7 @@ import { RADIUS_MAX, RADIUS_MIN, radiusError } from '../../lib/formats.js';
 import { UNDO_SECONDS, usePendingDeleteIds, useUndoDeleteStore } from '../../store/undoDeleteStore.js';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
 import { formatPhone } from '../../lib/phone.js';
+import { RIDE_SESSIONS, rideSessionLabel } from '../../lib/sessions.js';
 
 export default function StudentsList() {
   const [search, setSearch] = useState('');
@@ -77,6 +78,25 @@ export default function StudentsList() {
         hint: 'Their bus changes to the bus that serves the new route.',
       },
       { key: 'classGrade', label: 'Class / Grade', type: 'select', options: CLASS_GRADE_OPTIONS, get: (s) => s.classGrade || '' },
+      {
+        key: 'rideSession',
+        label: 'Rides',
+        type: 'select',
+        options: RIDE_SESSIONS,
+        get: (s) => s.rideSession || 'both',
+        hint: 'Morning-only students are left off evening trips, and the other way round.',
+      },
+      {
+        key: 'arrivalCalls',
+        label: 'Arrival calls',
+        type: 'select',
+        options: [
+          { value: 'on', label: 'On' },
+          { value: 'off', label: 'Off' },
+        ],
+        get: (s) => (s.arrivalCalls === false ? 'off' : 'on'),
+        hint: 'Call the parent when the bus is almost at the home. For brothers and sisters, on for one child is enough.',
+      },
       { key: 'pickupPoint', label: 'Pickup point', type: 'text', get: (s) => s.pickupPoint || '', validate: (v) => (v.length > 120 ? 'At most 120 characters' : '') },
       { key: 'dropoffPoint', label: 'Drop-off point', type: 'text', get: (s) => s.dropoffPoint || '', validate: (v) => (v.length > 120 ? 'At most 120 characters' : '') },
       {
@@ -104,7 +124,7 @@ export default function StudentsList() {
   const stats = data?.stats || {};
 
   return (
-    <div className={selection.selecting ? 'pb-24' : undefined}>
+    <div>
       <PageHeader
         title="Students"
         subtitle="Monitor child safe boarding status and details."
@@ -197,7 +217,12 @@ export default function StudentsList() {
                     <Td>{s.primaryGuardian ? s.primaryGuardian.fullName || `${s.primaryGuardian.firstName} ${s.primaryGuardian.lastName}` : '—'}</Td>
                     <Td>{s.primaryGuardian?.phone ? formatPhone(s.primaryGuardian.phone) : '—'}</Td>
                     <Td>{s.bus?.plateNumber || s.bus?.name || '—'}</Td>
-                    <Td>{s.route?.name || '—'}</Td>
+                    <Td>
+                      {s.route?.name || '—'}
+                      {s.rideSession && s.rideSession !== 'both' && (
+                        <span className="block whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">{rideSessionLabel(s.rideSession)}</span>
+                      )}
+                    </Td>
                     <Td>{s.pickupTime || '—'}</Td>
                     <Td>
                       <Badge>{s.todayStatus || s.todayAttendance}</Badge>

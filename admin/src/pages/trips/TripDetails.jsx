@@ -12,6 +12,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Tabs from '../../components/ui/Tabs.jsx';
 import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
+import { sessionLabel } from '../../lib/sessions.js';
 
 const stopIcon = (n) =>
   L.divIcon({
@@ -45,6 +46,7 @@ export default function TripDetails() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">{trip.tripCode}</h1>
+            {trip.session && <Badge>{sessionLabel(trip.session)}</Badge>}
             {trip.autoEnded ? (
               <Badge tone="warning">Ended automatically</Badge>
             ) : (

@@ -1,27 +1,28 @@
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, radii } from '../../lib/theme.js';
-import { sanitizePhone, toLocalPhone } from '../../lib/phone.js';
+import { sanitizePhone } from '../../lib/phone.js';
 import GhanaFlag from './GhanaFlag.jsx';
 
-// Ghana phone input: 10 digits starting with 0 (0551234567), or the 9 digits
-// without it (551234567) - the leading 0 is added when the field loses focus.
-export default function PhoneInput({ value, onChange, onBlur, error, placeholder = '055 123 4567', ...props }) {
+// Ghana phone input with the flag and +233 in front. Takes the 10 digits with
+// the leading 0 (0551234567) or the 9 digits without it (551234567); the 0 is
+// added in the background when the number is sent (toLocalPhone), so the box
+// keeps exactly what the driver typed. The length is capped by sanitizePhone,
+// not by a changing maxLength, which some phones apply late and cut numbers
+// short.
+export default function PhoneInput({ value, onChange, error, placeholder = '055 123 4567', ...props }) {
   return (
     <View style={[styles.wrap, error && styles.wrapError]}>
       <View style={styles.prefix}>
         <GhanaFlag />
-        <Text style={styles.prefixText}>GH</Text>
+        <Text style={styles.prefixText}>+233</Text>
       </View>
       <TextInput
         keyboardType="phone-pad"
+        textContentType="telephoneNumber"
+        autoComplete="tel"
         value={value}
-        maxLength={String(value || '').startsWith('0') || !value ? 10 : 9}
+        maxLength={16}
         onChangeText={(text) => onChange?.(sanitizePhone(text))}
-        onBlur={(e) => {
-          const local = toLocalPhone(value);
-          if (local !== value) onChange?.(local);
-          onBlur?.(e);
-        }}
         placeholder={placeholder}
         placeholderTextColor={colors.slate400}
         style={styles.input}

@@ -11,6 +11,7 @@ import { useUiStore } from '../src/store/uiStore.js';
 import { useOfflineQueueStore } from '../src/store/offlineQueueStore.js';
 import { useOfflineSync } from '../src/hooks/useOfflineSync.js';
 import BrandSplash from '../src/components/layout/BrandSplash.jsx';
+import BackgroundWork from '../src/components/BackgroundWork.jsx';
 
 // How long the in-app splash stays up at minimum, so it doesn't just flicker.
 const MIN_SPLASH_MS = 1200;
@@ -64,6 +65,8 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <StatusBar style="light" />
+          {/* Sends the bus position and checks notifications on every screen, without moving between screens. */}
+          {isAuthenticated && <BackgroundWork />}
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Protected guard={!isAuthenticated}>
               <Stack.Screen name="(auth)" />

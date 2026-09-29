@@ -8,3 +8,7 @@ export const markAllNotificationsRead = () => apiClient.patch('/notifications/re
 export const getNotificationPreferences = () => apiClient.get('/notifications/preferences').then((r) => r.data.data);
 export const updateNotificationPreferences = (muted) =>
   apiClient.put('/notifications/preferences', { muted }).then((r) => r.data.data);
+// Deleting hides a notification for this admin only (other admins still see it).
+export const deleteNotification = (id) => apiClient.delete(`/notifications/${id}`).then((r) => r.data.data);
+// body: { ids: [...] } or { all: true }
+export const deleteNotifications = (body) => apiClient.post('/notifications/delete', body).then((r) => r.data);

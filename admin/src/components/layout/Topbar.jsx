@@ -27,6 +27,7 @@ const SECTION_LINKS = {
   'my profile': '/account/profile',
   'account settings': '/account/settings',
   notifications: '/notifications',
+  system: '/system',
 };
 
 const resolveCrumb = (crumb) =>
@@ -102,7 +103,7 @@ export default function Topbar() {
 
       <div className="flex shrink-0 items-center gap-3">
         {admin?.role === 'superadmin' && <SchoolPicker />}
-        {!pathname.startsWith('/help') && (
+        {admin?.role !== 'superadmin' && !pathname.startsWith('/help') && (
           <Link
             to={`/help#${guideSectionFor(pathname)}`}
             title="How this page works"

@@ -11,7 +11,8 @@ import { Select } from '../../components/ui/Input.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import { SearchableSelect } from '../../components/ui/SearchableSelect.jsx';
-import { CAPACITY_MAX, capacityError, digitsOnly, formatPlate, ifChanged, plateError } from '../../lib/formats.js';
+import { CAPACITY_MAX, capacityError, digitsOnly, ifChanged, plateError } from '../../lib/formats.js';
+import { PlateInput } from '../../components/ui/FormattedInputs.jsx';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
 import { UNDO_SECONDS, useUndoDeleteStore } from '../../store/undoDeleteStore.js';
 import { getBus, updateBus } from '../../api/buses.js';
@@ -108,9 +109,8 @@ export default function EditBus() {
           <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
               <Label required>Bus Plate Number</Label>
-              <Input value={form.plateNumber} onChange={(e) => set('plateNumber')(formatPlate(e.target.value))} error={Boolean(errors.plateNumber)} />
+              <PlateInput value={form.plateNumber} onChange={set('plateNumber')} error={errors.plateNumber} />
               <FieldError>{errors.plateNumber}</FieldError>
-              {!errors.plateNumber && <p className="mt-1.5 text-xs text-slate-400">Format: region letters, number, year, e.g. GR-1234-20</p>}
             </div>
             <div>
               <Label required>Bus Name/Nickname</Label>

@@ -10,6 +10,8 @@ import Trip from '../models/Trip.js';
 import { tenantContext } from '../utils/tenantContext.js';
 import { assertFormats } from '../utils/formats.js';
 import { buildInsights, INSIGHT_RANGES } from '../services/platformInsights.js';
+import { forgetSchoolStatus } from '../utils/access.js';
+import { issueSetupCode } from '../utils/setupCode.js';
 
 // Derives a short, URL/login-screen-friendly code from the school name,
 // e.g. "Awabus Demo School" -> "AWABUS-DEMO-SCHOOL". Matches School.code's
@@ -106,8 +108,15 @@ export const getInsights = asyncHandler(async (req, res) => {
 // @route   GET /api/superadmin/schools
 // @access  Private (superadmin)
 export const listSchools = asyncHandler(async (req, res) => {
-  const schools = await asSystem(() => School.find({}).sort({ createdAt: -1 }).lean());
-  res.json({ success: true, schools });
+  const [schools, waiting] = await asSystem(() =>
+    Promise.all([
+      School.find({}).sort({ createdAt: -1 }).lean(),
+      // Admins who have not chosen a password yet (still need their setup code).
+      Admin.find({ role: 'admin', password: { $in: ['', null] } }).select('school').lean(),
+    ])
+  );
+  const pending = new Set(waiting.map((a) => String(a.school)));
+  res.json({ success: true, schools: schools.map((s) => ({ ...s, adminSetUp: !pending.has(String(s._id)) })) });
 });
 
 // @desc    Create a school together with its first admin
@@ -137,6 +146,7 @@ export const createSchool = asyncHandler(async (req, res) => {
   const session = await mongoose.startSession();
   let school;
   let admin;
+  let setup;
 
   try {
     await session.withTransaction(async () => {
@@ -146,8 +156,10 @@ export const createSchool = asyncHandler(async (req, res) => {
         })
       );
 
-      // No password is set here on purpose: the admin sets their own on first
-      // sign-in via the existing check-email / set-password flow.
+      // No password is set here on purpose: the admin chooses their own on
+      // first sign-in, which needs the setup code shown to the superadmin once.
+      const draft = {};
+      setup = issueSetupCode(draft);
       [admin] = await asSystem(() =>
         Admin.create(
           [
@@ -157,6 +169,7 @@ export const createSchool = asyncHandler(async (req, res) => {
               email,
               phone: adminPhone.trim(),
               role: 'admin',
+              ...draft,
             },
           ],
           { session }
@@ -169,9 +182,30 @@ export const createSchool = asyncHandler(async (req, res) => {
 
   res.status(201).json({
     success: true,
-    school,
+    school: { ...school.toObject(), adminSetUp: false },
     admin: admin.toSafeObject(),
+    ...setup,
   });
+});
+
+// @desc    New setup code for a school's admin who has not chosen a password yet
+// @route   POST /api/superadmin/schools/:id/setup-code
+// @access  Private (superadmin)
+export const createAdminSetupCode = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(400);
+    throw new Error('Invalid school id');
+  }
+  const admin = await asSystem(() =>
+    Admin.findOne({ school: req.params.id, role: 'admin', password: { $in: ['', null] } }).sort({ createdAt: 1 })
+  );
+  if (!admin) {
+    res.status(409);
+    throw new Error('This school\'s admin has already set a password. If they forgot it, they can use "Forgot password" on the sign-in page.');
+  }
+  const setup = issueSetupCode(admin);
+  await asSystem(() => admin.save());
+  res.json({ success: true, admin: { name: admin.name, email: admin.email }, ...setup });
 });
 
 // @desc    Toggle a school's active status
@@ -192,6 +226,7 @@ export const updateSchoolStatus = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('School not found');
   }
+  forgetSchoolStatus(school._id); // takes effect on the school's next request
 
   res.json({ success: true, school });
 });

@@ -58,3 +58,13 @@ export const formatDuration = (minutes) => {
   const m = (minutes || 0) % 60;
   return formatClock(h * 3600 + m * 60);
 };
+
+// Coordinates with the correct hemisphere: 5.6037 -> "5.6037° N", -0.1870 -> "0.1870° W",
+// 0.4712 -> "0.4712° E" (e.g. the Volta region is east of 0°). Missing -> "—".
+const coord = (value, pos, neg) => {
+  const n = Number(value);
+  if (value === null || value === undefined || value === '' || Number.isNaN(n)) return '—';
+  return `${Math.abs(n).toFixed(4)}° ${n < 0 ? neg : pos}`;
+};
+export const formatLat = (value) => coord(value, 'N', 'S');
+export const formatLng = (value) => coord(value, 'E', 'W');

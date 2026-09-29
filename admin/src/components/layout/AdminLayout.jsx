@@ -8,7 +8,7 @@ import { useViewSchoolStore } from '../../store/viewSchoolStore.js';
 
 // Pages that are not about one school, so a superadmin can open them without
 // choosing a school first.
-const PLATFORM_PATHS = ['/platform', '/account', '/help', '/notifications'];
+const PLATFORM_PATHS = ['/platform', '/system', '/account', '/help', '/notifications'];
 
 export default function AdminLayout() {
   const admin = useAuthStore((s) => s.admin);

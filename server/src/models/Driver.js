@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { setupCodeFields } from '../utils/setupCode.js';
 import { normalizePhones } from '../plugins/normalizePhones.js';
 import bcrypt from 'bcryptjs';
 import { tenantScope } from '../plugins/tenantScope.js';
@@ -58,9 +59,31 @@ const driverSchema = new mongoose.Schema(
     residentialAddress: { type: String, trim: true },
 
     status: { type: String, enum: ['Active', 'Idle', 'Maintenance', 'Inactive'], default: 'Active' },
+    // One-time code for choosing the first password (utils/setupCode.js).
+    ...setupCodeFields,
+    // When the password last changed; sign-ins from before then stop working.
+    passwordChangedAt: { type: Date, default: null },
+    // Online / offline in the driver app: when the app last reached the server
+    // (it checks in every 30 seconds while open and signed in), and when the
+    // driver last signed out.
+    lastSeenAt: { type: Date, default: null },
+    // Driver-app notifications the driver deleted (by notification id); kept
+    // 30 days, after which those notifications are gone anyway.
+    dismissedNotifications: [{ id: { type: String }, at: { type: Date, default: Date.now }, _id: false }],
+    signedOutAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
+
+// No check-in for this long means the app is closed, the phone is off or
+// has no data: the driver shows as offline.
+export const ONLINE_WINDOW_MS = 2 * 60 * 1000;
+
+driverSchema.virtual('online').get(function online() {
+  if (!this.lastSeenAt) return false;
+  if (this.signedOutAt && this.signedOutAt >= this.lastSeenAt) return false;
+  return Date.now() - new Date(this.lastSeenAt).getTime() < ONLINE_WINDOW_MS;
+});
 
 driverSchema.virtual('fullName').get(function fullName() {
   return `${this.firstName} ${this.lastName}`;
@@ -68,6 +91,8 @@ driverSchema.virtual('fullName').get(function fullName() {
 
 driverSchema.pre('save', async function preSave(next) {
   if (!this.isModified('password') || !this.password) return next();
+  // A second back so a token issued right after this save is still newer.
+  if (!this.isNew) this.passwordChangedAt = new Date(Date.now() - 1000);
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();

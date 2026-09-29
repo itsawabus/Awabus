@@ -17,10 +17,15 @@ import LocationPickerModal from '../../components/ui/LocationPickerModal.jsx';
 import GeofenceMap, { ACCRA_DEFAULT } from '../../components/map/GeofenceMap.jsx';
 import { getStudent, updateStudent } from '../../api/students.js';
 import HouseholdLinkPicker from '../../components/students/HouseholdLinkPicker.jsx';
+import LanguageSelect from '../../components/students/LanguageSelect.jsx';
+import { DEFAULT_LANGUAGE } from '../../lib/languages.js';
 import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
 import PhoneInput from '../../components/ui/PhoneInput.jsx';
 import { fromStoredPhone, isValidPhone, toLocalPhone } from '../../lib/phone.js';
 import { RADIUS_MAX, RADIUS_MIN, coordsError, digitsOnly, formatCoord, formatName, ifChanged, nameError, radiusError } from '../../lib/formats.js';
+import RideSessionPicker from '../../components/students/RideSessionPicker.jsx';
+import GpsAddressInput from '../../components/ui/GpsAddressInput.jsx';
+import ArrivalCallsToggle, { arrivalCallsLabel } from '../../components/students/ArrivalCallsToggle.jsx';
 
 export default function EditStudent() {
   const { id } = useParams();
@@ -55,10 +60,14 @@ export default function EditStudent() {
             guardianFirst: student.primaryGuardian?.firstName || '',
             guardianLast: student.primaryGuardian?.lastName || '',
             guardianPhone: fromStoredPhone(student.primaryGuardian?.phone),
+            guardianLanguage: student.primaryGuardian?.preferredLanguage || DEFAULT_LANGUAGE,
             secondContactPhone: fromStoredPhone(student.secondContactPhone),
+            homeAddress: student.homeAddress || '',
             lat: student.lat ?? ACCRA_DEFAULT.lat,
             lng: student.lng ?? ACCRA_DEFAULT.lng,
             geofenceRadius: student.geofenceRadius || 200,
+            rideSession: student.rideSession || 'both',
+            arrivalCalls: student.arrivalCalls !== false,
           }
         : null,
     [student]
@@ -91,6 +100,7 @@ export default function EditStudent() {
       queryClient.invalidateQueries({ queryKey: ['student-options'] });
       setForm((f) => ({
         ...f,
+        homeAddress: updated.homeAddress ?? f.homeAddress,
         lat: updated.lat ?? f.lat,
         lng: updated.lng ?? f.lng,
         geofenceRadius: updated.geofenceRadius || f.geofenceRadius,
@@ -114,6 +124,7 @@ export default function EditStudent() {
   if (isLoading || !form) return <PageLoader />;
 
   const householdMembers = student.householdMembers || [];
+  const homeWithCalls = householdMembers.filter((m) => m.arrivalCalls !== false);
 
   return (
     <div>
@@ -154,17 +165,27 @@ export default function EditStudent() {
             lastName: form.lastName,
             classGrade: form.classGrade,
             gender: form.gender,
-            guardian: { id: student.primaryGuardian?._id, firstName: form.guardianFirst, lastName: form.guardianLast, phone: toLocalPhone(form.guardianPhone) },
+            guardian: {
+              id: student.primaryGuardian?._id,
+              firstName: form.guardianFirst,
+              lastName: form.guardianLast,
+              phone: toLocalPhone(form.guardianPhone),
+              preferredLanguage: form.guardianLanguage || DEFAULT_LANGUAGE,
+            },
             secondContactPhone: toLocalPhone(form.secondContactPhone),
+            homeAddress: form.homeAddress ?? baseline.homeAddress,
             lat: Number(form.lat),
             lng: Number(form.lng),
             geofenceRadius: Number(form.geofenceRadius),
+            rideSession: form.rideSession || 'both',
+            arrivalCalls: (form.arrivalCalls ?? baseline.arrivalCalls) !== false,
           });
         }}
       >
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1fr]">
-          <div className="space-y-6">
-            <Card>
+        <div className="space-y-6">
+          {/* Student and guardian side by side, same height */}
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <Card className="h-full">
               <CardHeader title="Student & School Info" />
               <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
@@ -192,10 +213,17 @@ export default function EditStudent() {
                     <option>Male</option>
                   </Select>
                 </div>
+                <div className="sm:col-span-2">
+                  <Label>Rides</Label>
+                  <RideSessionPicker value={form.rideSession} onChange={set('rideSession')} />
+                  <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    Students who ride one run only are left off the other run's trip.
+                  </p>
+                </div>
               </CardBody>
             </Card>
 
-            <Card>
+            <Card className="h-full">
               <CardHeader title="Guardian Details" />
               <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
@@ -216,13 +244,39 @@ export default function EditStudent() {
                   <Label>Backup Emergency Phone</Label>
                   <PhoneInput value={form.secondContactPhone} onChange={set('secondContactPhone')} placeholder="020 111 2233" />
                 </div>
+                <LanguageSelect value={form.guardianLanguage} onChange={set('guardianLanguage')} />
+                <div className="sm:col-span-2">
+                  <Label>Arrival calls</Label>
+                  <ArrivalCallsToggle
+                    value={form.arrivalCalls ?? baseline.arrivalCalls}
+                    onChange={set('arrivalCalls')}
+                    note={
+                      (form.arrivalCalls ?? baseline.arrivalCalls) && homeWithCalls.length
+                        ? `${homeWithCalls.map((m) => m.firstName).join(', ')} at the same home also ${homeWithCalls.length > 1 ? 'have' : 'has'} calls on. The parent is still called only once per trip.`
+                        : ''
+                    }
+                  />
+                </div>
                 {phoneError && <p className="text-sm font-medium text-red-600 sm:col-span-2">{phoneError}</p>}
               </CardBody>
             </Card>
+          </div>
 
-            <Card>
-              <CardHeader title="Location & Geofencing Parameters" />
-              <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+          {/* Location: fields on the left, the map on the right */}
+          <Card>
+            <CardHeader
+              title="Location & Geofencing"
+              subtitle="Type the GPS address, click the map or drag the pin. The green circle is the notification zone."
+            />
+            <CardBody className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_3fr]">
+              <div className="grid grid-cols-1 content-start gap-5 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <GpsAddressInput
+                    value={form.homeAddress ?? baseline.homeAddress}
+                    onChange={set('homeAddress')}
+                    onResolve={({ lat, lng }) => setForm((f) => ({ ...f, lat, lng }))}
+                  />
+                </div>
                 <div>
                   <Label>Latitude</Label>
                   <Input inputMode="decimal" value={form.lat} onChange={(e) => set('lat')(formatCoord(e.target.value))} error={Boolean(errors.coords)} />
@@ -231,23 +285,32 @@ export default function EditStudent() {
                   <Label>Longitude</Label>
                   <Input inputMode="decimal" value={form.lng} onChange={(e) => set('lng')(formatCoord(e.target.value))} error={Boolean(errors.coords)} />
                 </div>
-                <div>
+                <div className="sm:col-span-2">
                   <Label>Geofence Radius (meters)</Label>
                   <Input inputMode="numeric" value={form.geofenceRadius} onChange={(e) => set('geofenceRadius')(digitsOnly(e.target.value, 4))} error={Boolean(errors.geofenceRadius)} />
                   <FieldError>{errors.geofenceRadius}</FieldError>
                   {!errors.geofenceRadius && <p className="mt-1.5 text-xs text-slate-400">Between {RADIUS_MIN} and {RADIUS_MAX} metres</p>}
                 </div>
                 {errors.coords && (
-                  <div className="sm:col-span-3">
+                  <div className="sm:col-span-2">
                     <FieldError>{errors.coords}</FieldError>
                   </div>
                 )}
-                <div className="sm:col-span-3">
+                <div className="sm:col-span-2">
                   <Button type="button" variant="outline" onClick={() => setMapOpen(true)}>
                     Open map picker
                   </Button>
                 </div>
-              </CardBody>
+              </div>
+              <div className="h-72 overflow-hidden rounded-xl sm:h-80 lg:h-auto lg:min-h-[20rem]">
+                <GeofenceMap
+                  lat={form.lat}
+                  lng={form.lng}
+                  radius={form.geofenceRadius}
+                  onMove={(lat, lng) => setForm((f) => ({ ...f, lat, lng }))}
+                />
+              </div>
+            </CardBody>
               <LocationPickerModal
                 open={mapOpen}
                 onClose={() => setMapOpen(false)}
@@ -272,6 +335,15 @@ export default function EditStudent() {
                             {m.firstName} {m.lastName}
                           </Link>
                           <span className="text-xs text-slate-400">{[m.studentCode, m.classGrade].filter(Boolean).join(' · ')}</span>
+                          <span
+                            className={`ml-auto rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              m.arrivalCalls !== false
+                                ? 'bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400'
+                                : 'bg-slate-100 text-slate-500 dark:bg-navy dark:text-slate-400'
+                            }`}
+                          >
+                            Calls {arrivalCallsLabel(m.arrivalCalls).toLowerCase()}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -319,23 +391,9 @@ export default function EditStudent() {
                 )}
               </CardBody>
             </Card>
-          </div>
 
-          <Card className="flex flex-col">
-            <CardHeader title="Interactive Geofence Picker" />
-            <div className="h-80 px-5 pt-1 sm:h-96">
-              <GeofenceMap
-                lat={form.lat}
-                lng={form.lng}
-                radius={form.geofenceRadius}
-                onMove={(lat, lng) => setForm((f) => ({ ...f, lat, lng }))}
-              />
-            </div>
-            <p className="p-5 text-xs text-slate-400">
-              Click the map or drag the pin to update the latitude and longitude inputs. The green circle shows the
-              geofence radius, which can be customized on the left panel.
-            </p>
-            <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 p-5 dark:border-slate-800">
+          <Card>
+            <div className="flex flex-wrap items-center justify-between gap-3 p-5">
               <button
                 type="button"
                 onClick={() => setConfirmDelete(true)}

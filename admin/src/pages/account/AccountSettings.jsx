@@ -11,7 +11,6 @@ import OtpInput from '../../components/ui/OtpInput.jsx';
 import AccountTabs, { SuccessNote } from '../../components/account/AccountTabs.jsx';
 import PasswordChecklist from '../../components/account/PasswordChecklist.jsx';
 import useCountdown from '../../components/account/useCountdown.js';
-import RevealPasswordModal from '../../components/account/RevealPasswordModal.jsx';
 import NotificationSettings from '../../components/notifications/NotificationSettings.jsx';
 import { changePassword, requestVerification } from '../../api/account.js';
 import { isStrongPassword } from '../../lib/password.js';
@@ -20,7 +19,7 @@ import { cn } from '../../lib/utils.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useUiStore } from '../../store/uiStore.js';
 
-const emptyPassword = { current: '', next: '', confirm: '' };
+const emptyPassword = { next: '', confirm: '' };
 
 export default function AccountSettings() {
   usePageHeader({ breadcrumb: ['AwaBus', 'Account settings'] });
@@ -44,27 +43,6 @@ export default function AccountSettings() {
     return () => clearTimeout(t);
   }, [hash]);
 
-  // Showing the typed current password needs an emailed code first; once
-  // verified it can be toggled freely until revealUntil, then hides again.
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [revealUntil, setRevealUntil] = useState(0);
-  const [revealOpen, setRevealOpen] = useState(false);
-
-  useEffect(() => {
-    if (!revealUntil) return undefined;
-    const t = setTimeout(() => {
-      setShowCurrent(false);
-      setRevealUntil(0);
-    }, Math.max(revealUntil - Date.now(), 0));
-    return () => clearTimeout(t);
-  }, [revealUntil]);
-
-  const toggleCurrent = (show) => {
-    if (!show) return setShowCurrent(false);
-    if (Date.now() < revealUntil) return setShowCurrent(true);
-    return setRevealOpen(true);
-  };
-
   const sendMutation = useMutation({
     mutationFn: () => requestVerification({ purpose: 'change_password', channel }),
     onSuccess: (res) => {
@@ -77,23 +55,22 @@ export default function AccountSettings() {
   });
 
   const changeMutation = useMutation({
-    mutationFn: () => changePassword({ currentPassword: pw.current, newPassword: pw.next, code }),
-    onSuccess: () => {
+    mutationFn: () => changePassword({ newPassword: pw.next, code }),
+    onSuccess: (res) => {
+      if (res?.token) useAuthStore.getState().setToken(res.token); // stay signed in here
       setPw(emptyPassword);
       setSentTo('');
       setCode('');
       setError('');
-      setNotice('Your password has been changed');
+      setNotice(res?.message || 'Your password has been changed');
     },
     onError: (err) => setError(err.message),
   });
 
   const requestCode = () => {
     setError('');
-    if (!pw.current) return setError('Enter your current password');
     if (!isStrongPassword(pw.next, who)) return setError('Your new password doesn\'t meet all the password requirements yet');
     if (pw.next !== pw.confirm) return setError('The new passwords do not match');
-    if (pw.next === pw.current) return setError('Choose a password different from your current one');
     return sendMutation.mutate();
   };
 
@@ -106,33 +83,10 @@ export default function AccountSettings() {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[3fr_2fr]">
         <Card>
           <CardHeader
-            title="Change password"
-            subtitle="For your security, we'll confirm the change with a code sent to your email or phone."
+            title="Reset password"
+            subtitle="Choose a new password. We'll confirm it with a code sent to your email or phone."
           />
           <CardBody className="space-y-5">
-            <div>
-              <Label>Current password</Label>
-              <PasswordInput
-                value={pw.current}
-                onChange={(e) => {
-                  setError('');
-                  setPw((p) => ({ ...p, current: e.target.value }));
-                }}
-                autoComplete="current-password"
-                disabled={Boolean(sentTo)}
-                visible={showCurrent}
-                onToggleVisible={toggleCurrent}
-              />
-              <RevealPasswordModal
-                open={revealOpen}
-                email={admin?.email}
-                onClose={() => setRevealOpen(false)}
-                onVerified={(until) => {
-                  setRevealUntil(until);
-                  setShowCurrent(true);
-                }}
-              />
-            </div>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
                 <Label>New password</Label>
@@ -228,7 +182,7 @@ export default function AccountSettings() {
                     disabled={code.length !== 6}
                     loading={changeMutation.isPending}
                   >
-                    Update password
+                    Reset password
                   </Button>
                 </>
               ) : (

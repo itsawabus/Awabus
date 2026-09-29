@@ -94,7 +94,7 @@ export default function BusesList() {
   const stats = data?.stats || {};
 
   return (
-    <div className={selection.selecting ? 'pb-24' : undefined}>
+    <div>
       <PageHeader
         title="Buses"
         subtitle="Register, assign and manage every vehicle in the school fleet."

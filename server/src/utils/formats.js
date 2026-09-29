@@ -14,12 +14,59 @@ export const normalizeCode = (v) =>
     .replace(/[\s_/]+/g, '-')
     .replace(/-{2,}/g, '-');
 
+// Same masks as the admin form: dashes put in, stray characters dropped.
+//   "gr123420" -> "GR-1234-20", "gt 881 z" -> "GT-881-Z"
+export function normalizePlate(v) {
+  const chars = String(v || '').toUpperCase().replace(/[\s_/.]/g, '-').replace(/[^A-Z0-9-]/g, '');
+  let region = '';
+  let number = '';
+  let end = '';
+  let part = 0;
+  for (const c of chars) {
+    const isLetter = /[A-Z]/.test(c);
+    const isDigit = /\d/.test(c);
+    if (part === 0) {
+      if (isLetter && region.length < 3) region += c;
+      else if (region && (isDigit || c === '-')) {
+        part = 1;
+        if (isDigit) number += c;
+      }
+    } else if (part === 1) {
+      if (isDigit && number.length < 4) number += c;
+      else if (number && (isLetter || isDigit || c === '-')) {
+        part = 2;
+        if (isLetter || isDigit) end += c;
+      }
+    } else if (end === '' ? isLetter || isDigit : /\d/.test(end) && isDigit && end.length < 2) {
+      end += c;
+    }
+  }
+  if (part === 0) return region;
+  if (part === 1) return `${region}-${number}`;
+  return `${region}-${number}-${end}`;
+}
+
+//   "ghdl29831" -> "GHDL-29831", "gh dl 29831" -> "GH-DL-29831"
+export function normalizeLicense(v) {
+  let out = '';
+  for (const c of String(v || '').toUpperCase().replace(/[\s_/.]/g, '-').replace(/[^A-Z0-9-]/g, '')) {
+    const prev = out.slice(-1);
+    if (c === '-') {
+      if (out && prev !== '-') out += '-';
+      continue;
+    }
+    if (/\d/.test(c) && /[A-Z]/.test(prev)) out += '-';
+    out += c;
+  }
+  return out.replace(/-$/, '');
+}
+
 const blank = (v) => v === undefined || v === null || v === '';
 
 const RULES = {
-  plateNumber: (v) => (PLATE_RE.test(normalizeCode(v)) ? '' : 'Plate number must look like GR-1234-20'),
+  plateNumber: (v) => (PLATE_RE.test(normalizePlate(v)) ? '' : 'Plate number must look like GR-1234-20 or GT-881-Z'),
   licenseNumber: (v) => {
-    const s = normalizeCode(v);
+    const s = normalizeLicense(v);
     return s.length >= 6 && s.length <= 20 && LICENSE_RE.test(s)
       ? ''
       : 'License number must be 6-20 capital letters and numbers, e.g. GH-DL-29831';

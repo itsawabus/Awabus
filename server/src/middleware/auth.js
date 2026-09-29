@@ -5,6 +5,23 @@ import Driver from '../models/Driver.js';
 import School from '../models/School.js';
 import mongoose from 'mongoose';
 import { tenantContext } from '../utils/tenantContext.js';
+import { schoolStatus, accessError, SCHOOL_SUSPENDED_MESSAGE, DRIVER_INACTIVE_MESSAGE } from '../utils/access.js';
+import { issuedBeforePasswordChange } from '../utils/resetToken.js';
+
+// Every signed-in request from the driver app counts as "online now" (see
+// Driver.online). Written at most every 20 seconds per driver, and never
+// waited for, so it costs the request nothing.
+const SEEN_WRITE_EVERY_MS = 20 * 1000;
+function markDriverSeen(driver) {
+  const last = driver.lastSeenAt ? new Date(driver.lastSeenAt).getTime() : 0;
+  const signedOutSince = driver.signedOutAt && (!driver.lastSeenAt || driver.signedOutAt >= driver.lastSeenAt);
+  if (!signedOutSince && Date.now() - last < SEEN_WRITE_EVERY_MS) return;
+  const now = new Date();
+  driver.lastSeenAt = now;
+  Driver.updateOne({ _id: driver._id }, { $set: { lastSeenAt: now } }).catch((err) =>
+    console.error('[auth] could not record driver check-in:', err.message)
+  );
+}
 
 const extractBearerToken = (req) => {
   const authHeader = req.headers.authorization;
@@ -50,6 +67,10 @@ export const protectAdmin = asyncHandler(async (req, res, next) => {
         res.status(401);
         throw new Error('Superadmin account no longer exists');
       }
+      if (issuedBeforePasswordChange(decoded, admin)) {
+        res.status(401);
+        throw new Error('Your password was changed. Please sign in again.');
+      }
       req.admin = admin;
       req.school = null;
       next();
@@ -75,6 +96,11 @@ export const protectAdmin = asyncHandler(async (req, res, next) => {
       res.status(401);
       throw new Error('Admin account no longer exists');
     }
+    if (issuedBeforePasswordChange(decoded, admin)) {
+      res.status(401);
+      throw new Error('Your password was changed. Please sign in again.');
+    }
+    if ((await schoolStatus(decoded.school)) !== 'Active') throw accessError(res, 'SCHOOL_SUSPENDED', SCHOOL_SUSPENDED_MESSAGE);
     req.admin = admin;
     req.school = decoded.school;
     next();
@@ -147,8 +173,15 @@ export const protectDriver = asyncHandler(async (req, res, next) => {
       res.status(401);
       throw new Error('Driver account no longer exists');
     }
+    if (issuedBeforePasswordChange(decoded, driver)) {
+      res.status(401);
+      throw new Error('Your password was changed. Please sign in again.');
+    }
+    if (driver.status === 'Inactive') throw accessError(res, 'DRIVER_INACTIVE', DRIVER_INACTIVE_MESSAGE);
+    if ((await schoolStatus(decoded.school)) !== 'Active') throw accessError(res, 'SCHOOL_SUSPENDED', SCHOOL_SUSPENDED_MESSAGE);
     req.driver = driver;
     req.school = decoded.school;
+    markDriverSeen(driver);
     next();
   });
 });
