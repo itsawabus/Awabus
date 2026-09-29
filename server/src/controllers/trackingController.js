@@ -6,6 +6,7 @@ import Trip from '../models/Trip.js';
 import { closeStaleTrips, LIVE_TRIP_FILTER } from '../services/staleTrips.js';
 import { assistantsWithStatus } from '../services/assistPass.js';
 import { assistantLocationState } from '../services/busPosition.js';
+import { cleanTrail } from '../services/positionFilter.js';
 
 const statusFromBus = (bus) => {
   if (bus.gpsSignal === 'lost') return 'GPS Signal Lost';
@@ -91,7 +92,8 @@ export const getTrackingTrail = asyncHandler(async (req, res) => {
       lat: r.scanLat,
       lng: r.scanLng,
     }));
-  res.json({ success: true, data: { session: trip.session, path: trip.path || [], events } });
+  // Spikes left in older trails are taken out when drawn (services/positionFilter.js).
+  res.json({ success: true, data: { session: trip.session, path: cleanTrail(trip.path || []), events } });
 });
 
 // @desc    Live trip detail for a single bus (drives the "Trip Detail" tracking sub-view)

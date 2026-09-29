@@ -113,6 +113,7 @@ const tripSchema = new mongoose.Schema(
       lat: Number,
       lng: Number,
       heading: Number,
+      accuracy: Number, // metres, as reported by the phone (null on old app versions)
       updatedAt: Date,
     },
     gpsSignal: { type: String, enum: ['ok', 'lost', 'offline'], default: 'ok' },

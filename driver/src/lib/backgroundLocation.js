@@ -28,11 +28,15 @@ const BLOCKED_KEY = 'awabus_background_blocked';
 const TOKEN_KEY = 'awabus_driver_token'; // same key as src/store/authStore.js
 // Same pace as the screen tracker: at most one position every 8 seconds.
 export const PUSH_EVERY_MS = 8000;
+// Readings less accurate than this say nothing useful about where the bus is.
+export const USELESS_ACCURACY_M = 150;
 
 const toPosition = (loc) => ({
   lat: loc.coords.latitude,
   lng: loc.coords.longitude,
   heading: loc.coords.heading || 0,
+  accuracy: Number.isFinite(loc.coords.accuracy) ? Math.round(loc.coords.accuracy) : null,
+  speed: Number.isFinite(loc.coords.speed) && loc.coords.speed >= 0 ? loc.coords.speed : null,
   recordedAt: new Date(loc.timestamp || Date.now()).toISOString(),
 });
 
@@ -70,7 +74,11 @@ if (!TaskManager.isTaskDefined(TRIP_LOCATION_TASK)) {
   TaskManager.defineTask(TRIP_LOCATION_TASK, async ({ data, error }) => {
     if (error || !data?.locations?.length) return;
     const newest = data.locations[data.locations.length - 1];
-    const position = toPosition(newest);
+    // The most accurate of the batch (the phone may hand over several at once).
+    const best = data.locations.reduce((a, b) => ((b.coords?.accuracy ?? 999) <= (a.coords?.accuracy ?? 999) ? b : a), newest);
+    const position = toPosition(best.timestamp >= newest.timestamp - 15000 ? best : newest);
+    // Far too rough to say where the bus is (indoors, no GPS): not sent.
+    if (Number.isFinite(position.accuracy) && position.accuracy > USELESS_ACCURACY_M) return;
     useLiveGpsStore.getState().setPosition(position); // the screens show it when open
     await sendFromBackground(position);
   });

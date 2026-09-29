@@ -109,7 +109,7 @@ export const assistPushLocation = asyncHandler(async (req, res) => {
     throw new Error('That position is not in Ghana. Check that location is switched on.');
   }
   const trip = await Trip.findById(req.assistTrip._id).select(
-    'status bus startedAt locationSource driverLocation driverSeenAt assistantLocation assistantOnBus'
+    'status bus startedAt locationSource driverLocation driverSeenAt assistantLocation assistantOnBus liveLocation'
   );
   if (!trip || !['In Progress', 'Delayed'].includes(trip.status)) {
     res.status(409);

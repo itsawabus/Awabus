@@ -32,6 +32,10 @@ export function useGeolocation(active) {
               lat: loc.coords.latitude,
               lng: loc.coords.longitude,
               heading: loc.coords.heading || 0,
+              // How far off the reading may be (metres) and how fast the phone
+              // moves (m/s): the server uses them to ignore GPS "wander".
+              accuracy: Number.isFinite(loc.coords.accuracy) ? Math.round(loc.coords.accuracy) : null,
+              speed: Number.isFinite(loc.coords.speed) && loc.coords.speed >= 0 ? loc.coords.speed : null,
               // When the phone took the reading, so a queued one is not shown as current.
               recordedAt: new Date(loc.timestamp || Date.now()).toISOString(),
             });

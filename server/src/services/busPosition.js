@@ -12,6 +12,7 @@ import Bus from '../models/Bus.js';
 import { emitToSchool } from '../sockets/rooms.js';
 import { checkGeofences, metresBetween } from './parentAlerts.js';
 import { checkSchoolArrival } from './schoolArrival.js';
+import { judgeFix, MIN_STEP_M } from './positionFilter.js';
 
 export const DRIVER_SILENT_MS = 45 * 1000;
 export const ON_BUS_METRES = 300;
@@ -25,29 +26,51 @@ export const MAX_ASSIST_ACCURACY_M = 150;
 
 const recent = (date, ms, now = Date.now()) => Boolean(date) && now - new Date(date).getTime() <= ms;
 
-// The trail: a new point once the bus has moved on this far.
-export const TRAIL_STEP_METRES = 15;
 export const MAX_TRAIL_POINTS = 3000;
 const lastTrailPoint = new Map(); // trip id -> { lat, lng } (this server's memory)
 
-/** Shows `location` as the bus position everywhere (map, bus status, near-home alerts). */
+/**
+ * A new reading for the bus (driver's phone, or the assistant's as a backup).
+ * Filtered first (services/positionFilter.js): rough readings and GPS jumps
+ * are dropped, and a bus standing still stays put however the reading
+ * wanders. Only trusted positions feed the trail, near-home alerts and
+ * "At school". Returns the filter's decision.
+ */
 export async function publishBusLocation({ trip, location, source, io, school }) {
-  const key = String(trip._id);
-  const last = lastTrailPoint.get(key);
-  const addToTrail = !last || metresBetween(last, location) >= TRAIL_STEP_METRES;
-  const update = { $set: { liveLocation: location, gpsSignal: 'ok', locationSource: source } };
-  if (addToTrail) {
-    lastTrailPoint.set(key, { lat: location.lat, lng: location.lng });
-    update.$push = { path: { $each: [{ lat: location.lat, lng: location.lng, at: location.updatedAt || new Date() }], $slice: -MAX_TRAIL_POINTS } };
+  const shown = trip.liveLocation && Number.isFinite(trip.liveLocation.lat) ? trip.liveLocation : null;
+  const decision = judgeFix({ tripId: trip._id, last: shown, fix: location });
+  const now = new Date();
+
+  // The phone is reading its location either way: the bus is online.
+  await Bus.updateOne({ _id: trip.bus }, { $set: { locationSeenAt: now } });
+  if (decision.action === 'reject') return decision;
+
+  const display =
+    decision.action === 'hold'
+      ? { lat: shown.lat, lng: shown.lng, heading: shown.heading || 0, accuracy: Math.min(shown.accuracy ?? 999, location.accuracy ?? 999), updatedAt: location.updatedAt }
+      : { lat: location.lat, lng: location.lng, heading: location.heading || 0, accuracy: location.accuracy ?? null, updatedAt: location.updatedAt };
+  if (!Number.isFinite(display.accuracy) || display.accuracy >= 999) display.accuracy = null;
+
+  const update = { $set: { liveLocation: display, gpsSignal: 'ok', locationSource: source } };
+  if (decision.trail) {
+    const key = String(trip._id);
+    const lastPoint = lastTrailPoint.get(key);
+    if (!lastPoint || metresBetween(lastPoint, location) >= MIN_STEP_M) {
+      lastTrailPoint.set(key, { lat: location.lat, lng: location.lng });
+      update.$push = { path: { $each: [{ lat: location.lat, lng: location.lng, at: location.updatedAt || now }], $slice: -MAX_TRAIL_POINTS } };
+    }
   }
   await Trip.updateOne({ _id: trip._id }, update);
-  await Bus.updateOne({ _id: trip.bus }, { $set: { lastKnownLocation: location, gpsSignal: 'ok', locationSeenAt: new Date() } });
-  emitToSchool(io, school, 'bus:location', { tripId: trip._id, busId: trip.bus, location, source });
-  // Near-home check after the reply, so the phone never waits on SMS / calls.
-  setImmediate(() => {
-    checkGeofences({ tripId: trip._id, position: location, school });
-    checkSchoolArrival({ tripId: trip._id, position: location, school, io });
-  });
+  await Bus.updateOne({ _id: trip.bus }, { $set: { lastKnownLocation: display, gpsSignal: 'ok' } });
+  emitToSchool(io, school, 'bus:location', { tripId: trip._id, busId: trip.bus, location: display, source });
+  // Near-home and "At school" only from trusted positions, after the reply.
+  if (decision.trusted) {
+    setImmediate(() => {
+      checkGeofences({ tripId: trip._id, position: display, school });
+      checkSchoolArrival({ tripId: trip._id, position: display, school, io });
+    });
+  }
+  return decision;
 }
 
 /** Is the assistant's phone on the bus, judging by the driver's last live reading? (null = can't tell) */
@@ -96,7 +119,7 @@ export async function assistantReading({ trip, location, accuracy, name, io, sch
   const stillOnBus = onBus !== null ? onBus : trip.assistantOnBus;
   if (stillOnBus === false) return { used: false, reason: 'not_on_bus' };
   if (Number.isFinite(accuracy) && accuracy > MAX_ASSIST_ACCURACY_M) return { used: false, reason: 'weak_gps' };
-  await publishBusLocation({ trip, location, source: 'assistant', io, school });
+  await publishBusLocation({ trip, location: { ...location, accuracy: Number.isFinite(accuracy) ? accuracy : null }, source: 'assistant', io, school });
   return { used: true, reason: 'backup' };
 }
 
