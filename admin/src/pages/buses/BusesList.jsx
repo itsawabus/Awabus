@@ -23,6 +23,7 @@ import { BUS_STATUSES, BUS_TYPES } from '../../lib/options.js';
 import { CAPACITY_MAX, CAPACITY_MIN, capacityError } from '../../lib/formats.js';
 import { UNDO_SECONDS, usePendingDeleteIds, useUndoDeleteStore } from '../../store/undoDeleteStore.js';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
+import BusOnlineStatus from '../../components/buses/BusOnlineStatus.jsx';
 
 const STATUS_TABS = ['All', 'Active', 'Idle', 'Maintenance'];
 
@@ -49,6 +50,7 @@ export default function BusesList() {
   const { data, isLoading } = useQuery({
     queryKey: ['buses', page, debouncedSearch, status],
     queryFn: () => getBuses({ page, q: debouncedSearch, status }),
+    refetchInterval: 30000, // keeps the online / offline readings current
   });
 
   const scheduleDelete = useUndoDeleteStore((st) => st.scheduleDelete);
@@ -103,7 +105,7 @@ export default function BusesList() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Total Registered Buses" value={stats.totalBuses ?? 0} hint="Active school vehicles" icon={BusIcon} />
         <StatCard label="Buses in Maintenance" value={stats.maintenance ?? 0} hint="Overdue for inspection" icon={Settings2} tone="amber" />
-        <StatCard label="Idle Buses" value={stats.idle ?? 0} hint="Available for assignment" icon={Ban} tone="slate" />
+        <StatCard label="Idle Buses" value={stats.idle ?? 0} hint={`Available for assignment · ${stats.online ?? 0} online now (location on)`} icon={Ban} tone="slate" />
       </div>
 
       <ListToolbar
@@ -163,6 +165,7 @@ export default function BusesList() {
                 <Th>Bus Name</Th>
                 <Th>Route</Th>
                 <Th>Status</Th>
+                <Th>Online</Th>
                 <Th>Driver</Th>
                 <Th>Capacity</Th>
                 <Th className="text-right">Actions</Th>
@@ -176,6 +179,9 @@ export default function BusesList() {
                     <Td>{bus.assignedRoute ? `${bus.assignedRoute.name}` : '—'}</Td>
                     <Td>
                       <Badge>{bus.status}</Badge>
+                    </Td>
+                    <Td>
+                      <BusOnlineStatus busOnline={bus.online} driverOnline={bus.assignedDriver?.online} hasDriver={Boolean(bus.assignedDriver)} label="" showReason />
                     </Td>
                     <Td>{bus.assignedDriver ? `${bus.assignedDriver.firstName} ${bus.assignedDriver.lastName}` : '—'}</Td>
                     <Td>

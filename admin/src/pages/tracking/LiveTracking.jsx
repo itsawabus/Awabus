@@ -18,6 +18,7 @@ import { gpsFreshness } from '../../lib/gps.js';
 import useNow from '../../hooks/useNow.js';
 import { formatPhone } from '../../lib/phone.js';
 import { sessionLabel } from '../../lib/sessions.js';
+import { ConnectionPair } from '../../components/buses/BusOnlineStatus.jsx';
 
 const busIcon = (color) =>
   L.divIcon({
@@ -80,7 +81,7 @@ export default function LiveTracking() {
   }, [data]);
 
   useSocketEvent('bus:location', ({ tripId, location }) => {
-    setLiveBuses((prev) => prev.map((b) => (b.tripId === tripId ? { ...b, liveLocation: location, gpsSignal: 'ok' } : b)));
+    setLiveBuses((prev) => prev.map((b) => (b.tripId === tripId ? { ...b, liveLocation: location, gpsSignal: 'ok', busOnline: true } : b)));
   });
   // A trip starting or ending changes which buses are on the map: reload now
   // instead of waiting for the next 15-second refresh.
@@ -222,6 +223,10 @@ export default function LiveTracking() {
                 <p className="text-sm text-slate-400">
                   {selected.session ? `${sessionLabel(selected.session)} · ` : ''}Departure: {selected.departureTime || '—'}
                 </p>
+
+                <div className="my-4 h-px bg-slate-100 dark:bg-slate-800" />
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Online</p>
+                <ConnectionPair className="mt-1" busOnline={selected.busOnline} driverOnline={selected.driverOnline} hasDriver={Boolean(selected.driver)} />
 
                 <div className="my-4 h-px bg-slate-100 dark:bg-slate-800" />
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">GPS Signal</p>

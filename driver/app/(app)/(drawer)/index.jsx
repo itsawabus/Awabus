@@ -12,10 +12,10 @@ import Modal from '../../../src/components/ui/Modal.jsx';
 import ConfirmDialog from '../../../src/components/ui/ConfirmDialog.jsx';
 import StudentMeta, { guardianName } from '../../../src/components/StudentMeta.jsx';
 import MessageParentSheet from '../../../src/components/MessageParentSheet.jsx';
+import { ConnectionBadges, BusOfflineBanner } from '../../../src/components/ConnectionStatus.jsx';
 import { formatPhone } from '../../../src/lib/phone.js';
 import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
 import { useAuthStore } from '../../../src/store/authStore.js';
-import { useConnectionStore } from '../../../src/store/connectionStore.js';
 import { getTodaysTrip, markAttendance, startTrip } from '../../../src/api/driverApp.js';
 import { formatDate } from '../../../src/lib/utils.js';
 import { colors, radii } from '../../../src/lib/theme.js';
@@ -24,7 +24,6 @@ import { runWords } from '../../../src/lib/runs.js';
 export default function Home() {
   const queryClient = useQueryClient();
   const driver = useAuthStore((s) => s.driver);
-  const isOnline = useConnectionStore((s) => s.isOnline);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirm, setConfirm] = useState(null); // pending "are you sure?" request
   const [messageTo, setMessageTo] = useState(null); // { tripId, student } for the message sheet
@@ -166,7 +165,7 @@ export default function Home() {
               <Text style={styles.driverName}>{driver?.name}</Text>
               <Text style={styles.driverRole}>Primary Driver</Text>
             </View>
-            <Badge tone={isOnline ? 'success' : 'neutral'}>{isOnline ? 'Online' : 'Offline'}</Badge>
+            <ConnectionBadges style={styles.connection} />
           </View>
           <View style={styles.divider} />
           <Text style={styles.infoLine}>
@@ -188,6 +187,8 @@ export default function Home() {
             {trip.completedToday ? ` · ${trip.completedToday} trip${trip.completedToday === 1 ? '' : 's'} done today` : ''}
           </Text>
         </Card>
+
+        <BusOfflineBanner />
 
         <Text style={styles.sectionLabel}>Attendance Summary</Text>
         <View style={styles.statsRow}>
@@ -282,6 +283,7 @@ const SummaryRow = ({ label, value }) => (
 );
 
 const styles = StyleSheet.create({
+  connection: { flexShrink: 1, maxWidth: '55%' },
   startError: { marginTop: 16, color: colors.red600, fontSize: 13, lineHeight: 18 },
   scroll: { padding: 16, gap: 20, paddingBottom: 32 },
   centerPad: { flexGrow: 1, padding: 16, justifyContent: 'center' },

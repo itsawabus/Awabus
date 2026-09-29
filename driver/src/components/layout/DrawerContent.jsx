@@ -22,6 +22,7 @@ import Badge from '../ui/Badge.jsx';
 import Button from '../ui/Button.jsx';
 import Modal from '../ui/Modal.jsx';
 import { useOfflineQueueStore } from '../../store/offlineQueueStore.js';
+import { useConnectionStatus } from '../ConnectionStatus.jsx';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Home (pre-trip)', icon: Home },
@@ -40,6 +41,7 @@ export default function DrawerContent(props) {
   const unsent = useOfflineQueueStore((st) => st.queue.length);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const isOnline = useConnectionStore((s) => s.isOnline);
+  const { busOnline } = useConnectionStatus();
 
   const go = (path) => {
     props.navigation.closeDrawer();
@@ -51,9 +53,12 @@ export default function DrawerContent(props) {
       <DrawerContentScrollView {...props} contentContainerStyle={styles.scroll}>
         <View style={styles.topRow}>
           <Avatar name={driver?.name} src={driver?.profilePhotoUrl} size="md" />
-          <Badge tone={isOnline ? 'success' : 'neutral'} style={isOnline ? undefined : styles.offlineBadge}>
-            {isOnline ? 'Online' : 'Offline'}
-          </Badge>
+          <View style={styles.drawerBadges}>
+            <Badge tone={isOnline ? 'success' : 'neutral'} style={isOnline ? undefined : styles.offlineBadge}>
+              {isOnline ? 'Online' : 'Offline'}
+            </Badge>
+            <Badge tone={busOnline ? 'success' : 'warning'}>{busOnline ? 'Bus online' : 'Bus offline'}</Badge>
+          </View>
         </View>
 
         <Text style={styles.name}>{driver?.name || 'Driver'}</Text>
@@ -118,6 +123,7 @@ export default function DrawerContent(props) {
 }
 
 const styles = StyleSheet.create({
+  drawerBadges: { alignItems: 'flex-end', gap: 4 },
   unsentWarning: { marginTop: 12, fontSize: 13, fontWeight: '700', color: '#b91c1c' },
   container: {
     flex: 1,

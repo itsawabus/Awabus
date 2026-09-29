@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { getTodaysTrip, getNotifications, pushLocation } from '../api/driverApp.js';
 import { useGeolocation } from '../hooks/useGeolocation.js';
+import { useLocationStatus } from '../hooks/useLocationStatus.js';
 import { useLiveGpsStore } from '../store/liveGpsStore.js';
 import { useOfflineQueueStore } from '../store/offlineQueueStore.js';
 import { useConnectionStore } from '../store/connectionStore.js';
@@ -33,6 +34,11 @@ export default function BackgroundWork() {
   const tripId = live ? trip._id : null;
 
   const { position, error } = useGeolocation(live);
+
+  // Bus online / offline: check location, and tell the school at once when it
+  // changes (the next request carries the new X-Location reading).
+  const queryClient = useQueryClient();
+  useLocationStatus(() => queryClient.invalidateQueries({ queryKey: ['todays-trip'] }));
   const lastPushRef = useRef(0);
 
   const send = (payload) => {

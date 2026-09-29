@@ -18,8 +18,8 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
   await closeStaleTrips();
   const trips = await Trip.find(LIVE_TRIP_FILTER)
     .populate('route', 'routeId name')
-    .populate('bus', 'plateNumber name capacity lastKnownLocation gpsSignal status')
-    .populate('driver', 'firstName lastName phone');
+    .populate('bus', 'plateNumber name capacity lastKnownLocation gpsSignal status locationSeenAt locationOffAt')
+    .populate('driver', 'firstName lastName phone lastSeenAt signedOutAt');
 
   const buses = trips
     .filter((t) => t.bus)
@@ -36,6 +36,10 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
       distanceCoveredKm: t.distanceCoveredKm,
       departureTime: t.departureTime,
       session: t.session,
+      // Online / offline: the driver's app reaching the school (mobile data)
+      // and the bus's location being read (location on).
+      driverOnline: Boolean(t.driver?.online),
+      busOnline: Boolean(t.bus?.online),
     }));
 
   const counts = {
@@ -53,13 +57,16 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
 export const getTrackingTripDetail = asyncHandler(async (req, res) => {
   const trip = await Trip.findById(req.params.tripId)
     .populate('route', 'routeId name stops')
-    .populate('bus', 'plateNumber name capacity lastKnownLocation gpsSignal')
-    .populate('driver', 'firstName lastName phone')
+    .populate('bus', 'plateNumber name capacity lastKnownLocation gpsSignal locationSeenAt locationOffAt')
+    .populate('driver', 'firstName lastName phone lastSeenAt signedOutAt')
     .populate('studentProgress.student', 'firstName lastName studentCode');
 
   if (!trip) {
     res.status(404);
     throw new Error('Trip not found');
   }
-  res.json({ success: true, data: trip });
+  const data = trip.toObject();
+  data.driverOnline = Boolean(trip.driver?.online);
+  data.busOnline = Boolean(trip.bus?.online);
+  res.json({ success: true, data });
 });

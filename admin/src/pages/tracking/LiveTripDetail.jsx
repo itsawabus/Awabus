@@ -13,6 +13,7 @@ import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
 import { formatLat, formatLng, gpsFreshness } from '../../lib/gps.js';
 import useNow from '../../hooks/useNow.js';
 import { GpsState } from './LiveTracking.jsx';
+import { ConnectionPair } from '../../components/buses/BusOnlineStatus.jsx';
 import { runWords, sessionLabel, statusLabel } from '../../lib/sessions.js';
 
 export default function LiveTripDetail() {
@@ -95,6 +96,7 @@ export default function LiveTripDetail() {
                 {trip.bus?.name} · {trip.bus?.plateNumber}
               </p>
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{trip.route?.name}</p>
+              <ConnectionPair className="mt-3" busOnline={trip.busOnline} driverOnline={trip.driverOnline} hasDriver={Boolean(trip.driver)} />
             </div>
           </Card>
           <Card>

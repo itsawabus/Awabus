@@ -20,6 +20,7 @@ import { tenantContext } from '../utils/tenantContext.js';
 import { MAX_OTP_ATTEMPTS } from './authController.js';
 import { signResetToken, readResetToken } from '../utils/resetToken.js';
 import { schoolStatus, accessError, SCHOOL_SUSPENDED_MESSAGE, DRIVER_INACTIVE_MESSAGE } from '../utils/access.js';
+import { forgetBusLocation } from '../middleware/auth.js';
 import { notify, describeTrip } from '../services/notify.js';
 import { emitToSchool } from '../sockets/rooms.js';
 import { checkSetupCode, clearSetupCode, SETUP_CODE_MESSAGES } from '../utils/setupCode.js';
@@ -284,7 +285,11 @@ export const messageParent = asyncHandler(async (req, res) => {
 // @desc    Driver signed out of the app: show them offline straight away
 // @route   POST /api/driver-app/sign-out
 export const driverSignOut = asyncHandler(async (req, res) => {
-  await Driver.updateOne({ _id: req.driver._id }, { $set: { signedOutAt: new Date() } });
+  const now = new Date();
+  await Driver.updateOne({ _id: req.driver._id }, { $set: { signedOutAt: now } });
+  // The phone stops reading the bus location, so the bus goes offline too.
+  if (req.driver.assignedBus) await Bus.updateOne({ _id: req.driver.assignedBus }, { $set: { locationOffAt: now } });
+  forgetBusLocation(req.driver._id);
   res.json({ success: true });
 });
 
@@ -576,7 +581,7 @@ export const pushLocation = asyncHandler(async (req, res) => {
   };
   // Only these fields change, so this never overwrites a scan saved at the same moment.
   await Trip.updateOne({ _id: trip._id }, { $set: { liveLocation: location, gpsSignal: 'ok' } });
-  await Bus.updateOne({ _id: trip.bus }, { $set: { lastKnownLocation: location, gpsSignal: 'ok' } });
+  await Bus.updateOne({ _id: trip.bus }, { $set: { lastKnownLocation: location, gpsSignal: 'ok', locationSeenAt: new Date() } });
 
   emitToSchool(req.app.get('io'), req.school, 'bus:location', { tripId: trip._id, busId: trip.bus, location });
   res.json({ success: true, data: location });

@@ -1,6 +1,6 @@
 import asyncHandler from 'express-async-handler';
 import Bus from '../models/Bus.js';
-import Driver from '../models/Driver.js';
+import Driver, { ONLINE_WINDOW_MS } from '../models/Driver.js';
 import Route from '../models/Route.js';
 import Student from '../models/Student.js';
 import Trip from '../models/Trip.js';
@@ -12,7 +12,8 @@ import { searchPattern } from '../utils/search.js';
 const populateBus = (query) =>
   query
     .populate('assignedRoute', 'routeId name')
-    .populate('assignedDriver', 'firstName lastName phone');
+    // lastSeenAt / signedOutAt: the driver's online status, shown with the bus's.
+    .populate('assignedDriver', 'firstName lastName phone lastSeenAt signedOutAt');
 
 // Buses must belong to a route (enforced at creation — see createBus), so the
 // admin's Add Driver screen can show the real route a bus already services
@@ -37,12 +38,13 @@ export const getBuses = asyncHandler(async (req, res) => {
     ];
   }
 
-  const [buses, total, totalBuses, maintenance, idle] = await Promise.all([
+  const [buses, total, totalBuses, maintenance, idle, recentlyLocated] = await Promise.all([
     populateBus(Bus.find(filter)).sort({ createdAt: 1 }).skip(skip).limit(limit),
     Bus.countDocuments(filter),
     Bus.countDocuments(),
     Bus.countDocuments({ status: 'Maintenance' }),
     Bus.countDocuments({ status: 'Idle' }),
+    Bus.find({ locationSeenAt: { $gte: new Date(Date.now() - ONLINE_WINDOW_MS) } }).select('locationSeenAt locationOffAt'),
   ]);
 
   // Attach seats filled (student count) per bus for the capacity column.
@@ -62,7 +64,7 @@ export const getBuses = asyncHandler(async (req, res) => {
     success: true,
     data,
     meta: buildPaginationMeta(total, page, limit),
-    stats: { totalBuses, maintenance, idle },
+    stats: { totalBuses, maintenance, idle, online: recentlyLocated.filter((b) => b.online).length },
   });
 });
 

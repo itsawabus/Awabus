@@ -2,6 +2,7 @@ import axios from 'axios';
 import { API_URL } from '../lib/buildInfo.js';
 import { useAuthStore } from '../store/authStore.js';
 import { useConnectionStore } from '../store/connectionStore.js';
+import { useLocationStatusStore } from '../store/locationStatusStore.js';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -11,6 +12,10 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   const { token } = useAuthStore.getState();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Tells the school whether this phone is reading the bus location (bus online / offline).
+  const location = useLocationStatusStore.getState().state;
+  if (location === 'on') config.headers['X-Location'] = 'on';
+  else if (location === 'off' || location === 'denied') config.headers['X-Location'] = 'off';
   return config;
 });
 

@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import asyncHandler from 'express-async-handler';
 import Admin from '../models/Admin.js';
 import Driver from '../models/Driver.js';
+import Bus from '../models/Bus.js';
 import School from '../models/School.js';
 import mongoose from 'mongoose';
 import { tenantContext } from '../utils/tenantContext.js';
@@ -22,6 +23,25 @@ function markDriverSeen(driver) {
     console.error('[auth] could not record driver check-in:', err.message)
   );
 }
+
+// Bus online / offline (see Bus.online): the driver app says on every request
+// whether the phone is reading its location (X-Location: on | off). Written
+// straight away when it changes, otherwise at most every 20 seconds.
+const lastLocationWrite = new Map(); // driver id -> { state, at }
+function markBusLocation(driver, header) {
+  const state = header === 'on' ? 'on' : header === 'off' ? 'off' : null;
+  if (!state || !driver.assignedBus) return;
+  const key = String(driver._id);
+  const last = lastLocationWrite.get(key);
+  if (last && last.state === state && Date.now() - last.at < SEEN_WRITE_EVERY_MS) return;
+  lastLocationWrite.set(key, { state, at: Date.now() });
+  const field = state === 'on' ? 'locationSeenAt' : 'locationOffAt';
+  Bus.updateOne({ _id: driver.assignedBus }, { $set: { [field]: new Date() } }).catch((err) =>
+    console.error('[auth] could not record bus location status:', err.message)
+  );
+}
+// Signing out stops the phone reading the bus location.
+export const forgetBusLocation = (driverId) => lastLocationWrite.delete(String(driverId));
 
 const extractBearerToken = (req) => {
   const authHeader = req.headers.authorization;
@@ -182,6 +202,7 @@ export const protectDriver = asyncHandler(async (req, res, next) => {
     req.driver = driver;
     req.school = decoded.school;
     markDriverSeen(driver);
+    markBusLocation(driver, req.get('x-location'));
     next();
   });
 });

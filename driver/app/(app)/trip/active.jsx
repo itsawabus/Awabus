@@ -23,10 +23,12 @@ import { getTodaysTrip, markAttendance, endTrip } from '../../../src/api/driverA
 import { formatClock, formatDate, formatLat, formatLng, timeAgo } from '../../../src/lib/utils.js';
 import { colors, radii } from '../../../src/lib/theme.js';
 import { runWords } from '../../../src/lib/runs.js';
+import { BusOfflineBanner, useConnectionStatus } from '../../../src/components/ConnectionStatus.jsx';
 
 export default function ActiveTrip() {
   const queryClient = useQueryClient();
   const isOnline = useConnectionStore((s) => s.isOnline);
+  const { busOnline } = useConnectionStatus();
   const lastSyncAt = useConnectionStore((s) => s.lastSyncAt);
   const markSynced = useConnectionStore((s) => s.markSynced);
   const enqueue = useOfflineQueueStore((s) => s.enqueue);
@@ -181,6 +183,10 @@ export default function ActiveTrip() {
               <Text style={[styles.statusText, { color: isOnline ? colors.emerald700 : colors.slate500 }]}>
                 {isOnline ? 'Online' : 'Offline'}
               </Text>
+              <View style={[styles.dot, { marginLeft: 10, backgroundColor: busOnline ? colors.emerald600 : colors.amber500 }]} />
+              <Text style={[styles.statusText, { color: busOnline ? colors.emerald700 : colors.amber700 }]}>
+                {busOnline ? 'Bus online' : 'Bus offline'}
+              </Text>
             </View>
             <Text style={styles.syncText}>
               {waiting ? `${waiting} waiting to send · ` : ''}Last sync: {lastSyncAt ? timeAgo(lastSyncAt) : 'never'}
@@ -209,6 +215,9 @@ export default function ActiveTrip() {
             <Text style={styles.offlineText}>GPS is off: {gpsError} The school cannot see the bus until location is allowed.</Text>
           </View>
         ) : null}
+
+        {/* Location off (data is fine): the school can't see the bus. */}
+        {!gpsError && isOnline ? <BusOfflineBanner /> : null}
 
         {!isOnline && (
           <View style={styles.offlineBanner}>
@@ -389,7 +398,7 @@ const styles = StyleSheet.create({
   infoLabel: { color: colors.slate500 },
   infoValue: { color: colors.slate800, fontWeight: '700' },
   dateText: { color: colors.slate400, fontSize: 13, marginTop: 2 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  statusRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   statusLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   statusText: { fontWeight: '800', fontSize: 14 },
