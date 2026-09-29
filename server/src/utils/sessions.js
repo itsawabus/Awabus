@@ -1,9 +1,11 @@
 // Morning and evening runs.
 //
 // Each route has an estimated start time for its morning run and its evening
-// run (set by the school). They decide which run a trip belongs to. (They are
-// not a cut-off for parents: a cancelled ride always applies to the next run
-// that has not started, see services/rideCancellations.js.) Each student rides in the morning,
+// run (set by the school) for planning. Which run a trip is comes from the
+// clock: before noon the morning pick-up, from noon the afternoon drop-off
+// (sessionFor). They are not a cut-off for parents either (a cancelled ride
+// applies to the next run that has not started, services/rideCancellations.js).
+// Each student rides in the morning,
 // the evening, or both; a trip only lists the students riding that run.
 
 export const RIDE_SESSIONS = ['both', 'morning', 'evening'];
@@ -75,17 +77,28 @@ export function normalizeRideSession(value) {
 }
 
 /**
- * Which run a trip starting now belongs to. The day is split half-way between
- * the route's morning and evening start times (noon when they are not set).
+ * Which run a trip belongs to, from the current time (Ghana time = UTC):
+ * any time before 12:00 noon is the morning PICK-UP (home to school), from
+ * noon on it is the afternoon DROP-OFF (school to home). The route's start
+ * times don't change this; they are estimates for the school's planning.
+ * (`route` is kept in the signature for the callers.)
  */
+export const NOON_MINUTES = 12 * 60;
+// eslint-disable-next-line no-unused-vars
 export function sessionFor(route, now = new Date()) {
-  const current = now.getHours() * 60 + now.getMinutes();
-  const morning = route?.morningStartTime ? toMinutes(route.morningStartTime) : null;
-  const evening = route?.eveningStartTime ? toMinutes(route.eveningStartTime) : null;
-  let split = 12 * 60;
-  if (morning != null && evening != null) split = Math.round((morning + evening) / 2);
-  return current < split ? 'morning' : 'evening';
+  const current = now.getUTCHours() * 60 + now.getUTCMinutes();
+  return current < NOON_MINUTES ? 'morning' : 'evening';
 }
+
+/**
+ * Words for each run, so messages match what is happening:
+ * morning = picking children up from home, evening = taking them home.
+ */
+export const RUN_WORDS = {
+  morning: { name: 'morning pick-up', boarded: 'was picked up', dropped: 'arrived at school', near: 'will soon be picked up: the school bus is nearly at home' },
+  evening: { name: 'afternoon drop-off', boarded: 'got on the school bus at school', dropped: 'was dropped off at home', near: 'is almost home on the school bus' },
+};
+export const runWords = (session) => RUN_WORDS[session] || RUN_WORDS.evening;
 
 /** Does a student riding `rideSession` belong on a `session` trip? */
 export const ridesIn = (rideSession, session) => !session || !rideSession || rideSession === 'both' || rideSession === session;

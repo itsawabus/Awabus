@@ -9,6 +9,7 @@ import { PageLoader } from '../../../../src/components/ui/Spinner.jsx';
 import { getTripById } from '../../../../src/api/driverApp.js';
 import { formatDate, formatDuration, formatTime } from '../../../../src/lib/utils.js';
 import { colors } from '../../../../src/lib/theme.js';
+import { statusLabel } from '../../../../src/lib/runs.js';
 
 const STATUS_TONE = { Completed: 'success', Cancelled: 'danger', Delayed: 'warning' };
 const DROPOFF_TONE = { 'Dropped off': 'success', 'On board': 'warning', 'Not on board': 'danger', 'Not picked up': 'neutral' };
@@ -65,7 +66,7 @@ export default function TripHistoryDetail() {
                   <Text style={styles.studentMeta}>{p.attendance === 'Present' ? 'Attending' : 'Not attending'}</Text>
                 </View>
                 {p.attendance === 'Present' && (
-                  <Badge tone={DROPOFF_TONE[p.dropoffStatus] || 'neutral'}>{p.dropoffStatus || 'Not picked up'}</Badge>
+                  <Badge tone={DROPOFF_TONE[p.dropoffStatus] || 'neutral'}>{p.dropoffStatus ? statusLabel(trip.session, p.dropoffStatus) : 'Not picked up'}</Badge>
                 )}
               </View>
             ))

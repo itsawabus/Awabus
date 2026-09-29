@@ -19,6 +19,7 @@ import { useConnectionStore } from '../../../src/store/connectionStore.js';
 import { getTodaysTrip, markAttendance, startTrip } from '../../../src/api/driverApp.js';
 import { formatDate } from '../../../src/lib/utils.js';
 import { colors, radii } from '../../../src/lib/theme.js';
+import { runWords } from '../../../src/lib/runs.js';
 
 export default function Home() {
   const queryClient = useQueryClient();
@@ -75,6 +76,9 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ['todays-trip'] });
       router.push('/trip/active');
     },
+    // E.g. it just turned noon: the server has the afternoon drop-off ready
+    // instead of the morning pick-up. Reload so the right run shows.
+    onError: () => queryClient.invalidateQueries({ queryKey: ['todays-trip'] }),
   });
 
   // Changing attendance is confirmed first, so a stray tap changes nothing.
@@ -176,7 +180,7 @@ export default function Home() {
           {trip.session ? (
             <Text style={styles.infoLine}>
               <Text style={styles.infoLabel}>Run: </Text>
-              <Text style={styles.infoValue}>{trip.session === 'morning' ? 'Morning' : 'Evening'}</Text>
+              <Text style={styles.infoValue}>{runWords(trip.session).name}</Text>
             </Text>
           ) : null}
           <Text style={styles.dateText}>
@@ -229,7 +233,13 @@ export default function Home() {
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={styles.footer}>
-        <Button onPress={() => setConfirmOpen(true)} disabled={total === 0}>
+        <Button
+          onPress={() => {
+            startMutation.reset();
+            setConfirmOpen(true);
+          }}
+          disabled={total === 0}
+        >
           Start trip
         </Button>
       </SafeAreaView>
@@ -239,7 +249,7 @@ export default function Home() {
 
       <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <Text style={styles.modalTitle}>
-          {trip.session ? `Start the ${trip.session} run?` : trip.completedToday ? 'Start another trip?' : "Start today's trip?"}
+          {trip.session ? `Start the ${runWords(trip.session).name.toLowerCase()}?` : trip.completedToday ? 'Start another trip?' : "Start today's trip?"}
         </Text>
         <Text style={styles.modalSubtitle}>
           {trip.completedToday
@@ -250,8 +260,9 @@ export default function Home() {
           <SummaryRow label="Attending Students" value={attending} />
           <SummaryRow label="Bus" value={trip.bus?.plateNumber} />
           <SummaryRow label="Route" value={trip.route?.name} />
-          {trip.session ? <SummaryRow label="Run" value={trip.session === 'morning' ? 'Morning' : 'Evening'} /> : null}
+          {trip.session ? <SummaryRow label="Run" value={runWords(trip.session).name} /> : null}
         </View>
+        {startMutation.isError ? <Text style={styles.startError}>{startMutation.error.message}</Text> : null}
         <Button loading={startMutation.isPending} onPress={() => startMutation.mutate()} style={{ marginTop: 24 }}>
           Yes, start trip
         </Button>
@@ -271,6 +282,7 @@ const SummaryRow = ({ label, value }) => (
 );
 
 const styles = StyleSheet.create({
+  startError: { marginTop: 16, color: colors.red600, fontSize: 13, lineHeight: 18 },
   scroll: { padding: 16, gap: 20, paddingBottom: 32 },
   centerPad: { flexGrow: 1, padding: 16, justifyContent: 'center' },
   centerCard: { alignItems: 'center', gap: 8, paddingVertical: 40 },

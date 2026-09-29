@@ -12,7 +12,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Tabs from '../../components/ui/Tabs.jsx';
 import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
-import { sessionLabel } from '../../lib/sessions.js';
+import { runWords, sessionLabel, statusLabel } from '../../lib/sessions.js';
 
 const stopIcon = (n) =>
   L.divIcon({
@@ -127,8 +127,8 @@ export default function TripDetails() {
         <Card>
           <div className="flex flex-wrap gap-6 border-b border-slate-100 p-5 dark:border-slate-800">
             <ChipStat label="attending" value={attending} />
-            <ChipStat label="dropped off" value={droppedOff} />
-            <ChipStat label="on board" value={onBoard} />
+            <ChipStat label={runWords(trip.session).drop.toLowerCase()} value={droppedOff} />
+            <ChipStat label={runWords(trip.session).board.toLowerCase()} value={onBoard} />
             <ChipStat label="cancelled" value={cancelled} />
           </div>
           <Table>
@@ -151,7 +151,7 @@ export default function TripDetails() {
                   </Td>
                   <Td>{p.alertStatus}</Td>
                   <Td>{p.alertTime || '—'}</Td>
-                  <Td>{p.dropoffStatus}</Td>
+                  <Td>{statusLabel(trip.session, p.dropoffStatus)}</Td>
                   <Td className="text-right">
                     <Button size="sm" variant="outline">
                       Notify

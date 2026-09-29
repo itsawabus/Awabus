@@ -24,7 +24,7 @@ import { notify, describeTrip } from '../services/notify.js';
 import { emitToSchool } from '../sockets/rooms.js';
 import { checkSetupCode, clearSetupCode, SETUP_CODE_MESSAGES } from '../utils/setupCode.js';
 import { inGhana } from '../utils/geo.js';
-import { sessionFor, ridesIn } from '../utils/sessions.js';
+import { sessionFor, ridesIn, runWords } from '../utils/sessions.js';
 import { alertForScan, checkGeofences } from '../services/parentAlerts.js';
 import { cancelledStudentIds, dateKey } from '../services/rideCancellations.js';
 import { createPass, revokePass } from '../services/assistPass.js';
@@ -298,7 +298,7 @@ const provisionTodaysTrip = async (driver, dayStart, dayEnd) => {
   const route = await RouteModel.findById(driver.assignedRoute).populate('students', '_id rideSession');
   if (!route) return null;
 
-  // Morning or evening run, from the route's start times; only the students
+  // Morning pick-up before noon, afternoon drop-off from noon; only the students
   // riding that run are on it.
   const session = sessionFor(route);
   const tripCode = await nextSequentialCode(Trip, 'tripCode', 'TRP-', 4);
@@ -425,7 +425,7 @@ export const getTodaysTrip = asyncHandler(async (req, res) => {
       { _id: trip._id, status: 'Scheduled' },
       {
         $set: { status: 'Cancelled' },
-        $push: { timeline: { time: timeNow(), title: 'Not driven', description: `The ${trip.session} run was never started.` } },
+        $push: { timeline: { time: timeNow(), title: 'Not driven', description: `The ${runWords(trip.session).name} was never started.` } },
       }
     );
     trip = null;
@@ -454,6 +454,16 @@ export const startTrip = asyncHandler(async (req, res) => {
   }
   // Already running (e.g. the start was sent twice): keep the original start time.
   if (isLive(trip)) return res.json({ success: true, data: trip });
+  // A trip prepared in the morning can't be started as the pick-up after
+  // noon (or the other way round): the app refreshes to the current run.
+  if (trip.session && trip.session !== sessionFor(null)) {
+    throw refuseTrip(
+      res,
+      409,
+      'RUN_CHANGED',
+      `It is now the ${runWords(sessionFor(null)).name} time. Pull down to refresh, then start the ${runWords(sessionFor(null)).name}.`
+    );
+  }
   trip.status = 'In Progress';
   trip.startedAt = new Date();
   trip.departureTime = timeNow();
@@ -695,7 +705,7 @@ export const sendDelayBroadcast = asyncHandler(async (req, res) => {
   const students = await Student.find({ _id: { $in: attendingIds } }).populate('primaryGuardian', 'phone');
   const guardianPhones = [...new Set(students.map((s) => s.primaryGuardian?.phone).filter(Boolean))];
 
-  const smsText = `AwaBus: ${trip.route?.name || 'Your route'} is running late. ${extra}`.trim();
+  const smsText = `AwaBus: ${trip.route?.name || 'Your route'}${trip.session ? ` (${runWords(trip.session).name})` : ''} is running late. ${extra}`.trim();
 
   let delivered = 0;
   let failed = 0;

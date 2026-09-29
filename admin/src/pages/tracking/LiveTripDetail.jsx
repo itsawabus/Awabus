@@ -13,7 +13,7 @@ import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
 import { formatLat, formatLng, gpsFreshness } from '../../lib/gps.js';
 import useNow from '../../hooks/useNow.js';
 import { GpsState } from './LiveTracking.jsx';
-import { sessionLabel } from '../../lib/sessions.js';
+import { runWords, sessionLabel, statusLabel } from '../../lib/sessions.js';
 
 export default function LiveTripDetail() {
   const { tripId } = useParams();
@@ -80,7 +80,7 @@ export default function LiveTripDetail() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MiniStat label="Departure" value={trip.departureTime || '—'} sub="On-time departure" />
         <MiniStat label="Duration" value={trip.etaMinutes ? `${trip.etaMinutes} min` : '—'} sub={gps.label} />
-        <MiniStat label="Students scanned" value={`${scanned} / ${progress.length}`} sub="On board or dropped off" />
+        <MiniStat label="Students scanned" value={`${scanned} / ${progress.length}`} sub={`${runWords(trip.session).board} or ${runWords(trip.session).drop.toLowerCase()}`} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.6fr]">
@@ -156,7 +156,7 @@ export default function LiveTripDetail() {
                       </span>
                     )}
                   </Td>
-                  <Td>{p.dropoffStatus}</Td>
+                  <Td>{statusLabel(trip.session, p.dropoffStatus)}</Td>
                 </Tr>
               ))}
             </Tbody>

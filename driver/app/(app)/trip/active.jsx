@@ -22,6 +22,7 @@ import { useAuthStore } from '../../../src/store/authStore.js';
 import { getTodaysTrip, markAttendance, endTrip } from '../../../src/api/driverApp.js';
 import { formatClock, formatDate, formatLat, formatLng, timeAgo } from '../../../src/lib/utils.js';
 import { colors, radii } from '../../../src/lib/theme.js';
+import { runWords } from '../../../src/lib/runs.js';
 
 export default function ActiveTrip() {
   const queryClient = useQueryClient();
@@ -92,10 +93,12 @@ export default function ActiveTrip() {
   });
 
   // Every step is confirmed first, so a stray tap changes nothing.
+  // Worded for the run: morning pick-up or afternoon drop-off.
+  const words = runWords(trip?.session);
   const STEP = {
-    'On board': { verb: 'boarded', label: 'Yes, on board' },
-    'Dropped off': { verb: 'dropped off', label: 'Yes, dropped off' },
-    'Not on board': { verb: 'not here', label: 'Yes, not here', danger: true },
+    'On board': { verb: words.boardVerb, label: `Yes, ${words.board.toLowerCase()}` },
+    'Dropped off': { verb: words.dropVerb, label: `Yes, ${words.drop.toLowerCase()}` },
+    'Not on board': { verb: words.notHere.toLowerCase(), label: `Yes, ${words.notHere.toLowerCase()}`, danger: true },
   };
   const askStatus = (p, dropoffStatus) => {
     const name = p.student ? `${p.student.firstName} ${p.student.lastName}` : 'this student';
@@ -152,7 +155,7 @@ export default function ActiveTrip() {
       <TripHeader
         status="Trip active"
         isOnline={isOnline}
-        subtitle={`${trip.bus?.plateNumber || ''}, ${trip.route?.name || ''}`}
+        subtitle={`${trip.session ? `${runWords(trip.session).name} · ` : ''}${trip.bus?.plateNumber || ''}, ${trip.route?.name || ''}`}
         elapsedSeconds={elapsed}
       />
 
@@ -218,7 +221,7 @@ export default function ActiveTrip() {
           <View style={styles.rowBetween}>
             <Text style={styles.sectionLabel}>Trip progress</Text>
             <Text style={styles.progressText}>
-              {droppedCount} of {riding.length} dropped off
+              {droppedCount} of {riding.length} {words.dropCount}
             </Text>
           </View>
           <View style={styles.progressTrack}>
@@ -226,7 +229,7 @@ export default function ActiveTrip() {
             <View style={[styles.progressFill, { width: `${riding.length ? (droppedCount / riding.length) * 100 : 0}%` }]} />
           </View>
           <Text style={styles.progressDetail}>
-            {onBoard.length} on board · {unscanned.length} waiting{notHere.length ? ` · ${notHere.length} not here` : ''}
+            {onBoard.length} {words.onBus} · {unscanned.length} waiting{notHere.length ? ` · ${notHere.length} ${words.notHere.toLowerCase()}` : ''}
             {progress.length - riding.length ? ` · ${progress.length - riding.length} absent` : ''}
           </Text>
         </View>
@@ -250,7 +253,7 @@ export default function ActiveTrip() {
           )}
           <View style={{ gap: 8 }}>
             {visibleStudents.map((p) => (
-              <StudentRow key={p.student?._id} p={p} isOnline={isOnline} onSet={(status) => askStatus(p, status)} onCall={callParent} onMessage={(student) => setMessageTo({ tripId: trip._id, student })} />
+              <StudentRow key={p.student?._id} p={p} session={trip.session} isOnline={isOnline} onSet={(status) => askStatus(p, status)} onCall={callParent} onMessage={(student) => setMessageTo({ tripId: trip._id, student })} />
             ))}
             {visibleStudents.length === 0 && <Text style={styles.emptyListText}>No students found.</Text>}
           </View>
@@ -274,22 +277,22 @@ export default function ActiveTrip() {
         <Text style={styles.modalSubtitle}>You are about to end the current trip.</Text>
         <View style={styles.summaryBox}>
           <SummaryRow label="Trip duration" value={formatClock(elapsed)} />
-          <SummaryRow label="Dropped off" value={`${droppedCount} of ${riding.length}`} />
+          <SummaryRow label={words.drop} value={`${droppedCount} of ${riding.length}`} />
           <SummaryRow label="Bus" value={trip.bus?.plateNumber} />
           <SummaryRow label="Route" value={trip.route?.name} />
         </View>
         {onBoard.length > 0 && (
           <View style={[styles.warningBox, styles.dangerBox]}>
             <Text style={styles.dangerText}>
-              {onBoard.length} student{onBoard.length === 1 ? ' is' : 's are'} still marked on board:{' '}
-              {onBoard.map((p) => p.student?.firstName).filter(Boolean).join(', ')}. Drop them off first, or check the bus.
+              {onBoard.length} student{onBoard.length === 1 ? ' is' : 's are'} still marked {words.onBus}:{' '}
+              {onBoard.map((p) => p.student?.firstName).filter(Boolean).join(', ')}. Mark them {words.drop.toLowerCase()} first, or check the bus.
             </Text>
           </View>
         )}
         {unscanned.length > 0 && (
           <View style={styles.warningBox}>
             <Text style={styles.warningText}>
-              {unscanned.length} student{unscanned.length === 1 ? ' was' : 's were'} never boarded or marked not here. Their
+              {unscanned.length} student{unscanned.length === 1 ? ' was' : 's were'} never marked {words.board.toLowerCase()} or {words.notHere.toLowerCase()}. Their
               trip status will stay incomplete.
             </Text>
           </View>
@@ -306,7 +309,8 @@ export default function ActiveTrip() {
 }
 
 // One student: what happened so far, and the next step as a button.
-function StudentRow({ p, isOnline, onSet, onCall, onMessage }) {
+function StudentRow({ p, session, isOnline, onSet, onCall, onMessage }) {
+  const w = runWords(session);
   const name = p.student ? `${p.student.firstName} ${p.student.lastName}` : 'Student';
   const when = p._offline || !isOnline ? ' (offline)' : p.alertTime ? ` at ${p.alertTime}` : '';
   const status = p.dropoffStatus;
@@ -329,7 +333,7 @@ function StudentRow({ p, isOnline, onSet, onCall, onMessage }) {
           <Text style={styles.studentName}>{name}</Text>
           <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
         </View>
-        <Text style={styles.scannedText}>Dropped off{when}</Text>
+        <Text style={styles.scannedText}>{w.drop}{when}</Text>
       </View>
     );
   }
@@ -338,10 +342,10 @@ function StudentRow({ p, isOnline, onSet, onCall, onMessage }) {
       <View style={styles.studentRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.studentName}>{name}</Text>
-          <Text style={styles.onBoardText}>On board{when}</Text>
+          <Text style={styles.onBoardText}>{w.board}{when}</Text>
           <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
         </View>
-        <SmallButton label="Drop off" onPress={() => onSet('Dropped off')} />
+        <SmallButton label={w.drop} onPress={() => onSet('Dropped off')} />
       </View>
     );
   }
@@ -349,12 +353,12 @@ function StudentRow({ p, isOnline, onSet, onCall, onMessage }) {
     <View style={styles.studentRow}>
       <View style={{ flex: 1 }}>
         <Text style={styles.studentName}>{name}</Text>
-        {status === 'Not on board' ? <Text style={styles.notHereText}>Not here{when}</Text> : <Text style={styles.waitingText}>Waiting</Text>}
+        {status === 'Not on board' ? <Text style={styles.notHereText}>{w.notHere}{when}</Text> : <Text style={styles.waitingText}>{w.waiting}</Text>}
         <StudentMeta student={p.student} onCall={onCall} onMessage={onMessage} />
       </View>
       <View style={styles.actions}>
-        {status !== 'Not on board' && <SmallButton label="Not here" variant="ghost" onPress={() => onSet('Not on board')} />}
-        <SmallButton label="Board" onPress={() => onSet('On board')} />
+        {status !== 'Not on board' && <SmallButton label={w.notHere} variant="ghost" onPress={() => onSet('Not on board')} />}
+        <SmallButton label={w.board} onPress={() => onSet('On board')} />
       </View>
     </View>
   );

@@ -67,7 +67,7 @@ export default function RoutesList() {
         { key: 'status', label: 'Status', type: 'select', options: ROUTE_STATUSES, get: (r) => r.status || '' },
         {
           key: 'morningStartTime',
-          label: 'Morning run starts',
+          label: 'Morning pick-up starts',
           type: 'time',
           get: (r) => formatRunTime(r.morningStartTime),
           validate: (v) => (v && v >= '12:00' ? 'Must be before 12:00 noon' : ''),
@@ -75,7 +75,7 @@ export default function RoutesList() {
         },
         {
           key: 'eveningStartTime',
-          label: 'Evening run starts',
+          label: 'Afternoon drop-off starts',
           type: 'time',
           get: (r) => formatRunTime(r.eveningStartTime),
           validate: (v) => (v && v < '12:00' ? 'Must be 12:00 noon or later' : ''),
@@ -178,8 +178,8 @@ export default function RoutesList() {
                     <Td className="whitespace-nowrap text-sm">
                       {route.morningStartTime || route.eveningStartTime ? (
                         <>
-                          <span className="block">Morning {formatRunTime(route.morningStartTime, '—')}</span>
-                          <span className="block text-slate-500 dark:text-slate-400">Evening {formatRunTime(route.eveningStartTime, '—')}</span>
+                          <span className="block">Pick-up {formatRunTime(route.morningStartTime, '—')}</span>
+                          <span className="block text-slate-500 dark:text-slate-400">Drop-off {formatRunTime(route.eveningStartTime, '—')}</span>
                         </>
                       ) : (
                         <span className="text-amber-600 dark:text-amber-400">Not set</span>

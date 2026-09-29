@@ -445,8 +445,8 @@ export default function AddStudent() {
                     <SummaryStat label="Stops On Route" value={`${selectedRoute.stops?.length || 0} Scheduled Stops`} />
                     <SummaryStat label="Bus Driver" value={selectedRoute.assignedDriver ? `${selectedRoute.assignedDriver.firstName} ${selectedRoute.assignedDriver.lastName}` : 'Not assigned yet'} />
                     <SummaryStat label="Seats Available" value={selectedBus ? `${selectedBus.capacity} Seats` : '—'} />
-                    <SummaryStat label="Morning run" value={formatRunTime(selectedRoute.morningStartTime)} />
-                    <SummaryStat label="Evening run" value={formatRunTime(selectedRoute.eveningStartTime)} />
+                    <SummaryStat label="Morning pick-up" value={formatRunTime(selectedRoute.morningStartTime)} />
+                    <SummaryStat label="Afternoon drop-off" value={formatRunTime(selectedRoute.eveningStartTime)} />
                   </CardBody>
                 </Card>
               )}

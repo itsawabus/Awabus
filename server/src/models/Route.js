@@ -21,8 +21,9 @@ const routeSchema = new mongoose.Schema(
     assignedDriver: { type: mongoose.Schema.Types.ObjectId, ref: 'Driver', default: null },
     students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }],
     stops: [stopSchema],
-    // Estimated start of each run, "HH:MM" 24-hour ('' = not set). They decide
-    // whether a trip is the morning or evening run (utils/sessions.js).
+    // Estimated start of each run, "HH:MM" 24-hour ('' = not set), for the
+    // school's planning. Which run a trip is comes from the clock: before noon
+    // the morning pick-up, from noon the afternoon drop-off (utils/sessions.js).
     morningStartTime: { type: String, default: '' },
     eveningStartTime: { type: String, default: '' },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },

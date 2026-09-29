@@ -10,6 +10,7 @@ import { useOfflineQueueStore } from '../../../src/store/offlineQueueStore.js';
 import { getTripById } from '../../../src/api/driverApp.js';
 import { formatDateTime, formatDuration } from '../../../src/lib/utils.js';
 import { colors } from '../../../src/lib/theme.js';
+import { runWords } from '../../../src/lib/runs.js';
 
 export default function TripCompleted() {
   const { tripId } = useLocalSearchParams();
@@ -31,6 +32,7 @@ export default function TripCompleted() {
   const neverScanned = riding.length - droppedOff - stillOnBoard - notHere;
   const absent = progress.length - riding.length;
   const allGood = stillOnBoard === 0 && neverScanned === 0;
+  const w = runWords(trip.session);
   const broadcasts = trip.delayBroadcasts || [];
   const totalRecipients = broadcasts.reduce((sum, b) => sum + (b.recipientCount || 0), 0);
 
@@ -40,7 +42,7 @@ export default function TripCompleted() {
         <View style={styles.iconWrap}>
           <CheckCheck size={28} color={colors.white} />
         </View>
-        <Text style={styles.bannerTitle}>Trip completed</Text>
+        <Text style={styles.bannerTitle}>{trip.session ? `${w.name} completed` : 'Trip completed'}</Text>
         <Text style={styles.bannerSubtitle}>
           {allGood ? 'Every student on this trip is accounted for.' : 'Some students need checking. See below.'}
         </Text>
@@ -50,10 +52,10 @@ export default function TripCompleted() {
         <Card>
           <Text style={styles.sectionLabel}>Trip performance summary</Text>
           <Row label="Trip duration" value={formatDuration(trip.durationMinutes)} />
-          <Row label="Dropped off" value={`${droppedOff} of ${riding.length}`} />
-          {stillOnBoard > 0 && <Row label="Still marked on board" value={stillOnBoard} warn />}
-          {neverScanned > 0 && <Row label="Never boarded" value={neverScanned} warn />}
-          {notHere > 0 && <Row label="Not here at pickup" value={notHere} />}
+          <Row label={w.drop} value={`${droppedOff} of ${riding.length}`} />
+          {stillOnBoard > 0 && <Row label={`Still marked ${w.onBus}`} value={stillOnBoard} warn />}
+          {neverScanned > 0 && <Row label={`Never marked ${w.board.toLowerCase()}`} value={neverScanned} warn />}
+          {notHere > 0 && <Row label={w.notHere} value={notHere} />}
           {absent > 0 && <Row label="Absent" value={absent} />}
           <Row label="Delay broadcasts" value={broadcasts.length ? `${broadcasts.length} sent to ${totalRecipients} parents` : '0'} />
           <Row label="Trip ended" value={formatDateTime(trip.endedAt || trip.date)} last />

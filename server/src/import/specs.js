@@ -44,8 +44,8 @@ export const SPECS = {
       { key: 'name', header: 'Route Name', required: true, kind: 'text', min: 3, max: 80, example: 'West Legon - Ashongman', help: 'Where the route runs, e.g. start area - end area' },
       { key: 'status', header: 'Status', kind: 'list', options: ['Active', 'Inactive'], example: 'Active', help: 'Leave blank for Active' },
       // Added later: templates downloaded before these existed are still accepted.
-      { key: 'morningStartTime', header: 'Morning Start Time', kind: 'time', example: '06:00', help: 'When the morning run usually leaves, before 12:00, e.g. 06:00', addedLater: true },
-      { key: 'eveningStartTime', header: 'Evening Start Time', kind: 'time', example: '15:00', help: 'When the evening run usually leaves school, 12:00 or later, e.g. 15:00', addedLater: true },
+      { key: 'morningStartTime', header: 'Morning Start Time', kind: 'time', example: '06:00', help: 'When the morning pick-up usually leaves, before 12:00, e.g. 06:00', addedLater: true },
+      { key: 'eveningStartTime', header: 'Evening Start Time', kind: 'time', example: '15:00', help: 'When the afternoon drop-off usually leaves school, 12:00 or later, e.g. 15:00', addedLater: true },
     ],
   },
 

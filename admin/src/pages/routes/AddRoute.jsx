@@ -48,8 +48,8 @@ export default function AddRoute() {
             <Row label="Route ID" value={created.routeId} />
             <Row label="Route" value={created.name} />
             <Row label="Stops" value={created.stops?.length || 'None yet'} />
-            <Row label="Morning run" value={formatRunTime(created.morningStartTime)} />
-            <Row label="Evening run" value={formatRunTime(created.eveningStartTime)} />
+            <Row label="Morning pick-up" value={formatRunTime(created.morningStartTime)} />
+            <Row label="Afternoon drop-off" value={formatRunTime(created.eveningStartTime)} />
             <Row label="Status" value={created.status} />
           </div>
           <p className="mt-4 text-xs text-slate-400">

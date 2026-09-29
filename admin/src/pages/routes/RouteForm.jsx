@@ -15,12 +15,12 @@ export default function RouteForm({ mode, values, onChange, onSubmit, submitting
   const [checked, setChecked] = useState(false);
   const stops = values.stops || [];
 
-  // Same rules as the server: morning run before noon, evening run from noon.
+  // Same rules as the server: morning pick-up before noon, afternoon drop-off from noon.
   const timeError =
     values.morningStartTime && values.morningStartTime >= '12:00'
-      ? 'The morning run must start before 12:00 noon.'
+      ? 'The morning pick-up must start before 12:00 noon.'
       : values.eveningStartTime && values.eveningStartTime < '12:00'
-        ? 'The evening run must start at 12:00 noon or later.'
+        ? 'The afternoon drop-off must start at 12:00 noon or later.'
         : '';
 
   const submit = (e) => {
@@ -59,12 +59,12 @@ export default function RouteForm({ mode, values, onChange, onSubmit, submitting
         <div className="border-t border-slate-100 p-5 dark:border-slate-800">
           <h4 className="text-sm font-bold text-slate-900 dark:text-white">Run times</h4>
           <p className="mb-4 mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-            When each run usually sets off. They decide whether a trip is the morning or evening run, so it only lists the
-            students riding that run.
+            When each run usually sets off, for planning. The run itself follows the clock: before 12:00 noon it is the
+            morning pick-up, from noon the afternoon drop-off.
           </p>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
-              <Label htmlFor="morningStartTime">Morning run starts (estimated)</Label>
+              <Label htmlFor="morningStartTime">Morning pick-up starts (estimated)</Label>
               <Input
                 id="morningStartTime"
                 type="time"
@@ -75,7 +75,7 @@ export default function RouteForm({ mode, values, onChange, onSubmit, submitting
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Before 12:00, e.g. 06:00</p>
             </div>
             <div>
-              <Label htmlFor="eveningStartTime">Evening run starts (estimated)</Label>
+              <Label htmlFor="eveningStartTime">Afternoon drop-off starts (estimated)</Label>
               <Input
                 id="eveningStartTime"
                 type="time"

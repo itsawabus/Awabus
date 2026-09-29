@@ -6,6 +6,7 @@ import Student from '../models/Student.js';
 import Bus from '../models/Bus.js';
 import Trip from '../models/Trip.js';
 import { sendSms } from './messaging/index.js';
+import { runWords } from '../utils/sessions.js';
 
 export const parentAlertsEnabled = () => process.env.PARENT_ALERTS === 'true';
 
@@ -22,10 +23,14 @@ export const ALERT_STATUS = {
 
 const timeNow = () => new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Accra' });
 
-// Scans that tell the parent something.
+// Scans that tell the parent something, worded for the run: in the morning
+// the child is picked up at home and arrives at school; in the afternoon the
+// child gets on at school and is dropped off at home.
 const SCAN_TEXT = {
-  'On board': (name, plate, time) => `AwaBus: ${name} boarded the school bus${plate ? ` ${plate}` : ''} at ${time}.`,
-  'Dropped off': (name, plate, time) => `AwaBus: ${name} was dropped off by the school bus${plate ? ` ${plate}` : ''} at ${time}.`,
+  'On board': (name, plate, time, session) =>
+    `AwaBus: ${name} ${runWords(session).boarded}${plate ? ` (bus ${plate})` : ''} at ${time}.`,
+  'Dropped off': (name, plate, time, session) =>
+    `AwaBus: ${name} ${runWords(session).dropped}${plate ? ` (bus ${plate})` : ''} at ${time}.`,
 };
 
 const loadStudent = (id) =>
@@ -52,7 +57,7 @@ export async function alertForScan({ trip, row, dropoffStatus, school }) {
   if (!parentAlertsEnabled()) return { alertStatus: ALERT_STATUS.off, alertTime, alertFor: dropoffStatus };
 
   const [student, bus] = await Promise.all([loadStudent(row.student), trip.bus ? Bus.findById(trip.bus).select('plateNumber').lean() : null]);
-  const text = makeText(student?.firstName || 'Your child', bus?.plateNumber, alertTime);
+  const text = makeText(student?.firstName || 'Your child', bus?.plateNumber, alertTime, trip.session);
   const alertStatus = await deliver(student?.primaryGuardian?.phone, text, 'boarding_alert', school);
   return { alertStatus, alertTime, alertFor: dropoffStatus };
 }
@@ -78,11 +83,15 @@ export function metresBetween(a, b) {
  */
 export async function checkGeofences({ tripId, position, school }) {
   try {
-    const trip = await Trip.findById(tripId).select('studentProgress bus status').lean();
+    const trip = await Trip.findById(tripId).select('studentProgress bus status session').lean();
     if (!trip) return 0;
+    // Morning pick-up: only children still waiting at home (the bus is coming
+    // for them). Afternoon drop-off: only children on the bus (it is taking
+    // them home). A child already picked up is never "near home" in the morning.
+    const due = trip.session === 'morning' ? ['Pending', 'Boarding now'] : trip.session === 'evening' ? ['On board'] : ['Pending', 'On board', 'Boarding now'];
     const waiting = trip.studentProgress
       .map((row, index) => ({ row, index }))
-      .filter(({ row }) => !row.nearHomeAt && ['Present', 'Expected'].includes(row.attendance) && ['Pending', 'On board', 'Boarding now'].includes(row.dropoffStatus));
+      .filter(({ row }) => !row.nearHomeAt && ['Present', 'Expected'].includes(row.attendance) && due.includes(row.dropoffStatus));
     if (!waiting.length) return 0;
 
     // Everyone on the trip, so parents already called on it (for a brother or
@@ -130,7 +139,7 @@ export async function checkGeofences({ tripId, position, school }) {
         status = ALERT_STATUS.sibling; // this parent / home was already called on this trip
       } else {
         family.forEach((key) => calledFamilies.add(key));
-        const what = row.dropoffStatus === 'On board' ? 'is almost home on the school bus' : 'will soon be picked up: the school bus is nearly at home';
+        const what = trip.session ? runWords(trip.session).near : row.dropoffStatus === 'On board' ? runWords('evening').near : runWords('morning').near;
         // eslint-disable-next-line no-await-in-loop
         status = await deliver(s.primaryGuardian?.phone, `AwaBus: ${s.firstName} ${what}.`, 'approaching_alert', school);
       }

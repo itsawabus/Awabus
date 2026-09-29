@@ -75,14 +75,16 @@ export const GUIDE = [
         steps: [
           'Click Add Route.',
           'Type the route name, e.g. "Madina - Adenta".',
-          'Set the run times: when the morning run usually leaves (before 12:00) and when the evening run leaves school (12:00 or later).',
+          'Set the run times: when the morning pick-up usually leaves (before 12:00) and when the afternoon drop-off leaves school (12:00 or later). They are estimates for planning.',
           'Add the stops in the order the bus drives them, then click Create Route.',
         ],
       },
       {
-        title: 'Why run times matter',
+        title: 'Morning pick-up and afternoon drop-off',
         steps: [
-          'A trip started before the halfway point between the two times is the morning run; after it, the evening run. Without times, noon is the halfway point.',
+          'The time of day decides the run: any trip before 12:00 noon is the morning pick-up (home to school); from noon it is the afternoon drop-off (school to home).',
+          'Buttons, statuses and messages follow the run. Morning: Picked up, then At school. Afternoon: On the bus, then Dropped home.',
+          'Arrival calls follow it too: in the morning only children still waiting at home are called about ("the bus is almost here"); in the afternoon only children on the bus ("almost home").',
           'Each trip only lists the students who ride that run.',
           'To set them on many routes at once, select the routes and use Edit selected.',
         ],

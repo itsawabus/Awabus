@@ -11,6 +11,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
 import Input, { Label, Textarea, Select } from '../../components/ui/Input.jsx';
 import { formatPhone } from '../../lib/phone.js';
 import { cn } from '../../lib/utils.js';
+import { runWords, sessionLabel, statusLabel } from '../../lib/sessions.js';
 
 // Bus assistant page: opened by the teacher on bus duty from the driver's QR
 // code. No account; the link's pass works until the trip ends.
@@ -177,7 +178,7 @@ function AssistBoard({ pass, name, onChangeName }) {
             </p>
             <h1 className="mt-1 truncate text-lg font-extrabold text-slate-900 dark:text-white">{trip.route?.name || 'Trip'}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {[trip.bus?.plateNumber, trip.session === 'morning' ? 'Morning run' : trip.session === 'evening' ? 'Afternoon run' : '', trip.tripCode]
+              {[sessionLabel(trip.session), trip.bus?.plateNumber, trip.tripCode]
                 .filter(Boolean)
                 .join(' · ')}
             </p>
@@ -203,8 +204,8 @@ function AssistBoard({ pass, name, onChangeName }) {
 
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
           <Stat label="Riding" value={riding.length} />
-          <Stat label="On board" value={onBoard} />
-          <Stat label="Dropped off" value={dropped} />
+          <Stat label={runWords(trip.session).board} value={onBoard} />
+          <Stat label={runWords(trip.session).drop} value={dropped} />
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -235,6 +236,7 @@ function AssistBoard({ pass, name, onChangeName }) {
           <StudentCard
             key={p.student?._id}
             p={p}
+            session={trip.session}
             live={live}
             scheduled={trip.status === 'Scheduled'}
             busy={mark.isPending && mark.variables?.studentId === p.student?._id}
@@ -279,16 +281,17 @@ const Stat = ({ label, value }) => (
   </div>
 );
 
-function StudentCard({ p, live, scheduled, busy, onAction, onMessage }) {
+function StudentCard({ p, session, live, scheduled, busy, onAction, onMessage }) {
+  const w = runWords(session);
   const s = p.student || {};
   const g = s.primaryGuardian;
   const name = `${s.firstName || ''} ${s.lastName || ''}`.trim() || 'Student';
   const out = ['Absent', 'Cancelled'].includes(p.attendance);
 
-  let status = p.dropoffStatus;
+  let status = statusLabel(session, p.dropoffStatus);
   if (p.attendance === 'Cancelled') status = 'Cancelled by parent';
   else if (p.attendance === 'Absent') status = 'Not attending';
-  else if (status === 'Pending') status = scheduled ? 'Attending' : 'Waiting';
+  else if (p.dropoffStatus === 'Pending' && scheduled) status = 'Attending';
 
   return (
     <div className={cn('rounded-2xl bg-white p-4 shadow-sm dark:bg-navy-light', out && 'opacity-70')}>
@@ -301,7 +304,7 @@ function StudentCard({ p, live, scheduled, busy, onAction, onMessage }) {
               .join(' · ')}
           </p>
         </div>
-        <Badge tone={status === 'Dropped off' || status === 'On board' || status === 'Attending' ? 'success' : out || status === 'Not on board' ? 'danger' : 'neutral'}>
+        <Badge tone={['Dropped off', 'On board'].includes(p.dropoffStatus) && !out ? 'success' : status === 'Attending' ? 'success' : out || p.dropoffStatus === 'Not on board' ? 'danger' : 'neutral'}>
           {status}
         </Badge>
       </div>
@@ -323,21 +326,21 @@ function StudentCard({ p, live, scheduled, busy, onAction, onMessage }) {
         )}
         {live && !out && p.dropoffStatus === 'Pending' && (
           <>
-            <Button size="sm" loading={busy} onClick={() => onAction(`${name} boarded?`, { dropoffStatus: 'On board' }, 'Mark them as on board.')}>
-              Board
+            <Button size="sm" loading={busy} onClick={() => onAction(`${name}: ${w.board.toLowerCase()}?`, { dropoffStatus: 'On board' }, `Mark them as ${w.board.toLowerCase()}.`)}>
+              {w.board}
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => onAction(`${name} is not here?`, { dropoffStatus: 'Not on board' }, 'Mark them as not on board. The school is told.', true)}
+              onClick={() => onAction(`${name}: ${w.notHere.toLowerCase()}?`, { dropoffStatus: 'Not on board' }, `Mark them as ${w.notHere.toLowerCase()}. The school is told.`, true)}
             >
-              Not here
+              {w.notHere}
             </Button>
           </>
         )}
         {live && !out && p.dropoffStatus === 'On board' && (
-          <Button size="sm" loading={busy} onClick={() => onAction(`Drop off ${name}?`, { dropoffStatus: 'Dropped off' }, 'Mark them as dropped off.')}>
-            Drop off
+          <Button size="sm" loading={busy} onClick={() => onAction(`${name}: ${w.drop.toLowerCase()}?`, { dropoffStatus: 'Dropped off' }, `Mark them as ${w.drop.toLowerCase()}.`)}>
+            {w.drop}
           </Button>
         )}
         {g?.phone && (
