@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { getTodaysTrip, getNotifications, pushLocation } from '../api/driverApp.js';
+import { getTodaysTrip, getNotifications, pushLocation, sendCrashReport } from '../api/driverApp.js';
+import { reportLastCrash } from '../lib/crashLog.js';
 import { useGeolocation } from '../hooks/useGeolocation.js';
 import { useLocationStatus } from '../hooks/useLocationStatus.js';
 import { useLiveGpsStore } from '../store/liveGpsStore.js';
@@ -116,6 +117,12 @@ export default function BackgroundWork() {
   // Signed out (this component goes away): stop tracking.
   useEffect(() => () => {
     stopTripTracking();
+  }, []);
+
+  // A crash noted on this phone goes to the school's System page once.
+  useEffect(() => {
+    const t = setTimeout(() => reportLastCrash(sendCrashReport), 3000);
+    return () => clearTimeout(t);
   }, []);
 
   // New notifications: a short vibration if the driver wants it.

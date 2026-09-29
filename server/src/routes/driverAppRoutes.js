@@ -24,6 +24,7 @@ import {
   getBroadcastHistory,
   getDriverNotifications,
   deleteDriverNotifications,
+  reportAppCrash,
 } from '../controllers/driverAppController.js';
 import { protectDriver } from '../middleware/auth.js';
 import { authLimits } from '../middleware/rateLimit.js';
@@ -59,5 +60,6 @@ router
   .post(protectDriver, createAssistPass)
   .delete(protectDriver, deleteAssistPass);
 router.get('/broadcasts', protectDriver, getBroadcastHistory);
+router.post('/crash-report', protectDriver, reportAppCrash);
 
 export default router;

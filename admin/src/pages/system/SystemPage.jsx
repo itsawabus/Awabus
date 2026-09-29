@@ -139,6 +139,28 @@ function HealthTab({ h }) {
         </Card>
       </div>
 
+      {h.appCrashes?.length ? (
+        <Card className="mb-6">
+          <CardHeader title="Driver app crashes" subtitle="Sent by drivers' phones on the next launch (last 30 days)" />
+          <CardBody className="space-y-4">
+            {h.appCrashes.map((c, i) => (
+              <div key={i} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">{c.message || 'Unknown error'}</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {timeAgo(c.at)} · {c.driver || 'driver'} · {c.native ? 'Android crash' : 'app code error'}{c.code ? ` · ${c.code}` : ''}
+                </p>
+                {c.stack ? (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs font-semibold text-brand-600">Details</summary>
+                    <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-slate-50 p-2 text-[11px] text-slate-700 dark:bg-navy dark:text-slate-300">{c.stack}</pre>
+                  </details>
+                ) : null}
+              </div>
+            ))}
+          </CardBody>
+        </Card>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader title="Background jobs" subtitle="Things the server does on its own" />

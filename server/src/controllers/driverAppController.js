@@ -10,6 +10,7 @@ import Bus from '../models/Bus.js';
 import RouteModel from '../models/Route.js';
 import Student from '../models/Student.js';
 import OtpToken from '../models/OtpToken.js';
+import AppCrash from '../models/AppCrash.js';
 import generateToken from '../utils/generateToken.js';
 import { getPagination, buildPaginationMeta } from '../utils/pagination.js';
 import { nextSequentialCode } from '../utils/idGenerator.js';
@@ -1060,4 +1061,22 @@ export const driverResetPassword = asyncHandler(async (req, res) => {
   await saveDriverAsSystem(driver);
 
   res.json({ success: true, message: 'You can now sign in with your new password' });
+});
+
+// @desc    A crash of the driver app on this phone (sent on the next launch)
+// @route   POST /api/driver-app/crash-report
+export const reportAppCrash = asyncHandler(async (req, res) => {
+  const text = (v, max) => String(v || '').slice(0, max);
+  const at = Number(req.body?.at);
+  await AppCrash.create({
+    school: req.school,
+    driver: req.driver._id,
+    message: text(req.body?.message, 500),
+    stack: text(req.body?.stack, 6000),
+    native: Boolean(req.body?.native),
+    code: text(req.body?.code, 80),
+    happenedAt: Number.isFinite(at) ? new Date(at) : null,
+  });
+  console.error(`[app crash] driver ${req.driver._id}: ${text(req.body?.message, 200)}`);
+  res.status(201).json({ success: true });
 });

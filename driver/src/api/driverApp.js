@@ -1,3 +1,4 @@
+import { CODE_LABEL } from '../lib/buildInfo.js';
 // Thin wrappers over every /api/driver-app endpoint. See
 // server/src/routes/driverAppRoutes.js for the authoritative contract.
 import apiClient from './client.js';
@@ -74,3 +75,7 @@ export const sendParentMessage = (tripId, studentId, text) =>
 export const getAssistPass = (tripId) => apiClient.get(`/driver-app/trips/${tripId}/assist-pass`).then((r) => r.data.data);
 export const createAssistPass = (tripId) => apiClient.post(`/driver-app/trips/${tripId}/assist-pass`).then((r) => r.data.data);
 export const stopAssistPass = (tripId) => apiClient.delete(`/driver-app/trips/${tripId}/assist-pass`).then((r) => r.data);
+
+// A crash noted on this phone (src/lib/crashLog.js), for the System page.
+export const sendCrashReport = (crash) =>
+  apiClient.post('/driver-app/crash-report', { ...crash, code: CODE_LABEL }).then((r) => r.data);
