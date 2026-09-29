@@ -226,9 +226,16 @@ function AssistBoard({ pass, name, onChangeName }) {
                 .join(' · ')}
             </p>
           </div>
-          <Badge tone={live ? 'success' : trip.status === 'Scheduled' ? 'neutral' : 'warning'}>
-            {trip.status === 'Scheduled' ? 'Not started' : trip.status}
-          </Badge>
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <Badge tone={live ? 'success' : trip.status === 'Scheduled' ? 'neutral' : 'warning'}>
+              {trip.status === 'Scheduled' ? 'Not started' : trip.status}
+            </Badge>
+            {/* This page reaching AwaBus: the driver sees the same connected / disconnected. */}
+            <span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold', error ? 'text-red-600' : 'text-emerald-700 dark:text-emerald-400')}>
+              <span className={cn('h-2 w-2 rounded-full', error ? 'bg-red-500' : 'bg-emerald-500')} />
+              {error ? 'Not connected' : 'Connected'}
+            </span>
+          </div>
         </div>
 
         {trip.driver && (

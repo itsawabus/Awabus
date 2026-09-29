@@ -21,7 +21,8 @@ import { useConnectionStore } from '../../../src/store/connectionStore.js';
 import { useOfflineQueueStore } from '../../../src/store/offlineQueueStore.js';
 import { useUiStore } from '../../../src/store/uiStore.js';
 import { useAuthStore } from '../../../src/store/authStore.js';
-import { getTodaysTrip, markAttendance, endTrip } from '../../../src/api/driverApp.js';
+import { getTodaysTrip, markAttendance, endTrip, getAssistPass } from '../../../src/api/driverApp.js';
+import { AssistantLine } from '../../../src/components/AssistantStatus.jsx';
 import { formatClock, formatDate, formatLat, formatLng, timeAgo } from '../../../src/lib/utils.js';
 import { colors, radii } from '../../../src/lib/theme.js';
 import { runWords } from '../../../src/lib/runs.js';
@@ -189,6 +190,15 @@ export default function ActiveTrip() {
     .filter((sec) => sec.rows.length);
   const nextUp = ordered.next[0];
 
+  // The bus assistant (teacher): connected or not, checked every 15 seconds.
+  const assist = useQuery({
+    queryKey: ['assist-pass', trip?._id],
+    queryFn: () => getAssistPass(trip._id),
+    enabled: Boolean(trip?._id),
+    refetchInterval: 15000,
+  });
+  const helpers = assist.data?.assistants || [];
+
   // Selected students' rows, and which of them each step applies to.
   const selectedRows = progress.filter((p) => selected.includes(p.student?._id));
   const riderRow = (p) => p.attendance !== 'Absent' && p.attendance !== 'Cancelled';
@@ -262,6 +272,11 @@ export default function ActiveTrip() {
             <QrCode size={16} color={colors.brand600} />
             <Text style={styles.assistBtnText}>Bus assistant QR code</Text>
           </Pressable>
+          {helpers.length ? (
+            helpers.map((h) => <AssistantLine key={h.name} assistant={h} style={{ marginTop: 6 }} />)
+          ) : (
+            <Text style={styles.noAssistant}>No bus assistant connected</Text>
+          )}
         </Card>
 
         <Card>
@@ -639,6 +654,7 @@ const styles = StyleSheet.create({
   listLinkText: { color: colors.brand600, fontSize: 13, fontWeight: '700' },
   assistBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, alignSelf: 'flex-start' },
   assistBtnText: { color: colors.brand600, fontSize: 13, fontWeight: '700' },
+  noAssistant: { marginTop: 6, fontSize: 12, color: colors.slate400 },
   selectedRow: { borderRadius: radii.xl, borderWidth: 2, borderColor: colors.brand600 },
   selectMark: { position: 'absolute', top: 8, right: 8 },
   selectBar: { borderTopWidth: 1, borderTopColor: colors.slate200, backgroundColor: colors.white, paddingHorizontal: 16, paddingTop: 10, gap: 10 },

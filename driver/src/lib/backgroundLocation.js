@@ -20,6 +20,11 @@ import { useConnectionStore } from '../store/connectionStore.js';
 
 export const TRIP_LOCATION_TASK = 'awabus-trip-location';
 const TRIP_KEY = 'awabus_background_trip'; // { tripId, driverId } while a trip is tracked
+// Set just before asking the phone to start tracking, cleared when it answers.
+// Still set on the next launch = the app closed while starting it: do not try
+// again by itself (that would close the app every time it opens).
+const STARTING_KEY = 'awabus_background_starting';
+const BLOCKED_KEY = 'awabus_background_blocked';
 const TOKEN_KEY = 'awabus_driver_token'; // same key as src/store/authStore.js
 // Same pace as the screen tracker: at most one position every 8 seconds.
 export const PUSH_EVERY_MS = 8000;
@@ -105,13 +110,23 @@ export async function askBackgroundPermission() {
  * Starts background tracking for this trip. Returns 'running', or why not
  * ('no_permission' | 'failed'); the screen tracker keeps working either way.
  */
-export async function startTripTracking(tripId, driverId) {
+export async function startTripTracking(tripId, driverId, { manual = false } = {}) {
   lastStartError = '';
   try {
+    if (manual) await AsyncStorage.multiRemove([STARTING_KEY, BLOCKED_KEY]).catch(() => {});
+    else if ((await AsyncStorage.getItem(STARTING_KEY).catch(() => null)) || (await AsyncStorage.getItem(BLOCKED_KEY).catch(() => null))) {
+      // The last attempt closed the app: stay off until the driver taps Try again.
+      await AsyncStorage.setItem(BLOCKED_KEY, '1').catch(() => {});
+      await AsyncStorage.removeItem(STARTING_KEY).catch(() => {});
+      await Location.stopLocationUpdatesAsync(TRIP_LOCATION_TASK).catch(() => {});
+      lastStartError = 'Screen-off tracking made the app close last time, so it is off. Tap Try again to retry, or keep the app open during the trip.';
+      return 'failed';
+    }
     if (!TaskManager.isTaskDefined(TRIP_LOCATION_TASK)) throw new Error('The tracking task is not set up in this version of the app.');
     await AsyncStorage.setItem(TRIP_KEY, JSON.stringify({ tripId, driverId }));
     if ((await backgroundPermission()) !== 'granted') return 'no_permission';
     if (await Location.hasStartedLocationUpdatesAsync(TRIP_LOCATION_TASK).catch(() => false)) return 'running';
+    await AsyncStorage.setItem(STARTING_KEY, String(Date.now())).catch(() => {});
     await Location.startLocationUpdatesAsync(TRIP_LOCATION_TASK, {
       accuracy: Location.Accuracy.High,
       timeInterval: 5000,
@@ -124,11 +139,15 @@ export async function startTripTracking(tripId, driverId) {
         notificationTitle: 'AwaBus trip running',
         notificationBody: 'Sharing the bus location with the school until the trip ends.',
         notificationColor: '#0a1f2a',
-        killServiceOnDestroy: false,
+        // Swiping the app away ends it (a service left running is restarted at
+        // every launch, before the app can stop it if the phone refuses it).
+        killServiceOnDestroy: true,
       },
     });
+    await AsyncStorage.removeItem(STARTING_KEY).catch(() => {});
     return 'running';
   } catch (err) {
+    await AsyncStorage.removeItem(STARTING_KEY).catch(() => {});
     lastStartError = err?.message || String(err);
     console.warn('[background location] could not start:', lastStartError);
     return 'failed';

@@ -279,6 +279,14 @@ export default function LiveTracking() {
                   {selected.driver ? `${selected.driver.firstName} ${selected.driver.lastName}` : '—'}
                 </p>
                 <p className="text-sm text-slate-400">Driver · {formatPhone(selected.driver?.phone)}</p>
+                {(selected.assistants || []).map((a) => (
+                  <p key={a.name} className="mt-1 flex items-center gap-1.5 text-sm">
+                    <span className={`h-2 w-2 rounded-full ${a.connected ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                    <span className={a.connected ? 'font-semibold text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}>
+                      Bus assistant {a.name} · {a.connected ? 'connected' : 'disconnected'}
+                    </span>
+                  </p>
+                ))}
 
                 <div className="my-4 h-px bg-slate-100 dark:bg-slate-800" />
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Route Details</p>
