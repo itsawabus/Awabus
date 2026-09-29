@@ -24,9 +24,22 @@ export const MAX_ASSIST_ACCURACY_M = 150;
 
 const recent = (date, ms, now = Date.now()) => Boolean(date) && now - new Date(date).getTime() <= ms;
 
+// The trail: a new point once the bus has moved on this far.
+export const TRAIL_STEP_METRES = 15;
+export const MAX_TRAIL_POINTS = 3000;
+const lastTrailPoint = new Map(); // trip id -> { lat, lng } (this server's memory)
+
 /** Shows `location` as the bus position everywhere (map, bus status, near-home alerts). */
 export async function publishBusLocation({ trip, location, source, io, school }) {
-  await Trip.updateOne({ _id: trip._id }, { $set: { liveLocation: location, gpsSignal: 'ok', locationSource: source } });
+  const key = String(trip._id);
+  const last = lastTrailPoint.get(key);
+  const addToTrail = !last || metresBetween(last, location) >= TRAIL_STEP_METRES;
+  const update = { $set: { liveLocation: location, gpsSignal: 'ok', locationSource: source } };
+  if (addToTrail) {
+    lastTrailPoint.set(key, { lat: location.lat, lng: location.lng });
+    update.$push = { path: { $each: [{ lat: location.lat, lng: location.lng, at: location.updatedAt || new Date() }], $slice: -MAX_TRAIL_POINTS } };
+  }
+  await Trip.updateOne({ _id: trip._id }, update);
   await Bus.updateOne({ _id: trip.bus }, { $set: { lastKnownLocation: location, gpsSignal: 'ok', locationSeenAt: new Date() } });
   emitToSchool(io, school, 'bus:location', { tripId: trip._id, busId: trip.bus, location, source });
   // Near-home check after the reply, so the phone never waits on SMS / calls.

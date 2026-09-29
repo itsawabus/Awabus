@@ -625,6 +625,12 @@ export const markAttendance = asyncHandler(async (req, res) => {
   if (attendance) changes.attendance = attendance;
   if (dropoffStatus) {
     changes.dropoffStatus = dropoffStatus;
+    // Where the bus was at this step (its last position, if recent), for the trail.
+    changes.scannedAt = new Date();
+    const pos = trip.liveLocation;
+    const fresh = pos?.updatedAt && Date.now() - new Date(pos.updatedAt).getTime() < 3 * 60 * 1000;
+    changes.scanLat = fresh && Number.isFinite(pos.lat) ? pos.lat : null;
+    changes.scanLng = fresh && Number.isFinite(pos.lng) ? pos.lng : null;
     // Text the parent about boarding / drop-off (or record why not).
     Object.assign(changes, (await alertForScan({ trip, row: trip.studentProgress[index], dropoffStatus, school: req.school })) || {});
   }

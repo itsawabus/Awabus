@@ -56,6 +56,31 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
   res.json({ success: true, data: buses, counts });
 });
 
+// @desc    Where a bus has been on a trip, and where / when each child was
+//          picked up or dropped (the trail on Live Tracking)
+// @route   GET /api/tracking/trips/:tripId/trail
+export const getTrackingTrail = asyncHandler(async (req, res) => {
+  const trip = await Trip.findById(req.params.tripId)
+    .select('+path session studentProgress')
+    .populate('studentProgress.student', 'firstName lastName')
+    .lean();
+  if (!trip) {
+    res.status(404);
+    throw new Error('Trip not found');
+  }
+  const events = (trip.studentProgress || [])
+    .filter((r) => r.scannedAt && Number.isFinite(r.scanLat) && Number.isFinite(r.scanLng) && ['On board', 'Dropped off', 'Not on board'].includes(r.dropoffStatus))
+    .map((r) => ({
+      studentId: r.student?._id,
+      name: r.student ? `${r.student.firstName} ${r.student.lastName}` : 'Student',
+      status: r.dropoffStatus,
+      at: r.scannedAt,
+      lat: r.scanLat,
+      lng: r.scanLng,
+    }));
+  res.json({ success: true, data: { session: trip.session, path: trip.path || [], events } });
+});
+
 // @desc    Live trip detail for a single bus (drives the "Trip Detail" tracking sub-view)
 // @route   GET /api/tracking/trips/:tripId
 export const getTrackingTripDetail = asyncHandler(async (req, res) => {
