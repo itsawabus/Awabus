@@ -23,12 +23,11 @@ import { useUiStore } from '../../../src/store/uiStore.js';
 import { useAuthStore } from '../../../src/store/authStore.js';
 import { getTodaysTrip, markAttendance, endTrip, getAssistPass } from '../../../src/api/driverApp.js';
 import { AssistantLine } from '../../../src/components/AssistantStatus.jsx';
-import { formatClock, formatDate, formatLat, formatLng, timeAgo } from '../../../src/lib/utils.js';
+import { formatClock, timeAgo } from '../../../src/lib/utils.js';
 import { colors, radii, themed, themedMap } from '../../../src/lib/theme.js';
 import { runWords } from '../../../src/lib/runs.js';
 import { orderTrip, sectionsFor, matchesSearch, callInfo, formatDistance, CALL_IN_PROGRESS } from '../../../src/lib/nearest.js';
-import BackgroundLocationBanner from '../../../src/components/BackgroundLocationBanner.jsx';
-import { BusOfflineBanner, useConnectionStatus } from '../../../src/components/ConnectionStatus.jsx';
+import { BusOfflineBanner } from '../../../src/components/ConnectionStatus.jsx';
 import { busLabel } from '../../../src/lib/bus.js';
 import { hasHome, openDirections } from '../../../src/lib/directions.js';
 import { useTripPhotos } from '../../../src/hooks/useTripPhotos.js';
@@ -39,13 +38,11 @@ export default function ActiveTrip() {
   useStayAwake('awabus-trip');
   const queryClient = useQueryClient();
   const isOnline = useConnectionStore((s) => s.isOnline);
-  const { busOnline } = useConnectionStatus();
   const lastSyncAt = useConnectionStore((s) => s.lastSyncAt);
   const markSynced = useConnectionStore((s) => s.markSynced);
   const enqueue = useOfflineQueueStore((s) => s.enqueue);
   const vibrationEnabled = useUiStore((s) => s.vibration);
   const driverId = useAuthStore((s) => s.driver?.id);
-  const driverName = useAuthStore((s) => s.driver?.name);
   const queue = useOfflineQueueStore((s) => s.queue);
 
   const [elapsed, setElapsed] = useState(0);
@@ -276,52 +273,12 @@ export default function ActiveTrip() {
           </View>
         </Pressable>
 
+        {/* Only what the driver needs: sync status and the bus assistant. */}
         <Card>
-          <Text style={styles.infoLine}>
-            <Text style={styles.infoLabel}>Bus: </Text>
-            <Text style={styles.infoValue}>{busLabel(trip.bus)}</Text>
+          <Text style={styles.syncText}>
+            {waiting ? `${waiting} waiting to send · ` : ''}Last sync: {lastSyncAt ? timeAgo(lastSyncAt) : 'never'}
           </Text>
-          <Text style={styles.infoLine}>
-            <Text style={styles.infoLabel}>Driver: </Text>
-            <Text style={styles.infoValue}>
-              {(trip.driver?.firstName ? `${trip.driver.firstName} ${trip.driver.lastName || ''}`.trim() : driverName) || '—'}
-            </Text>
-          </Text>
-          <Text style={styles.dateText}>{formatDate(trip.date)}</Text>
           <AssistantStatusBox helpers={helpers} onOpen={() => router.push('/trip/assistant')} />
-        </Card>
-
-        <Card>
-          <View style={styles.statusRow}>
-            <View style={styles.statusLeft}>
-              <View style={[styles.dot, { backgroundColor: isOnline ? colors.emerald600 : colors.slate400 }]} />
-              <Text style={[styles.statusText, { color: isOnline ? colors.emerald700 : colors.slate500 }]}>
-                {isOnline ? 'Driver online' : 'Driver offline'}
-              </Text>
-              <View style={[styles.dot, { marginLeft: 10, backgroundColor: busOnline ? colors.emerald600 : colors.amber500 }]} />
-              <Text style={[styles.statusText, { color: busOnline ? colors.emerald700 : colors.amber700 }]}>
-                {busOnline ? 'Bus online' : 'Bus offline'}
-              </Text>
-            </View>
-            <Text style={styles.syncText}>
-              {waiting ? `${waiting} waiting to send · ` : ''}Last sync: {lastSyncAt ? timeAgo(lastSyncAt) : 'never'}
-            </Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.coordsRow}>
-            <Text style={styles.infoLine}>
-              <Text style={styles.infoLabel}>Lat: </Text>
-              <Text style={styles.infoValue}>
-                {formatLat(position ? position.lat : trip.liveLocation?.lat)}
-              </Text>
-            </Text>
-            <Text style={styles.infoLine}>
-              <Text style={styles.infoLabel}>Lon: </Text>
-              <Text style={styles.infoValue}>
-                {formatLng(position ? position.lng : trip.liveLocation?.lng)}
-              </Text>
-            </Text>
-          </View>
         </Card>
 
         {gpsError ? (
@@ -330,8 +287,6 @@ export default function ActiveTrip() {
             <Text style={styles.offlineText}>GPS is off: {gpsError} The school cannot see the bus until location is allowed.</Text>
           </View>
         ) : null}
-
-        <BackgroundLocationBanner />
 
         {/* Location off (data is fine): the school can't see the bus. */}
         {!gpsError && isOnline ? <BusOfflineBanner /> : null}
@@ -708,17 +663,7 @@ const styles = themed(() => ({
   drivingTitle: { color: colors.onDark, fontSize: 17, fontWeight: '800' },
   drivingHint: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 },
   scroll: { padding: 16, gap: 16, paddingBottom: 32 },
-  infoLine: { fontSize: 14, marginBottom: 2 },
-  infoLabel: { color: colors.slate500 },
-  infoValue: { color: colors.slate800, fontWeight: '700' },
-  dateText: { color: colors.slate400, fontSize: 13, marginTop: 2 },
-  statusRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
-  statusLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  statusText: { fontWeight: '800', fontSize: 14 },
   syncText: { fontSize: 12, color: colors.slate400 },
-  divider: { height: 1, backgroundColor: colors.slate100, marginVertical: 10 },
-  coordsRow: { flexDirection: 'row', justifyContent: 'space-between' },
   offlineBanner: {
     flexDirection: 'row',
     gap: 8,
