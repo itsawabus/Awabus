@@ -20,3 +20,41 @@ body {
   border-radius: 0.75rem;
   z-index: 0;
 }
+
+/* Chart colours (validated with the dataviz palette checker against the card
+   surfaces: white in light mode, navy-light #132a40 in dark mode). Status
+   colours always come with a text label/icon, never colour alone. */
+.viz {
+  --viz-surface: #ffffff;
+  --viz-accent: #0d9488;
+  --viz-compare: #2a78d6;
+  --viz-good: #0ca30c;
+  --viz-warning: #fab219;
+  --viz-serious: #ec835a;
+  --viz-critical: #d03b3b;
+  --viz-neutral: #94a3b8;
+  --viz-quiet: #cbd5e1; /* de-emphasised marks */
+  --viz-grid: #e8edf3;
+  --viz-axis: #cbd5e1;
+  --viz-ink: #0f172a;
+  --viz-ink-2: #475569;
+  --viz-ink-3: #64748b;
+}
+.dark .viz {
+  --viz-surface: #132a40;
+  --viz-accent: #14a386;
+  --viz-compare: #3987e5;
+  --viz-neutral: #64748b;
+  --viz-quiet: #2b4560;
+  --viz-grid: #1c3752;
+  --viz-axis: #2b4a66;
+  --viz-ink: #ffffff;
+  --viz-ink-2: #cbd5e1;
+  --viz-ink-3: #94a3b8;
+}
+
+/* Satellite / Hybrid imagery: a light lift so roads, roofs and open ground
+   separate clearly (map labels and markers are not affected). */
+.awabus-imagery {
+  filter: contrast(1.1) saturate(1.12) brightness(1.04);
+}

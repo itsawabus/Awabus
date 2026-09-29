@@ -2,9 +2,9 @@ import { create } from 'zustand';
 
 // Carries state between the Forgot Password → Verify OTP → Create New Password screens.
 export const useResetFlowStore = create((set) => ({
-  phone: '',
+  email: '',
   resetToken: '',
-  setPhone: (phone) => set({ phone }),
+  setEmail: (email) => set({ email }),
   setResetToken: (resetToken) => set({ resetToken }),
-  clear: () => set({ phone: '', resetToken: '' }),
+  clear: () => set({ email: '', resetToken: '' }),
 }));

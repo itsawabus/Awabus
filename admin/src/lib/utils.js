@@ -35,13 +35,15 @@ export const initials = (name = '') =>
     .map((p) => p[0]?.toUpperCase())
     .join('');
 
+// jane.doe@school.com -> j*******@school.com
+export const maskEmail = (email = '') => email.replace(/^(.)(.*)(@.*)$/, (_, a, b, c) => `${a}${'*'.repeat(Math.max(b.length, 1))}${c}`);
+
 export const maskPhone = (phone = '') => {
-  // +233 24 *** ** 83
+  // 024 *** ** 83
   const digits = phone.replace(/\D/g, '');
   if (digits.length < 6) return phone;
-  const last2 = digits.slice(-2);
-  const first = digits.slice(0, digits.length - 6);
-  return `+${first.slice(0, 3)} ${first.slice(3, 5)} *** ** ${last2}`;
+  const local = digits.startsWith('233') ? `0${digits.slice(3)}` : digits.startsWith('0') ? digits : `0${digits}`;
+  return `${local.slice(0, 3)} *** ** ${local.slice(-2)}`;
 };
 
 export const genderLabel = (g) => g || '—';
@@ -58,6 +60,15 @@ export const statusToneMap = {
   'In Transit': 'success',
   Delayed: 'danger',
   Absent: 'danger',
+  'Not on board': 'danger',
+  'Trip cancelled': 'danger',
+  'On board': 'success',
+  'Dropped off': 'success',
+  'Trip not started': 'neutral',
+  'Awaiting pickup': 'warning',
+  'Not scanned': 'warning',
+  'Not on this trip': 'neutral',
+  'No trip today': 'neutral',
   Cancelled: 'danger',
   Failed: 'danger',
   Maintenance: 'warning',

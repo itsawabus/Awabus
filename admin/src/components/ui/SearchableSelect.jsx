@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import { cn } from '../../lib/utils.js';
 
-// Single-value searchable dropdown. `options` = [{ value, label, description? }]
+// Single-value searchable dropdown. `options` = [{ value, label, description?, disabled? }]
+// A disabled option is shown (with its description saying why) but can't be picked.
 export function SearchableSelect({ options = [], value, onChange, placeholder = 'Select...', error, disabled }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -54,6 +55,7 @@ export function SearchableSelect({ options = [], value, onChange, placeholder = 
               <button
                 type="button"
                 key={opt.value}
+                disabled={opt.disabled}
                 onClick={() => {
                   onChange(opt.value);
                   setOpen(false);
@@ -61,7 +63,8 @@ export function SearchableSelect({ options = [], value, onChange, placeholder = 
                 }}
                 className={cn(
                   'flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-navy',
-                  opt.value === value && 'bg-brand-50 dark:bg-brand-500/10'
+                  opt.value === value && 'bg-brand-50 dark:bg-brand-500/10',
+                  opt.disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent dark:hover:bg-transparent'
                 )}
               >
                 <span className="font-medium text-slate-800 dark:text-slate-100">{opt.label}</span>

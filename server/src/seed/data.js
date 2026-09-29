@@ -1,10 +1,20 @@
 // Realistic Ghana-flavoured sample data for local development & demos.
 // Coordinates are approximate Accra-area landmarks used only for the map demo.
 
+export const SCHOOL = {
+  name: 'Awabus Demo School',
+  code: 'AWA-001',
+  address: 'East Legon, Accra, Ghana',
+  contactEmail: 'info@awabusdemoschool.edu.gh',
+  contactPhone: '+233302123456',
+  timezone: 'Africa/Accra',
+  status: 'Active',
+};
+
 export const ADMIN = {
   name: 'Ama Kzyei',
   phone: '+233244528983',
-  email: 'ama.kzyei@awabus.com',
+  email: 'itsawabus@gmail.com',
   password: 'Awabus@123',
   role: 'admin',
 };
@@ -49,6 +59,7 @@ export const DRIVERS = [
     emergencyContactRelation: 'Wife',
     emergencyContactPhone: '+233249991122',
     residentialAddress: 'Plot 15, Madina Estate, Accra, Ghana',
+    password: 'Driver@123',
     status: 'Active',
   },
   {
@@ -65,6 +76,7 @@ export const DRIVERS = [
     emergencyContactRelation: 'Sister',
     emergencyContactPhone: '+233201234567',
     residentialAddress: 'House 22, Adenta, Accra, Ghana',
+    password: 'Driver@123',
     status: 'Active',
   },
   {
@@ -81,6 +93,7 @@ export const DRIVERS = [
     emergencyContactRelation: 'Brother',
     emergencyContactPhone: '+233551239988',
     residentialAddress: 'Madina Zongo Junction, Accra, Ghana',
+    password: 'Driver@123',
     status: 'Active',
   },
   {
@@ -97,6 +110,7 @@ export const DRIVERS = [
     emergencyContactRelation: 'Wife',
     emergencyContactPhone: '+233248889900',
     residentialAddress: 'Airport Residential Area, Accra, Ghana',
+    password: 'Driver@123',
     status: 'Maintenance',
   },
   {
@@ -113,6 +127,7 @@ export const DRIVERS = [
     emergencyContactRelation: 'Wife',
     emergencyContactPhone: '+233277990011',
     residentialAddress: 'Cantonments, Accra, Ghana',
+    password: 'Driver@123',
     status: 'Active',
   },
   {
@@ -129,6 +144,7 @@ export const DRIVERS = [
     emergencyContactRelation: 'Wife',
     emergencyContactPhone: '+233245551122',
     residentialAddress: 'Tesano, Accra, Ghana',
+    password: 'Driver@123',
     status: 'Active',
   },
   {
@@ -145,6 +161,7 @@ export const DRIVERS = [
     emergencyContactRelation: 'Sister',
     emergencyContactPhone: '+233209001122',
     residentialAddress: 'Dansoman, Accra, Ghana',
+    password: 'Driver@123',
     status: 'Idle',
   },
   {
@@ -161,6 +178,7 @@ export const DRIVERS = [
     emergencyContactRelation: 'Father',
     emergencyContactPhone: '+233243009911',
     residentialAddress: 'Spintex Road, Accra, Ghana',
+    password: 'Driver@123',
     status: 'Active',
   },
   {
@@ -177,6 +195,7 @@ export const DRIVERS = [
     emergencyContactRelation: 'Wife',
     emergencyContactPhone: '+233244118822',
     residentialAddress: 'Tema Community 25, Accra, Ghana',
+    password: 'Driver@123',
     status: 'Active',
   },
   {
@@ -193,6 +212,7 @@ export const DRIVERS = [
     emergencyContactRelation: 'Wife',
     emergencyContactPhone: '+233201119900',
     residentialAddress: 'Kasoa Highway, Accra, Ghana',
+    password: 'Driver@123',
     status: 'Active',
   },
   {
@@ -209,6 +229,7 @@ export const DRIVERS = [
     emergencyContactRelation: 'Brother',
     emergencyContactPhone: '+233559339900',
     residentialAddress: 'East Legon, Accra, Ghana',
+    password: 'Driver@123',
     status: 'Idle',
   },
   {
@@ -225,6 +246,7 @@ export const DRIVERS = [
     emergencyContactRelation: 'Father',
     emergencyContactPhone: '+233243110077',
     residentialAddress: 'Airport - Spintex, Accra, Ghana',
+    password: 'Driver@123',
     status: 'Active',
   },
 ];

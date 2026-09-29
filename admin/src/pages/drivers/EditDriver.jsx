@@ -1,96 +1,197 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import usePageHeader from '../../hooks/usePageHeader.js';
+import { useEditDraft } from '../../hooks/useFormDraft.js';
+import DraftNotice from '../../components/ui/DraftNotice.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card, { CardBody, CardHeader } from '../../components/ui/Card.jsx';
-import Input, { Label } from '../../components/ui/Input.jsx';
+import Input, { Label, FieldError, Select } from '../../components/ui/Input.jsx';
 import PhoneInput from '../../components/ui/PhoneInput.jsx';
+import { fromStoredPhone, isValidPhone, toLocalPhone } from '../../lib/phone.js';
 import Button from '../../components/ui/Button.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import { SearchableSelect } from '../../components/ui/SearchableSelect.jsx';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
-import { getDriver, updateDriver, deleteDriver } from '../../api/drivers.js';
+import { UNDO_SECONDS, useUndoDeleteStore } from '../../store/undoDeleteStore.js';
+import { getDriver, getDriverOptions, updateDriver } from '../../api/drivers.js';
 import { getBusOptions } from '../../api/buses.js';
-import { getRouteOptions } from '../../api/routes.js';
+import { busHolders, busPickerOptions, busTakenBy } from '../../lib/assignments.js';
+import { dateError, emailError, formatEmail, formatName, ifChanged, licenseError, nameError } from '../../lib/formats.js';
+import { LicenseInput } from '../../components/ui/FormattedInputs.jsx';
 
 export default function EditDriver() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  usePageHeader({ breadcrumb: ['AwaBus', 'Drivers', 'Edit Driver'] });
 
-  const [form, setForm] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const { data: driver, isLoading } = useQuery({ queryKey: ['driver', id], queryFn: () => getDriver(id) });
   const { data: busOptions = [] } = useQuery({ queryKey: ['bus-options'], queryFn: getBusOptions });
-  const { data: routeOptions = [] } = useQuery({ queryKey: ['route-options'], queryFn: getRouteOptions });
+  const { data: driverOptions = [] } = useQuery({ queryKey: ['driver-options'], queryFn: () => getDriverOptions() });
+  const holders = busHolders(busOptions, driverOptions);
+  usePageHeader({
+    breadcrumb: [
+      'AwaBus',
+      'Drivers',
+      { label: driver ? `${driver.firstName} ${driver.lastName}` : '...', to: `/drivers/${id}` },
+      'Edit',
+    ],
+  });
 
-  useEffect(() => {
-    if (driver) {
-      setForm({
-        firstName: driver.firstName,
-        lastName: driver.lastName,
-        phone: driver.phone?.replace('+233', '') || '',
-        email: driver.email || '',
-        licenseNumber: driver.licenseNumber,
-        licenseExpiry: driver.licenseExpiry ? driver.licenseExpiry.slice(0, 10) : '',
-        assignedBus: driver.assignedBus?._id || null,
-        assignedRoute: driver.assignedRoute?._id || null,
-        status: driver.status,
-      });
-    }
-  }, [driver]);
+  const baseline = useMemo(
+    () =>
+      driver
+        ? {
+            firstName: driver.firstName,
+            lastName: driver.lastName,
+            phone: fromStoredPhone(driver.phone),
+            email: driver.email || '',
+            licenseNumber: driver.licenseNumber,
+            licenseExpiry: driver.licenseExpiry ? driver.licenseExpiry.slice(0, 10) : '',
+            assignedBus: driver.assignedBus?._id || null,
+            status: driver.status,
+            emergencyContactName: driver.emergencyContactName || '',
+            emergencyContactRelation: driver.emergencyContactRelation || 'Wife',
+            emergencyContactPhone: fromStoredPhone(driver.emergencyContactPhone),
+          }
+        : null,
+    [driver]
+  );
+  // Unsaved edits are kept as a draft until saved or discarded.
+  const [form, setForm, draft] = useEditDraft(`driver:${id}`, baseline);
 
-  const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
+  const set = (key) => (val) => {
+    setErrors((e) => ({ ...e, [key]: '' }));
+    setForm((f) => ({ ...f, [key]: val }));
+  };
 
   const updateMutation = useMutation({
     mutationFn: (payload) => updateDriver(id, payload),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bus-options'] });
+      queryClient.invalidateQueries({ queryKey: ['driver-options'] });
       queryClient.invalidateQueries({ queryKey: ['drivers'] });
+      draft.clear();
       queryClient.invalidateQueries({ queryKey: ['driver', id] });
       navigate(`/drivers/${id}`);
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteDriver(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['drivers'] });
-      navigate('/drivers');
-    },
-  });
+  const scheduleDelete = useUndoDeleteStore((st) => st.scheduleDelete);
+  // The delete waits out the undo time (see undoDeleteStore); the list hides it meanwhile.
+  const deleteWithUndo = () => {
+    const label = `${driver.firstName} ${driver.lastName}`;
+    scheduleDelete({
+      title: label,
+      items: [{ id, label, path: `/drivers/${id}` }],
+      onFinished: () =>
+        Promise.all([...['drivers', 'buses', 'routes', 'bus-options', 'driver-options'], 'dashboard'].map((key) => queryClient.invalidateQueries({ queryKey: [key] }))),
+    });
+    navigate('/drivers');
+  };
 
   if (isLoading || !form) return <PageLoader />;
+
+  const selectedBus = busOptions.find((b) => b._id === form.assignedBus);
+  const selectedRoute = selectedBus?.assignedRoute;
 
   return (
     <div>
       <PageHeader title="Edit Driver" subtitle="Update personal information, licensing status, and assigned fleet assets." />
+      <DraftNotice show={draft.restored} onDiscard={draft.discard} discardLabel="Discard changes" />
       <form
+        // Our own checks run on submit (and skip unchanged old values), so the
+        // browser's built-in checks must not block saving an older record.
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          updateMutation.mutate({ ...form, phone: `+233${form.phone}` });
+          const next = {
+            firstName: ifChanged(form.firstName, baseline.firstName, () => nameError(form.firstName, 'First name')),
+            lastName: ifChanged(form.lastName, baseline.lastName, () => nameError(form.lastName, 'Last name')),
+            phone: isValidPhone(form.phone) ? '' : 'Enter a 10-digit number starting with 0, e.g. 024 412 3456',
+            email: ifChanged(form.email, baseline.email, () => emailError(form.email)),
+            licenseNumber: ifChanged(form.licenseNumber, baseline.licenseNumber, () => licenseError(form.licenseNumber)),
+            // An unchanged old expiry can stay; a newly entered one must still be valid.
+            licenseExpiry: form.licenseExpiry === baseline.licenseExpiry ? '' : dateError(form.licenseExpiry, 'licenseExpiry'),
+            emergencyContactName: nameError(form.emergencyContactName, 'Emergency contact name'),
+            emergencyContactPhone: !form.emergencyContactPhone
+              ? 'Enter the emergency contact\'s phone number'
+              : isValidPhone(form.emergencyContactPhone)
+                ? ''
+                : 'Must be 10 digits starting with 0',
+            assignedBus: !form.assignedBus
+              ? 'Select the bus this driver operates'
+              : form.assignedBus !== baseline.assignedBus && busTakenBy(holders, form.assignedBus, id)
+                ? `This bus already has a driver (${busTakenBy(holders, form.assignedBus, id)}). A bus and its route can only have one driver.`
+                : '',
+          };
+          setErrors(next);
+          if (Object.values(next).some(Boolean)) return;
+          updateMutation.mutate({
+            ...form,
+            phone: toLocalPhone(form.phone),
+            emergencyContactRelation: form.emergencyContactRelation || 'Wife',
+            emergencyContactPhone: toLocalPhone(form.emergencyContactPhone),
+          });
         }}
       >
         <Card>
+          {updateMutation.error && (
+            <div className="mx-6 mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+              {updateMutation.error.message}
+            </div>
+          )}
           <CardHeader title="Personal Information" />
           <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
               <Label>First Name</Label>
-              <Input value={form.firstName} onChange={(e) => set('firstName')(e.target.value)} />
+              <Input value={form.firstName} onChange={(e) => set('firstName')(formatName(e.target.value))} error={Boolean(errors.firstName)} />
+              <FieldError>{errors.firstName}</FieldError>
             </div>
             <div>
               <Label>Last Name</Label>
-              <Input value={form.lastName} onChange={(e) => set('lastName')(e.target.value)} />
+              <Input value={form.lastName} onChange={(e) => set('lastName')(formatName(e.target.value))} error={Boolean(errors.lastName)} />
+              <FieldError>{errors.lastName}</FieldError>
             </div>
             <div>
               <Label>Phone Number</Label>
-              <PhoneInput value={form.phone} onChange={set('phone')} />
+              <PhoneInput value={form.phone} onChange={set('phone')} error={Boolean(errors.phone)} />
+              <FieldError>{errors.phone}</FieldError>
             </div>
             <div>
               <Label>Email Address</Label>
-              <Input type="email" value={form.email} onChange={(e) => set('email')(e.target.value)} />
+              <Input type="email" value={form.email} onChange={(e) => set('email')(formatEmail(e.target.value))} error={Boolean(errors.email)} placeholder="e.g. kwame.mensah@gmail.com" />
+              <FieldError>{errors.email}</FieldError>
+            </div>
+          </CardBody>
+
+          <CardHeader title="Emergency Contact" subtitle="Required: who to call if something happens to this driver" />
+          <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <div>
+              <Label required>Contact Name</Label>
+              <Input
+                value={form.emergencyContactName ?? ''}
+                onChange={(e) => set('emergencyContactName')(formatName(e.target.value))}
+                placeholder="e.g. Abena Mensah"
+                error={Boolean(errors.emergencyContactName)}
+              />
+              <FieldError>{errors.emergencyContactName}</FieldError>
+            </div>
+            <div>
+              <Label required>Relation</Label>
+              <Select value={form.emergencyContactRelation || 'Wife'} onChange={(e) => set('emergencyContactRelation')(e.target.value)}>
+                {['Wife', 'Husband', 'Sister', 'Brother', 'Father', 'Mother', 'Other'].map((r) => (
+                  <option key={r}>{r}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label required>Contact Phone</Label>
+              <PhoneInput value={form.emergencyContactPhone ?? ''} onChange={set('emergencyContactPhone')} error={Boolean(errors.emergencyContactPhone)} placeholder="020 111 2233" />
+              <FieldError>{errors.emergencyContactPhone}</FieldError>
             </div>
           </CardBody>
 
@@ -98,33 +199,35 @@ export default function EditDriver() {
           <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
               <Label>License Number</Label>
-              <Input value={form.licenseNumber} onChange={(e) => set('licenseNumber')(e.target.value)} />
+              <LicenseInput value={form.licenseNumber} onChange={set('licenseNumber')} error={errors.licenseNumber} />
+              <FieldError>{errors.licenseNumber}</FieldError>
             </div>
             <div>
               <Label>Expiry Date</Label>
-              <Input type="date" value={form.licenseExpiry} onChange={(e) => set('licenseExpiry')(e.target.value)} />
+              <Input type="date" value={form.licenseExpiry} onChange={(e) => set('licenseExpiry')(e.target.value)} error={Boolean(errors.licenseExpiry)} />
+              <FieldError>{errors.licenseExpiry}</FieldError>
             </div>
           </CardBody>
 
           <CardHeader title="Asset Assignment" />
           <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
-              <Label>Assigned Bus</Label>
+              <Label required>Assigned Bus</Label>
               <SearchableSelect
                 placeholder="Select bus"
                 value={form.assignedBus}
                 onChange={set('assignedBus')}
-                options={busOptions.map((b) => ({ value: b._id, label: `${b.name} (${b.plateNumber})` }))}
+                error={Boolean(errors.assignedBus)}
+                options={busPickerOptions(busOptions, holders, id)}
               />
+              <FieldError>{errors.assignedBus}</FieldError>
+              <p className="mt-1.5 text-xs text-slate-400">Each bus has one driver. Buses that already have a driver can&apos;t be picked.</p>
             </div>
             <div>
-              <Label>Assigned Route</Label>
-              <SearchableSelect
-                placeholder="Select route"
-                value={form.assignedRoute}
-                onChange={set('assignedRoute')}
-                options={routeOptions.map((r) => ({ value: r._id, label: r.name }))}
-              />
+              <Label>Route (from selected bus)</Label>
+              <div className="flex h-11 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-navy dark:text-slate-300">
+                {selectedRoute ? `${selectedRoute.routeId} - ${selectedRoute.name}` : 'No bus selected'}
+              </div>
             </div>
           </CardBody>
 
@@ -157,13 +260,13 @@ export default function EditDriver() {
             <Button variant="outline" onClick={() => setConfirmDelete(false)}>
               Cancel
             </Button>
-            <Button variant="danger" loading={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
+            <Button variant="danger" onClick={deleteWithUndo}>
               Delete Driver
             </Button>
           </>
         }
       >
-        <p className="text-sm text-slate-500 dark:text-slate-400">This action is permanent and cannot be undone.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">You&apos;ll have {UNDO_SECONDS} seconds to undo. After that it&apos;s permanent.</p>
       </Modal>
     </div>
   );

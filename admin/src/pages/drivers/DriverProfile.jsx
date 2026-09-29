@@ -1,17 +1,20 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Pencil } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2, Pencil, Smartphone } from 'lucide-react';
 import usePageHeader from '../../hooks/usePageHeader.js';
-import { getDriver } from '../../api/drivers.js';
+import { createDriverSetupCode, getDriver } from '../../api/drivers.js';
+import SetupCodeBox from '../../components/account/SetupCodeBox.jsx';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
 import Card, { CardHeader } from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
+import OnlineStatus, { lastSeenText } from '../../components/drivers/OnlineStatus.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Tabs from '../../components/ui/Tabs.jsx';
 import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
 import { formatDate } from '../../lib/utils.js';
+import { formatPhone } from '../../lib/phone.js';
 
 const InfoRow = ({ label, value }) => (
   <div>
@@ -23,7 +26,7 @@ const InfoRow = ({ label, value }) => (
 export default function DriverProfile() {
   const { id } = useParams();
   const [tab, setTab] = useState('personal');
-  const { data: driver, isLoading } = useQuery({ queryKey: ['driver', id], queryFn: () => getDriver(id) });
+  const { data: driver, isLoading } = useQuery({ queryKey: ['driver', id], queryFn: () => getDriver(id), refetchInterval: 30000 });
 
   usePageHeader({ breadcrumb: ['AwaBus', 'Drivers', driver ? `${driver.firstName} ${driver.lastName}` : '...'] });
 
@@ -36,16 +39,19 @@ export default function DriverProfile() {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-4">
           <Avatar name={`${driver.firstName} ${driver.lastName}`} src={driver.profilePhotoUrl} size="lg" />
-          <div>
-            <div className="flex items-center gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
                 {driver.firstName} {driver.lastName}
               </h1>
               <Badge>{driver.status}</Badge>
+              <OnlineStatus driver={driver} />
             </div>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Driver Profile &amp; Assigned Assets</p>
+            <p className="mt-1 break-words text-sm text-slate-500 dark:text-slate-400">
+              Driver Profile &amp; Assigned Assets · {driver.online ? 'Driver app open now' : lastSeenText(driver)}
+            </p>
           </div>
         </div>
         <Button as={Link} to={`/drivers/${id}/edit`} variant="outline">
@@ -66,24 +72,27 @@ export default function DriverProfile() {
 
       {tab === 'personal' && (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.4fr]">
-          <Card>
-            <CardHeader title="Driver Information" />
-            <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2">
-              <InfoRow label="Phone" value={driver.phone} />
-              <InfoRow label="Email" value={driver.email} />
-              <InfoRow label="Date of birth" value={driver.dob ? `${formatDate(driver.dob)} (${age} years)` : '—'} />
-              <InfoRow label="Gender" value={driver.gender} />
-              <InfoRow
-                label="Emergency contact"
-                value={
-                  driver.emergencyContactName
-                    ? `${driver.emergencyContactName} (${driver.emergencyContactRelation}) - ${driver.emergencyContactPhone}`
-                    : '—'
-                }
-              />
-              <InfoRow label="Residential address" value={driver.residentialAddress} />
-            </div>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader title="Driver Information" />
+              <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2">
+                <InfoRow label="Phone" value={formatPhone(driver.phone)} />
+                <InfoRow label="Email" value={driver.email} />
+                <InfoRow label="Date of birth" value={driver.dob ? `${formatDate(driver.dob)} (${age} years)` : '—'} />
+                <InfoRow label="Gender" value={driver.gender} />
+                <InfoRow
+                  label="Emergency contact"
+                  value={
+                    driver.emergencyContactName
+                      ? `${driver.emergencyContactName} (${driver.emergencyContactRelation}) - ${formatPhone(driver.emergencyContactPhone)}`
+                      : '—'
+                  }
+                />
+                <InfoRow label="Residential address" value={driver.residentialAddress} />
+              </div>
+            </Card>
+            <DriverAppAccess driver={driver} />
+          </div>
           <AssignmentHistoryCard driver={driver} />
         </div>
       )}
@@ -96,8 +105,12 @@ export default function DriverProfile() {
             <InfoRow label="Expiry date" value={formatDate(driver.licenseExpiry)} />
             <InfoRow label="License class" value={driver.licenseClass} />
             <InfoRow
-              label="Validation status"
-              value={driver.licenseValidation?.status === 'verified' ? 'DVLA Verified' : driver.licenseValidation?.status}
+              label="Status"
+              value={
+                driver.licenseExpiry && new Date(driver.licenseExpiry) < new Date()
+                  ? 'Expired - update the expiry date'
+                  : 'Details saved'
+              }
             />
           </div>
         </Card>
@@ -105,6 +118,51 @@ export default function DriverProfile() {
 
       {tab === 'assignments' && <AssignmentHistoryCard driver={driver} full />}
     </div>
+  );
+}
+
+// Whether the driver has set up the driver app, and a way to hand them a
+// (new) setup code when they have not.
+function DriverAppAccess({ driver }) {
+  const queryClient = useQueryClient();
+  const [code, setCode] = useState(null);
+  const mutation = useMutation({
+    mutationFn: () => createDriverSetupCode(driver._id),
+    onSuccess: (res) => {
+      setCode(res);
+      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+    },
+  });
+  return (
+    <Card>
+      <CardHeader title="Driver App" />
+      <div className="space-y-3 p-5 text-sm">
+        {driver.accountSetUp ? (
+          <p className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-400">
+            <CheckCircle2 className="h-4 w-4 shrink-0" /> Set up: the driver has chosen a password
+          </p>
+        ) : (
+          <>
+            <p className="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200">
+              <Smartphone className="h-4 w-4 shrink-0" /> Not set up yet
+            </p>
+            <p className="text-slate-500 dark:text-slate-400">
+              To sign in the first time, the driver needs a setup code from you. Making a new code cancels any older one.
+            </p>
+            {code ? (
+              <SetupCodeBox code={code.setupCode} expires={code.setupCodeExpires}>
+                Give this code to {driver.firstName}. They enter it with their phone number in the driver app.
+              </SetupCodeBox>
+            ) : (
+              <Button variant="outline" onClick={() => mutation.mutate()} loading={mutation.isPending}>
+                Create setup code
+              </Button>
+            )}
+            {mutation.isError && <p className="text-red-600">{mutation.error.message}</p>}
+          </>
+        )}
+      </div>
+    </Card>
   );
 }
 

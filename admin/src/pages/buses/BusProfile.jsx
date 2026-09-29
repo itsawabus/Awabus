@@ -10,6 +10,8 @@ import Button from '../../components/ui/Button.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
 import { formatDate } from '../../lib/utils.js';
+import { formatPhone } from '../../lib/phone.js';
+import BusOnlineStatus, { ConnectionPair } from '../../components/buses/BusOnlineStatus.jsx';
 
 const InfoRow = ({ label, value }) => (
   <div className="flex items-center justify-between border-b border-slate-100 py-3 last:border-0 dark:border-slate-800">
@@ -20,7 +22,7 @@ const InfoRow = ({ label, value }) => (
 
 export default function BusProfile() {
   const { id } = useParams();
-  const { data, isLoading } = useQuery({ queryKey: ['bus', id], queryFn: () => getBus(id) });
+  const { data, isLoading } = useQuery({ queryKey: ['bus', id], queryFn: () => getBus(id), refetchInterval: 30000 });
 
   usePageHeader({ breadcrumb: ['AwaBus', 'Buses', data?.data?.plateNumber || '...'] });
 
@@ -34,6 +36,7 @@ export default function BusProfile() {
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">{bus.plateNumber}</h1>
           <Badge>{bus.status}</Badge>
+          <BusOnlineStatus busOnline={bus.online} driverOnline={bus.assignedDriver?.online} hasDriver={Boolean(bus.assignedDriver)} />
         </div>
         <div className="flex gap-3">
           <Button as={Link} to="/buses" variant="outline">
@@ -55,6 +58,10 @@ export default function BusProfile() {
               <InfoRow label="Total Capacity" value={`${bus.capacity} Passengers`} />
               <InfoRow label="Current Route" value={bus.assignedRoute?.name} />
               <InfoRow label="Status" value={<Badge>{bus.status}</Badge>} />
+              <InfoRow
+                label="Online"
+                value={<ConnectionPair busOnline={bus.online} driverOnline={bus.assignedDriver?.online} hasDriver={Boolean(bus.assignedDriver)} />}
+              />
             </div>
           </Card>
 
@@ -68,7 +75,7 @@ export default function BusProfile() {
                     {bus.assignedDriver.firstName} {bus.assignedDriver.lastName}
                   </p>
                   <p className="text-sm text-slate-500 dark:text-slate-400">Active School Bus Driver</p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{bus.assignedDriver.phone}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{formatPhone(bus.assignedDriver.phone)}</p>
                 </div>
               </div>
             ) : (

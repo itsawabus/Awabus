@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AdminLayout from './components/layout/AdminLayout.jsx';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx';
+import SuperadminRoute from './components/layout/SuperadminRoute.jsx';
 
 import SignIn from './pages/auth/SignIn.jsx';
 import ForgotPassword from './pages/auth/ForgotPassword.jsx';
@@ -9,6 +10,7 @@ import ResetPassword from './pages/auth/ResetPassword.jsx';
 import ResetSuccess from './pages/auth/ResetSuccess.jsx';
 
 import Dashboard from './pages/dashboard/Dashboard.jsx';
+import SuperadminDashboard from './pages/superadmin/SuperadminDashboard.jsx';
 
 import RoutesList from './pages/routes/RoutesList.jsx';
 import AddRoute from './pages/routes/AddRoute.jsx';
@@ -35,6 +37,14 @@ import TripDetails from './pages/trips/TripDetails.jsx';
 import LiveTracking from './pages/tracking/LiveTracking.jsx';
 import LiveTripDetail from './pages/tracking/LiveTripDetail.jsx';
 
+import MyProfile from './pages/account/MyProfile.jsx';
+import AccountSettings from './pages/account/AccountSettings.jsx';
+import HelpGuide from './pages/help/HelpGuide.jsx';
+import Notifications from './pages/notifications/Notifications.jsx';
+import SystemPage from './pages/system/SystemPage.jsx';
+import AssistTrip from './pages/assist/AssistTrip.jsx';
+import SchoolSettings from './pages/school/SchoolSettings.jsx';
+
 export default function App() {
   return (
     <Routes>
@@ -43,10 +53,21 @@ export default function App() {
       <Route path="/verify-otp" element={<VerifyOtp />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/reset-success" element={<ResetSuccess />} />
+      {/* Bus assistant (teacher on bus duty): public, opened from the driver's QR code */}
+      <Route path="/assist/:pass" element={<AssistTrip />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AdminLayout />}>
           <Route path="/" element={<Dashboard />} />
+
+          <Route path="/account" element={<Navigate to="/account/profile" replace />} />
+          <Route path="/account/profile" element={<MyProfile />} />
+          <Route path="/account/settings" element={<AccountSettings />} />
+
+          <Route element={<SuperadminRoute />}>
+            <Route path="/platform" element={<SuperadminDashboard />} />
+            <Route path="/system" element={<SystemPage />} />
+          </Route>
 
           <Route path="/routes" element={<RoutesList />} />
           <Route path="/routes/new" element={<AddRoute />} />
@@ -72,6 +93,10 @@ export default function App() {
 
           <Route path="/live-tracking" element={<LiveTracking />} />
           <Route path="/live-tracking/:tripId" element={<LiveTripDetail />} />
+
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/help" element={<HelpGuide />} />
+          <Route path="/settings/school" element={<SchoolSettings />} />
         </Route>
       </Route>
 

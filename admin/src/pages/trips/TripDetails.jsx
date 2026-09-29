@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { MapContainer, Marker, Polyline, TileLayer } from 'react-leaflet';
+import { MapContainer, Marker, Polyline } from 'react-leaflet';
 import L from 'leaflet';
+import { MapTiles } from '../../components/map/GeofenceMap.jsx';
 import usePageHeader from '../../hooks/usePageHeader.js';
 import { getTrip } from '../../api/trips.js';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
@@ -11,6 +12,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Tabs from '../../components/ui/Tabs.jsx';
 import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
+import { runWords, sessionLabel, statusLabel } from '../../lib/sessions.js';
 
 const stopIcon = (n) =>
   L.divIcon({
@@ -25,7 +27,7 @@ export default function TripDetails() {
   const [tab, setTab] = useState('route');
   const { data: trip, isLoading } = useQuery({ queryKey: ['trip', id], queryFn: () => getTrip(id) });
 
-  usePageHeader({ breadcrumb: ['AwaBus', 'Trip Details', trip?.tripCode || '...'] });
+  usePageHeader({ breadcrumb: ['AwaBus', 'Trip History', trip?.tripCode || '...'] });
 
   if (isLoading || !trip) return <PageLoader />;
 
@@ -44,8 +46,18 @@ export default function TripDetails() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">{trip.tripCode}</h1>
-            <Badge>{trip.status === 'In Progress' ? 'In progress' : trip.status}</Badge>
+            {trip.session && <Badge>{sessionLabel(trip.session)}</Badge>}
+            {trip.autoEnded ? (
+              <Badge tone="warning">Ended automatically</Badge>
+            ) : (
+              <Badge>{trip.status === 'In Progress' ? 'In progress' : trip.status}</Badge>
+            )}
           </div>
+          {trip.autoEnded && (
+            <p className="mt-2 max-w-xl text-sm text-amber-700 dark:text-amber-400">
+              The driver never ended this trip, so AwaBus ended it automatically. Student statuses are as the driver last recorded them.
+            </p>
+          )}
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {new Date(trip.date).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             {trip.departureTime && ` • Started ${trip.departureTime}`}
@@ -79,7 +91,7 @@ export default function TripDetails() {
             <CardHeader title="Route and drop-off points" subtitle={`${droppedOff} of ${trip.studentProgress?.length || 0} dropped off`} />
             <div className="h-80 px-5 pb-5 sm:h-96">
               <MapContainer center={center} zoom={13} className="h-full w-full">
-                <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <MapTiles />
                 {positions.length > 1 && <Polyline positions={positions} color="#0d9488" weight={4} />}
                 {stops.map((s, i) => (s.lat && s.lng ? <Marker key={i} position={[s.lat, s.lng]} icon={stopIcon(s.order || i + 1)} /> : null))}
               </MapContainer>
@@ -115,8 +127,8 @@ export default function TripDetails() {
         <Card>
           <div className="flex flex-wrap gap-6 border-b border-slate-100 p-5 dark:border-slate-800">
             <ChipStat label="attending" value={attending} />
-            <ChipStat label="dropped off" value={droppedOff} />
-            <ChipStat label="on board" value={onBoard} />
+            <ChipStat label={runWords(trip.session).drop.toLowerCase()} value={droppedOff} />
+            <ChipStat label={runWords(trip.session).board.toLowerCase()} value={onBoard} />
             <ChipStat label="cancelled" value={cancelled} />
           </div>
           <Table>
@@ -139,7 +151,7 @@ export default function TripDetails() {
                   </Td>
                   <Td>{p.alertStatus}</Td>
                   <Td>{p.alertTime || '—'}</Td>
-                  <Td>{p.dropoffStatus}</Td>
+                  <Td>{statusLabel(trip.session, p.dropoffStatus)}</Td>
                   <Td className="text-right">
                     <Button size="sm" variant="outline">
                       Notify

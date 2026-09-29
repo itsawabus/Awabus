@@ -1,0 +1,89 @@
+{
+  "expo": {
+    "name": "AwaBus Driver",
+    "slug": "awabus-driver",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "scheme": "awabusdriver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "backgroundColor": "#0b1b2b",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a1f2a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.awabus.driver",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.awabus.driver",
+      "adaptiveIcon": {
+        "backgroundColor": "#0a1f2a",
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "backgroundImage": "./assets/adaptive-icon-background.png",
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.WAKE_LOCK"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "AwaBus Driver uses your location while a trip is active to share your bus's live position with the school and parents.",
+          "locationAlwaysAndWhenInUsePermission": "AwaBus Driver keeps sharing your bus's live position with the school and parents while a trip is running, even when the screen is off or another app is open. It stops when the trip ends.",
+          "locationAlwaysPermission": "AwaBus Driver keeps sharing your bus's live position while a trip is running, even when the screen is off.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 300,
+          "resizeMode": "contain",
+          "backgroundColor": "#0a1f2a",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0a1f2a"
+          }
+        }
+      ],
+      "./plugins/withCrashCapture.js"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fac3f292-58f4-4c51-ade5-5a969f7a75bf"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/fac3f292-58f4-4c51-ade5-5a969f7a75bf"
+    }
+  }
+}

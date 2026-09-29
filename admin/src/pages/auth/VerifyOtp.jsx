@@ -6,18 +6,18 @@ import OtpInput from '../../components/ui/OtpInput.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { verifyOtp, resendOtp } from '../../api/auth.js';
 import { useResetFlowStore } from '../../store/resetFlowStore.js';
-import { maskPhone } from '../../lib/utils.js';
+import { maskEmail } from '../../lib/utils.js';
 
 export default function VerifyOtp() {
   const navigate = useNavigate();
-  const { phone, setResetToken } = useResetFlowStore();
+  const { email, setResetToken } = useResetFlowStore();
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
-    if (!phone) navigate('/forgot-password');
-  }, [phone, navigate]);
+    if (!email) navigate('/forgot-password');
+  }, [email, navigate]);
 
   useEffect(() => {
     if (cooldown <= 0) return undefined;
@@ -26,7 +26,7 @@ export default function VerifyOtp() {
   }, [cooldown]);
 
   const verifyMutation = useMutation({
-    mutationFn: () => verifyOtp(phone, code),
+    mutationFn: () => verifyOtp(email, code),
     onSuccess: (data) => {
       setResetToken(data.resetToken);
       navigate('/reset-password');
@@ -35,8 +35,12 @@ export default function VerifyOtp() {
   });
 
   const resendMutation = useMutation({
-    mutationFn: () => resendOtp(phone),
-    onSuccess: () => setCooldown(30),
+    mutationFn: () => resendOtp(email),
+    onSuccess: () => {
+      setError('');
+      setCooldown(30);
+    },
+    onError: (err) => setError(err.message),
   });
 
   const handleSubmit = (e) => {
@@ -51,9 +55,9 @@ export default function VerifyOtp() {
 
   return (
     <AuthLayout>
-      <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white">Verify your phone number</h1>
+      <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white">Check your email</h1>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-        Enter the 6-digit verification code sent to {maskPhone(phone)}
+        Enter the 6-digit verification code sent to {maskEmail(email)}
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-5">

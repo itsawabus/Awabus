@@ -1,5 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import Guardian from '../models/Guardian.js';
+import { normalizeLanguage } from '../utils/languages.js';
+import { searchPattern } from '../utils/search.js';
 
 // @desc    Search/list guardians (used by "Link Existing Parent")
 // @route   GET /api/guardians
@@ -8,10 +10,10 @@ export const getGuardians = asyncHandler(async (req, res) => {
   const filter = {};
   if (q) {
     filter.$or = [
-      { firstName: { $regex: q, $options: 'i' } },
-      { lastName: { $regex: q, $options: 'i' } },
-      { phone: { $regex: q, $options: 'i' } },
-      { email: { $regex: q, $options: 'i' } },
+      { firstName: { $regex: searchPattern(q), $options: 'i' } },
+      { lastName: { $regex: searchPattern(q), $options: 'i' } },
+      { phone: { $regex: searchPattern(q), $options: 'i' } },
+      { email: { $regex: searchPattern(q), $options: 'i' } },
     ];
   }
   const guardians = await Guardian.find(filter).sort({ createdAt: 1 }).limit(50);
@@ -26,7 +28,12 @@ export const createGuardian = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('First name, last name and phone are required');
   }
-  const guardian = await Guardian.create({ firstName, lastName, relation, phone, email });
+  const preferredLanguage = normalizeLanguage(req.body.preferredLanguage);
+  if (preferredLanguage === null) {
+    res.status(400);
+    throw new Error('Choose the parent\'s language from the list');
+  }
+  const guardian = await Guardian.create({ firstName, lastName, relation, phone, email, ...(preferredLanguage ? { preferredLanguage } : {}) });
   res.status(201).json({ success: true, data: guardian });
 });
 
@@ -41,6 +48,12 @@ export const updateGuardian = asyncHandler(async (req, res) => {
   ['firstName', 'lastName', 'relation', 'phone', 'email'].forEach((f) => {
     if (req.body[f] !== undefined) guardian[f] = req.body[f];
   });
+  const preferredLanguage = normalizeLanguage(req.body.preferredLanguage);
+  if (preferredLanguage === null) {
+    res.status(400);
+    throw new Error('Choose the parent\'s language from the list');
+  }
+  if (preferredLanguage) guardian.preferredLanguage = preferredLanguage;
   await guardian.save();
   res.json({ success: true, data: guardian });
 });

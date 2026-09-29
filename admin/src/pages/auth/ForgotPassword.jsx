@@ -2,24 +2,25 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import AuthLayout from '../../components/layout/AuthLayout.jsx';
-import PhoneInput from '../../components/ui/PhoneInput.jsx';
-import { Label, FieldError } from '../../components/ui/Input.jsx';
+import Input, { Label, FieldError } from '../../components/ui/Input.jsx';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 import Button from '../../components/ui/Button.jsx';
 import { forgotPassword } from '../../api/auth.js';
 import { useResetFlowStore } from '../../store/resetFlowStore.js';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
-  const setPhone = useResetFlowStore((s) => s.setPhone);
+  const setEmail = useResetFlowStore((s) => s.setEmail);
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
 
-  const digits = value.replace(/\s/g, '');
+  const email = value.trim().toLowerCase();
 
   const mutation = useMutation({
-    mutationFn: () => forgotPassword(`+233${digits}`),
+    mutationFn: () => forgotPassword(email),
     onSuccess: () => {
-      setPhone(`+233${digits}`);
+      setEmail(email);
       navigate('/verify-otp');
     },
     onError: (err) => setError(err.message),
@@ -28,8 +29,8 @@ export default function ForgotPassword() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
-    if (digits.length !== 9) {
-      setError('Enter a valid 9-digit phone number');
+    if (!EMAIL_RE.test(email)) {
+      setError('Enter the email address you sign in with');
       return;
     }
     mutation.mutate();
@@ -39,13 +40,22 @@ export default function ForgotPassword() {
     <AuthLayout>
       <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white">Forgot password?</h1>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-        Enter your phone number to receive a 6-digit verification code.
+        Enter the email address you sign in with and we'll send you a 6-digit verification code.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-5">
         <div>
-          <Label htmlFor="phone">Phone number</Label>
-          <PhoneInput id="phone" value={value} onChange={setValue} error={Boolean(error)} maxLength={11} />
+          <Label htmlFor="email">Email address</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="name@school.edu.gh"
+            error={Boolean(error)}
+            autoFocus
+          />
           <FieldError>{error}</FieldError>
         </div>
 

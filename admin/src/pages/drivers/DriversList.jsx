@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { MoreVertical, Plus, Users, SearchX } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Upload, Plus, Users, SearchX, UserCheck, Bus as BusIcon, IdCard } from 'lucide-react';
+import StatCard from '../../components/ui/StatCard.jsx';
+import OnlineStatus from '../../components/drivers/OnlineStatus.jsx';
 import usePageHeader from '../../hooks/usePageHeader.js';
 import useDebounce from '../../hooks/useDebounce.js';
-import { getDrivers, deleteDriver } from '../../api/drivers.js';
+import { getDrivers, updateDriver } from '../../api/drivers.js';
 import Card from '../../components/ui/Card.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -14,13 +16,20 @@ import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import Modal from '../../components/ui/Modal.jsx';
+import RowActions from '../../components/ui/RowActions.jsx';
+import BulkUploadModal from '../../components/import/BulkUploadModal.jsx';
+import useListSelection from '../../hooks/useListSelection.jsx';
+import ListToolbar from '../../components/ui/ListToolbar.jsx';
+import { DRIVER_STATUSES, LICENSE_CLASSES } from '../../lib/options.js';
+import { UNDO_SECONDS, usePendingDeleteIds, useUndoDeleteStore } from '../../store/undoDeleteStore.js';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
+import { formatPhone } from '../../lib/phone.js';
 
 export default function DriversList() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [openMenuId, setOpenMenuId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const debouncedSearch = useDebounce(search);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -38,30 +47,72 @@ export default function DriversList() {
   const { data, isLoading } = useQuery({
     queryKey: ['drivers', page, debouncedSearch],
     queryFn: () => getDrivers({ page, q: debouncedSearch }),
+    refetchInterval: 30000, // keeps Online / Offline current
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => deleteDriver(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['drivers'] });
-      setDeleteTarget(null);
+  const scheduleDelete = useUndoDeleteStore((st) => st.scheduleDelete);
+  const pendingIds = usePendingDeleteIds();
+
+  // Items waiting out their undo time are hidden already.
+  const drivers = (data?.data || []).filter((item) => !pendingIds.has(item._id));
+  const getLabel = (d) => `${d.firstName} ${d.lastName}`;
+  const invalidate = ['drivers', 'buses', 'routes', 'bus-options', 'driver-options'];
+  const selection = useListSelection({
+    items: drivers,
+    getLabel,
+    deletePath: (id) => `/drivers/${id}`,
+    noun: 'drivers',
+    singular: 'driver',
+    invalidate,
+    bulkEdit: {
+      updateOne: updateDriver,
+      fields: [
+      { key: 'status', label: 'Status', type: 'select', options: DRIVER_STATUSES, get: (d) => d.status || '' },
+      { key: 'licenseClass', label: 'License class', type: 'select', options: LICENSE_CLASSES, get: (d) => d.licenseClass || '' },
+    ],
     },
   });
-
-  const drivers = data?.data || [];
+  const confirmDelete = (item) => {
+    scheduleDelete({
+      title: getLabel(item),
+      items: [{ id: item._id, label: getLabel(item), path: `/drivers/${item._id}` }],
+      onFinished: () =>
+        Promise.all([...invalidate, 'dashboard'].map((key) => queryClient.invalidateQueries({ queryKey: [key] }))),
+    });
+    setDeleteTarget(null);
+  };
   const meta = data?.meta;
+  const stats = data?.stats || {};
 
   return (
     <div>
       <PageHeader
         title="Drivers"
         subtitle="Manage and assign authorized drivers for the school fleet."
-        action={
-          <Button as={Link} to="/drivers/new">
-            <Plus className="h-4 w-4" /> Add Driver
-          </Button>
-        }
       />
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total Drivers" value={stats.totalDrivers ?? 0} hint="Registered drivers" icon={Users} />
+        <StatCard label="Active Drivers" value={stats.active ?? 0} hint={`Status set to Active · ${stats.online ?? 0} online in the app now`} icon={UserCheck} />
+        <StatCard label="Without a Bus" value={stats.withoutBus ?? 0} hint="Need a bus before they can drive" icon={BusIcon} tone="slate" />
+        <StatCard
+          label="License Alerts"
+          value={stats.licenseAlerts ?? 0}
+          hint="Expired or expiring within 30 days"
+          icon={IdCard}
+          tone={stats.licenseAlerts ? 'red' : 'amber'}
+        />
+      </div>
+
+      <ListToolbar left={meta ? <p className="text-sm text-slate-500 dark:text-slate-400">{meta.total} drivers</p> : null}>
+        {selection.toolbarButton}
+        <Button variant="outline" onClick={() => setBulkOpen(true)}>
+          <Upload className="h-4 w-4" /> Bulk upload
+        </Button>
+        <Button as={Link} to="/drivers/new">
+          <Plus className="h-4 w-4" /> Add Driver
+        </Button>
+      </ListToolbar>
 
       <Card>
         {isLoading ? (
@@ -94,18 +145,21 @@ export default function DriversList() {
           <>
             <Table>
               <Thead>
+                {selection.headerCell}
                 <Th>Driver Name</Th>
                 <Th>Phone</Th>
                 <Th>License No</Th>
                 <Th>Assigned Bus</Th>
                 <Th>Assigned Route</Th>
                 <Th>Status</Th>
+                <Th>Driver App</Th>
                 <Th>Emergency Contact</Th>
                 <Th className="text-right">Actions</Th>
               </Thead>
               <Tbody>
                 {drivers.map((driver) => (
-                  <Tr key={driver._id} className="cursor-pointer" onClick={() => navigate(`/drivers/${driver._id}`)}>
+                  <Tr key={driver._id} {...selection.rowProps(driver, () => navigate(`/drivers/${driver._id}`))}>
+                    {selection.cell(driver)}
                     <Td>
                       <div className="flex items-center gap-3">
                         <Avatar name={`${driver.firstName} ${driver.lastName}`} src={driver.profilePhotoUrl} size="sm" />
@@ -114,45 +168,31 @@ export default function DriversList() {
                         </span>
                       </div>
                     </Td>
-                    <Td>{driver.phone}</Td>
+                    <Td>{formatPhone(driver.phone)}</Td>
                     <Td>{driver.licenseNumber}</Td>
                     <Td>{driver.assignedBus ? `${driver.assignedBus.name} (${driver.assignedBus.plateNumber})` : '—'}</Td>
                     <Td>{driver.assignedRoute ? `${driver.assignedRoute.name}` : '—'}</Td>
                     <Td>
                       <Badge>{driver.status}</Badge>
+                      {driver.accountSetUp === false && (
+                        <p className="mt-1 whitespace-nowrap text-xs text-slate-400">App not set up</p>
+                      )}
+                    </Td>
+                    <Td>
+                      <OnlineStatus driver={driver} showLastSeen />
                     </Td>
                     <Td>
                       {driver.emergencyContactName
                         ? `${driver.emergencyContactName} (${driver.emergencyContactRelation})`
                         : '—'}
                     </Td>
-                    <Td className="relative text-right" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => setOpenMenuId(openMenuId === driver._id ? null : driver._id)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-navy"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
-                      {openMenuId === driver._id && (
-                        <div className="absolute right-4 top-10 z-10 w-36 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-left shadow-lg dark:border-slate-700 dark:bg-navy-light">
-                          <Link
-                            to={`/drivers/${driver._id}/edit`}
-                            className="block px-3.5 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-navy"
-                            onClick={() => setOpenMenuId(null)}
-                          >
-                            Edit Info
-                          </Link>
-                          <button
-                            onClick={() => {
-                              setDeleteTarget(driver);
-                              setOpenMenuId(null);
-                            }}
-                            className="block w-full px-3.5 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
+                    <Td className="text-right">
+                      <RowActions
+                        items={[
+                          { label: 'Edit Info', to: `/drivers/${driver._id}/edit` },
+                          { label: 'Delete', danger: true, onClick: () => setDeleteTarget(driver) },
+                        ]}
+                      />
                     </Td>
                   </Tr>
                 ))}
@@ -171,6 +211,8 @@ export default function DriversList() {
           </>
         )}
       </Card>
+      {selection.bar}
+      {selection.dialog}
 
       <Modal
         open={Boolean(deleteTarget)}
@@ -181,17 +223,18 @@ export default function DriversList() {
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>
               Cancel
             </Button>
-            <Button variant="danger" loading={deleteMutation.isPending} onClick={() => deleteMutation.mutate(deleteTarget._id)}>
+            <Button variant="danger" onClick={() => confirmDelete(deleteTarget)}>
               Delete Driver
             </Button>
           </>
         }
       >
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          This action is permanent and cannot be undone. {deleteTarget?.firstName} {deleteTarget?.lastName} will be
+          You'll have {UNDO_SECONDS} seconds to undo. After that it's permanent. {deleteTarget?.firstName} {deleteTarget?.lastName} will be
           unassigned from their bus and route.
         </p>
       </Modal>
+      <BulkUploadModal open={bulkOpen} onClose={() => setBulkOpen(false)} entity="drivers" label="Drivers" singular="driver" />
     </div>
   );
 }

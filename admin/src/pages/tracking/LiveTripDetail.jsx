@@ -10,7 +10,11 @@ import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { PillTabs } from '../../components/ui/Tabs.jsx';
 import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
-import { timeAgo } from '../../lib/utils.js';
+import { formatLat, formatLng, gpsFreshness } from '../../lib/gps.js';
+import useNow from '../../hooks/useNow.js';
+import { GpsState, LocationSource, AssistantLocationLine } from './LiveTracking.jsx';
+import { ConnectionPair } from '../../components/buses/BusOnlineStatus.jsx';
+import { runWords, sessionLabel, statusLabel } from '../../lib/sessions.js';
 
 export default function LiveTripDetail() {
   const { tripId } = useParams();
@@ -22,6 +26,7 @@ export default function LiveTripDetail() {
   });
 
   usePageHeader({ breadcrumb: ['AwaBus', 'Live Tracking', trip?.tripCode || 'Trip Detail'] });
+  const now = useNow(15000);
 
   if (isLoading || !trip) return <PageLoader />;
 
@@ -31,7 +36,10 @@ export default function LiveTripDetail() {
     if (filter === 'absent') return p.attendance === 'Absent' || p.attendance === 'Cancelled';
     return true;
   });
-  const alerted = progress.filter((p) => p.alertStatus === 'Alert sent').length;
+  const gps = gpsFreshness(trip.liveLocation, now);
+  const running = trip.status === 'In Progress' || trip.status === 'Delayed';
+  const alerted = progress.filter((p) => p.alertStatus === 'Sent').length;
+  const scanned = progress.filter((p) => p.dropoffStatus === 'On board' || p.dropoffStatus === 'Dropped off').length;
 
   return (
     <div>
@@ -40,6 +48,7 @@ export default function LiveTripDetail() {
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-extrabold text-slate-900 dark:text-white">Trip Detail</h1>
             <Badge tone={trip.status === 'Delayed' ? 'warning' : 'success'}>{trip.status === 'In Progress' ? 'Trip in progress' : trip.status}</Badge>
+            {trip.session && <Badge>{sessionLabel(trip.session)}</Badge>}
           </div>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {trip.bus?.name} · {trip.bus?.plateNumber} • {trip.route?.name} · stop {Math.min(progress.length, 7)} of {progress.length}
@@ -55,15 +64,15 @@ export default function LiveTripDetail() {
         </div>
       </div>
 
-      {trip.gpsSignal !== 'ok' && (
+      {running && (gps.state === 'stale' || gps.state === 'lost') && (
         <Card className="mb-6 border border-amber-200 bg-amber-50 p-5 dark:border-amber-900 dark:bg-amber-950/20">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
             <div>
-              <p className="font-bold text-amber-800 dark:text-amber-400">{trip.bus?.plateNumber} has stopped reporting GPS</p>
-              <p className="text-sm text-amber-700/90 dark:text-amber-400/80">
-                The trip is still marked in progress — the marker shows the last reported location, not the live one.
+              <p className="font-bold text-amber-800 dark:text-amber-400">
+                {trip.bus?.plateNumber} {gps.state === 'lost' ? 'has stopped reporting GPS' : 'has not reported its position recently'}
               </p>
+              <p className="text-sm text-amber-700/90 dark:text-amber-400/80">{gps.detail}</p>
             </div>
           </div>
         </Card>
@@ -71,8 +80,8 @@ export default function LiveTripDetail() {
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MiniStat label="Departure" value={trip.departureTime || '—'} sub="On-time departure" />
-        <MiniStat label="Duration" value={trip.etaMinutes ? `${trip.etaMinutes} min` : '—'} sub={`Live · ${timeAgo(trip.liveLocation?.updatedAt)}`} />
-        <MiniStat label="GPS Updates" value={`${alerted} / ${progress.length}`} sub="Strong satellite lock" />
+        <MiniStat label="Duration" value={trip.etaMinutes ? `${trip.etaMinutes} min` : '—'} sub={gps.label} />
+        <MiniStat label="Students scanned" value={`${scanned} / ${progress.length}`} sub={`${runWords(trip.session).board} or ${runWords(trip.session).drop.toLowerCase()}`} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.6fr]">
@@ -87,17 +96,20 @@ export default function LiveTripDetail() {
                 {trip.bus?.name} · {trip.bus?.plateNumber}
               </p>
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{trip.route?.name}</p>
+              <ConnectionPair className="mt-3" busOnline={trip.busOnline} driverOnline={trip.driverOnline} hasDriver={Boolean(trip.driver)} />
+              <AssistantLocationLine info={trip.assistantLocationState} />
             </div>
           </Card>
           <Card>
             <CardHeader title="Last Location" />
             <div className="p-5 text-sm text-slate-500 dark:text-slate-400">
-              {trip.liveLocation ? (
+              {Number.isFinite(trip.liveLocation?.lat) && Number.isFinite(trip.liveLocation?.lng) ? (
                 <>
                   <p>
-                    Lat/Lng: {trip.liveLocation.lat?.toFixed(4)}° N, {trip.liveLocation.lng?.toFixed(4)}° W
+                    Lat/Lng: {formatLat(trip.liveLocation.lat)}, {formatLng(trip.liveLocation.lng)}
                   </p>
-                  <p className="mt-1">Last updated {timeAgo(trip.liveLocation.updatedAt)}</p>
+                  <GpsState gps={gps} />
+                  <LocationSource source={trip.locationSource} assistantName={trip.assistantLocation?.name} />
                 </>
               ) : (
                 <p>No location reported yet.</p>
@@ -109,7 +121,7 @@ export default function LiveTripDetail() {
         <Card>
           <CardHeader
             title="Student Progress"
-            subtitle={`${alerted} alerted · ${progress.length - alerted} remaining`}
+            subtitle={`${scanned} scanned · parents texted for ${alerted}`}
             action={
               <PillTabs
                 tabs={[
@@ -126,7 +138,7 @@ export default function LiveTripDetail() {
             <Thead>
               <Th>Student</Th>
               <Th>Attendance</Th>
-              <Th>Alert Status</Th>
+              <Th>Parent alert</Th>
               <Th>Drop-off</Th>
             </Thead>
             <Tbody>
@@ -138,8 +150,17 @@ export default function LiveTripDetail() {
                   <Td>
                     <Badge>{p.attendance}</Badge>
                   </Td>
-                  <Td>{p.alertStatus}</Td>
-                  <Td>{p.dropoffStatus}</Td>
+                  <Td>
+                    <span className={p.alertStatus === 'Failed' ? 'font-semibold text-red-600 dark:text-red-400' : ''}>{p.alertStatus}</span>
+                    {p.alertTime && p.alertStatus !== 'Not yet alerted' && <span className="block text-xs text-slate-400">{p.alertTime}</span>}
+                    {p.nearHomeAt && (
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">
+                        Bus near home {new Date(p.nearHomeAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                        {p.nearHomeAlert && p.nearHomeAlert !== 'Sent' ? ` · ${p.nearHomeAlert}` : p.nearHomeAlert === 'Sent' ? ' · parent texted' : ''}
+                      </span>
+                    )}
+                  </Td>
+                  <Td>{statusLabel(trip.session, p.dropoffStatus)}</Td>
                 </Tr>
               ))}
             </Tbody>

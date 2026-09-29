@@ -2,6 +2,8 @@ import asyncHandler from 'express-async-handler';
 import Bus from '../models/Bus.js';
 import Student from '../models/Student.js';
 import Trip from '../models/Trip.js';
+import Route from '../models/Route.js';
+import { LIVE_TRIP_FILTER } from '../services/staleTrips.js';
 
 // @desc    Dashboard summary: stat cards, bus status bar chart, recent trip logs.
 // @route   GET /api/dashboard
@@ -13,7 +15,7 @@ export const getDashboard = asyncHandler(async (req, res) => {
       Bus.countDocuments({ status: 'Maintenance' }),
       Bus.countDocuments({ status: 'Idle' }),
       Student.countDocuments(),
-      Trip.countDocuments({ status: 'In Progress' }),
+      Trip.countDocuments(LIVE_TRIP_FILTER), // running now, delayed ones included
       Trip.find()
         .sort({ date: -1 })
         .limit(6)
@@ -21,8 +23,16 @@ export const getDashboard = asyncHandler(async (req, res) => {
         .populate('bus', 'plateNumber'),
     ]);
 
-  const routeCount = await Trip.distinct('route').then((ids) => ids.length);
-  const completedToday = await Trip.countDocuments({ status: 'Completed' });
+  // "Today" is the calendar day in Ghana, which is on UTC all year.
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+  const [routeCount, completedToday] = await Promise.all([
+    Route.countDocuments({ status: 'Active' }),
+    Trip.countDocuments({
+      status: 'Completed',
+      $or: [{ endedAt: { $gte: startOfToday } }, { endedAt: null, date: { $gte: startOfToday } }],
+    }),
+  ]);
 
   res.json({
     success: true,

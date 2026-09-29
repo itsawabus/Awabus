@@ -1,90 +1,126 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import usePageHeader from '../../hooks/usePageHeader.js';
+import { useEditDraft } from '../../hooks/useFormDraft.js';
+import DraftNotice from '../../components/ui/DraftNotice.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card, { CardBody } from '../../components/ui/Card.jsx';
-import Input, { Label } from '../../components/ui/Input.jsx';
+import Input, { Label, FieldError } from '../../components/ui/Input.jsx';
 import { Select } from '../../components/ui/Input.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import { SearchableSelect } from '../../components/ui/SearchableSelect.jsx';
+import { CAPACITY_MAX, capacityError, digitsOnly, ifChanged, plateError } from '../../lib/formats.js';
+import { PlateInput } from '../../components/ui/FormattedInputs.jsx';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
-import { getBus, updateBus, deleteBus } from '../../api/buses.js';
+import { UNDO_SECONDS, useUndoDeleteStore } from '../../store/undoDeleteStore.js';
+import { getBus, updateBus } from '../../api/buses.js';
 import { getRouteOptions } from '../../api/routes.js';
-import { getDriverOptions } from '../../api/drivers.js';
 
 export default function EditBus() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  usePageHeader({ breadcrumb: ['AwaBus', 'Buses', 'Edit Bus'] });
 
-  const [form, setForm] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [routeError, setRouteError] = useState('');
 
   const { data, isLoading } = useQuery({ queryKey: ['bus', id], queryFn: () => getBus(id) });
   const { data: routeOptions = [] } = useQuery({ queryKey: ['route-options'], queryFn: getRouteOptions });
-  const { data: driverOptions = [] } = useQuery({ queryKey: ['driver-options'], queryFn: () => getDriverOptions() });
+  usePageHeader({
+    breadcrumb: ['AwaBus', 'Buses', { label: data?.data?.plateNumber || '...', to: `/buses/${id}` }, 'Edit'],
+  });
 
-  useEffect(() => {
-    if (data?.data) {
-      const bus = data.data;
-      setForm({
-        plateNumber: bus.plateNumber,
-        name: bus.name,
-        capacity: bus.capacity,
-        assignedRoute: bus.assignedRoute?._id || null,
-        assignedDriver: bus.assignedDriver?._id || null,
-        status: bus.status,
-      });
-    }
+  const baseline = useMemo(() => {
+    const bus = data?.data;
+    if (!bus) return null;
+    return {
+      plateNumber: bus.plateNumber,
+      name: bus.name,
+      capacity: bus.capacity,
+      assignedRoute: bus.assignedRoute?._id || null,
+      status: bus.status,
+    };
   }, [data]);
+  // Unsaved edits are kept as a draft until saved or discarded.
+  const [form, setForm, draft] = useEditDraft(`bus:${id}`, baseline);
 
-  const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
+  const [errors, setErrors] = useState({});
+  const set = (key) => (val) => {
+    setErrors((e) => ({ ...e, [key]: '' }));
+    setForm((f) => ({ ...f, [key]: val }));
+  };
 
   const updateMutation = useMutation({
     mutationFn: (payload) => updateBus(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['buses'] });
+      draft.clear();
       queryClient.invalidateQueries({ queryKey: ['bus', id] });
       navigate(`/buses/${id}`);
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteBus(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['buses'] });
-      navigate('/buses');
-    },
-  });
+  const scheduleDelete = useUndoDeleteStore((st) => st.scheduleDelete);
+  // The delete waits out the undo time (see undoDeleteStore); the list hides it meanwhile.
+  const deleteWithUndo = () => {
+    const label = `${data.data.plateNumber} (${data.data.name})`;
+    scheduleDelete({
+      title: label,
+      items: [{ id, label, path: `/buses/${id}` }],
+      onFinished: () =>
+        Promise.all([...['buses', 'routes', 'drivers', 'bus-options'], 'dashboard'].map((key) => queryClient.invalidateQueries({ queryKey: [key] }))),
+    });
+    navigate('/buses');
+  };
 
   if (isLoading || !form) return <PageLoader />;
   const bus = data.data;
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setRouteError('');
+    if (!form.assignedRoute) {
+      setRouteError('A bus must remain assigned to a route');
+      return;
+    }
+    const next = {
+      plateNumber: ifChanged(form.plateNumber, baseline.plateNumber, () => plateError(form.plateNumber)),
+      capacity: ifChanged(form.capacity, baseline.capacity, () => capacityError(form.capacity)),
+      name: form.name.trim() ? '' : 'Bus name is required',
+    };
+    setErrors(next);
+    if (Object.values(next).some(Boolean)) return;
+    updateMutation.mutate({ ...form, capacity: Number(form.capacity) });
+  };
+
   return (
     <div>
       <PageHeader title={`Edit Bus ${bus.plateNumber}`} />
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          updateMutation.mutate({ ...form, capacity: Number(form.capacity) });
-        }}
-      >
+      <DraftNotice show={draft.restored} onDiscard={draft.discard} discardLabel="Discard changes" />
+      <form noValidate onSubmit={handleSubmit}>
         <Card>
+          {updateMutation.error && (
+            <div className="mx-6 mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+              {updateMutation.error.message}
+            </div>
+          )}
           <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
               <Label required>Bus Plate Number</Label>
-              <Input value={form.plateNumber} onChange={(e) => set('plateNumber')(e.target.value.toUpperCase())} />
+              <PlateInput value={form.plateNumber} onChange={set('plateNumber')} error={errors.plateNumber} />
+              <FieldError>{errors.plateNumber}</FieldError>
             </div>
             <div>
               <Label required>Bus Name/Nickname</Label>
               <Input value={form.name} onChange={(e) => set('name')(e.target.value)} />
+              <FieldError>{errors.name}</FieldError>
             </div>
             <div>
               <Label required>Capacity (Seats)</Label>
-              <Input type="number" min="1" value={form.capacity} onChange={(e) => set('capacity')(e.target.value)} />
+              <Input inputMode="numeric" value={form.capacity} onChange={(e) => set('capacity')(digitsOnly(e.target.value, 3))} error={Boolean(errors.capacity)} />
+              <FieldError>{errors.capacity}</FieldError>
             </div>
             <div>
               <Label>Fleet Status</Label>
@@ -95,22 +131,26 @@ export default function EditBus() {
               </Select>
             </div>
             <div>
-              <Label>Assigned Route</Label>
+              <Label required>Assigned Route</Label>
               <SearchableSelect
                 placeholder="Select route"
                 value={form.assignedRoute}
-                onChange={set('assignedRoute')}
-                options={routeOptions.map((r) => ({ value: r._id, label: r.name }))}
+                onChange={(val) => {
+                  set('assignedRoute')(val);
+                  setRouteError('');
+                }}
+                error={Boolean(routeError)}
+                options={routeOptions.map((r) => {
+                  const taken = Boolean(r.assignedBus) && r.assignedBus._id !== id;
+                  return {
+                    value: r._id,
+                    label: `${r.routeId} - ${r.name}`,
+                    disabled: taken,
+                    description: taken ? `Already served by ${r.assignedBus.name}` : undefined,
+                  };
+                })}
               />
-            </div>
-            <div>
-              <Label>Assigned Driver</Label>
-              <SearchableSelect
-                placeholder="Select driver"
-                value={form.assignedDriver}
-                onChange={set('assignedDriver')}
-                options={driverOptions.map((d) => ({ value: d._id, label: `${d.firstName} ${d.lastName}` }))}
-              />
+              <FieldError>{routeError}</FieldError>
             </div>
           </CardBody>
 
@@ -143,13 +183,13 @@ export default function EditBus() {
             <Button variant="outline" onClick={() => setConfirmDelete(false)}>
               Cancel
             </Button>
-            <Button variant="danger" loading={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
+            <Button variant="danger" onClick={deleteWithUndo}>
               Delete Bus
             </Button>
           </>
         }
       >
-        <p className="text-sm text-slate-500 dark:text-slate-400">This action is permanent and cannot be undone.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">You&apos;ll have {UNDO_SECONDS} seconds to undo. After that it&apos;s permanent.</p>
       </Modal>
     </div>
   );

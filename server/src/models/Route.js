@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantScope } from '../plugins/tenantScope.js';
 
 const stopSchema = new mongoose.Schema(
   {
@@ -12,12 +13,19 @@ const stopSchema = new mongoose.Schema(
 
 const routeSchema = new mongoose.Schema(
   {
-    routeId: { type: String, required: true, unique: true }, // e.g. RT-001
+    school: { type: mongoose.Schema.Types.ObjectId, ref: 'School', required: true, index: true },
+
+    routeId: { type: String, required: true, trim: true }, // e.g. RT-001, unique per school
     name: { type: String, required: true, trim: true }, // e.g. West Legon - Ashongman
     assignedBus: { type: mongoose.Schema.Types.ObjectId, ref: 'Bus', default: null },
     assignedDriver: { type: mongoose.Schema.Types.ObjectId, ref: 'Driver', default: null },
     students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }],
     stops: [stopSchema],
+    // Estimated start of each run, "HH:MM" 24-hour ('' = not set), for the
+    // school's planning. Which run a trip is comes from the clock: before noon
+    // the morning pick-up, from noon the afternoon drop-off (utils/sessions.js).
+    morningStartTime: { type: String, default: '' },
+    eveningStartTime: { type: String, default: '' },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
   },
   { timestamps: true }
@@ -27,7 +35,13 @@ routeSchema.virtual('studentCount').get(function studentCount() {
   return this.students?.length || 0;
 });
 
+// routeId (e.g. "RT-001") can repeat across different schools, just not within the same one
+routeSchema.index({ school: 1, routeId: 1 }, { unique: true });
+routeSchema.index({ school: 1, status: 1 });
+
 routeSchema.set('toJSON', { virtuals: true });
 routeSchema.set('toObject', { virtuals: true });
+
+routeSchema.plugin(tenantScope);
 
 export default mongoose.model('Route', routeSchema);

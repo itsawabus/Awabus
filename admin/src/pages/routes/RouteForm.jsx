@@ -1,25 +1,45 @@
-import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { getBusOptions } from '../../api/buses.js';
-import { getDriverOptions } from '../../api/drivers.js';
-import { getStudentOptions } from '../../api/students.js';
 import Card, { CardBody, CardHeader } from '../../components/ui/Card.jsx';
 import { Label } from '../../components/ui/Input.jsx';
 import Input from '../../components/ui/Input.jsx';
-import { SearchableSelect, MultiSearchSelect } from '../../components/ui/SearchableSelect.jsx';
 import Button from '../../components/ui/Button.jsx';
+import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import RouteStopsEditor, { stopsErrors } from '../../components/routes/RouteStopsEditor.jsx';
 
-export default function RouteForm({ mode, values, onChange, onSubmit, submitting, routeIdDisplay }) {
-  const { data: busOptions = [] } = useQuery({ queryKey: ['bus-options'], queryFn: getBusOptions });
-  const { data: driverOptions = [] } = useQuery({ queryKey: ['driver-options'], queryFn: () => getDriverOptions() });
-  const { data: studentOptions = [] } = useQuery({ queryKey: ['student-options'], queryFn: () => getStudentOptions() });
-
+// Routes are the root of the assignment chain — buses assign themselves to a
+// route, drivers assign themselves to a bus, and students assign themselves
+// to a route. None of that is editable from here, so this form only ever
+// collects the route's own details: its name, run times and stops.
+export default function RouteForm({ mode, values, onChange, onSubmit, submitting, routeIdDisplay, error }) {
   const set = (key) => (val) => onChange({ ...values, [key]: val });
+  const [checked, setChecked] = useState(false);
+  const stops = values.stops || [];
+
+  // Same rules as the server: morning pick-up before noon, afternoon drop-off from noon.
+  const timeError =
+    values.morningStartTime && values.morningStartTime >= '12:00'
+      ? 'The morning pick-up must start before 12:00 noon.'
+      : values.eveningStartTime && values.eveningStartTime < '12:00'
+        ? 'The afternoon drop-off must start at 12:00 noon or later.'
+        : '';
+
+  const submit = (e) => {
+    e.preventDefault();
+    setChecked(true);
+    if (stopsErrors(stops).any || timeError) return;
+    // Stops are saved in the order shown, numbered from 1.
+    onSubmit(e, { ...values, stops: stops.map((st, i) => ({ name: st.name.trim(), lat: Number(st.lat), lng: Number(st.lng), order: i + 1 })) });
+  };
 
   return (
-    <form onSubmit={onSubmit}>
+    <form onSubmit={submit} noValidate>
       <Card>
         <CardHeader title="Route details" />
+        {error && (
+          <div className="mx-6 mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+            {error}
+          </div>
+        )}
         <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <div>
             <Label>Route ID</Label>
@@ -34,50 +54,51 @@ export default function RouteForm({ mode, values, onChange, onSubmit, submitting
               required
             />
           </div>
-          <div>
-            <Label>Assigned bus</Label>
-            <SearchableSelect
-              placeholder="Select bus capacity / plate"
-              value={values.assignedBus}
-              onChange={set('assignedBus')}
-              options={busOptions.map((b) => ({
-                value: b._id,
-                label: `${b.name} (${b.plateNumber})`,
-                description: `Capacity: ${b.capacity}`,
-              }))}
-            />
-          </div>
-          <div>
-            <Label>Assigned driver</Label>
-            <SearchableSelect
-              placeholder="Select pilot"
-              value={values.assignedDriver}
-              onChange={set('assignedDriver')}
-              options={driverOptions.map((d) => ({ value: d._id, label: `${d.firstName} ${d.lastName}` }))}
-            />
-          </div>
         </CardBody>
 
-        <CardHeader
-          title="Students section"
-          subtitle="Add students to this route"
-          action={
-            <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-bold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
-              {values.students.length} students assigned
-            </span>
-          }
-        />
-        <CardBody>
-          <MultiSearchSelect
-            placeholder="Search and select students..."
-            value={values.students}
-            onChange={set('students')}
-            options={studentOptions.map((s) => ({
-              value: s._id,
-              label: `${s.firstName} ${s.lastName}`,
-            }))}
-          />
-        </CardBody>
+        <div className="border-t border-slate-100 p-5 dark:border-slate-800">
+          <h4 className="text-sm font-bold text-slate-900 dark:text-white">Run times</h4>
+          <p className="mb-4 mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+            When each run usually sets off, for planning. The run itself follows the clock: before 12:00 noon it is the
+            morning pick-up, from noon the afternoon drop-off.
+          </p>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="morningStartTime">Morning pick-up starts (estimated)</Label>
+              <Input
+                id="morningStartTime"
+                type="time"
+                value={values.morningStartTime || ''}
+                onChange={(e) => set('morningStartTime')(e.target.value)}
+                max="11:59"
+              />
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Before 12:00, e.g. 06:00</p>
+            </div>
+            <div>
+              <Label htmlFor="eveningStartTime">Afternoon drop-off starts (estimated)</Label>
+              <Input
+                id="eveningStartTime"
+                type="time"
+                value={values.eveningStartTime || ''}
+                onChange={(e) => set('eveningStartTime')(e.target.value)}
+                min="12:00"
+              />
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">When the bus leaves school, e.g. 15:00</p>
+            </div>
+          </div>
+          {timeError && <p className="mt-3 text-sm font-medium text-red-600">{timeError}</p>}
+        </div>
+
+        <div className="border-t border-slate-100 p-5 dark:border-slate-800">
+          <h4 className="text-sm font-bold text-slate-900 dark:text-white">Stops</h4>
+          <p className="mb-4 mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+            Where the bus stops, in the order it drives them. Used by the driver app, Live Tracking and the route map.
+          </p>
+          <RouteStopsEditor stops={stops} onChange={set('stops')} showErrors={checked} />
+          {checked && stopsErrors(stops).any && (
+            <p className="mt-3 text-sm font-medium text-red-600">Fix the highlighted stops before saving.</p>
+          )}
+        </div>
 
         <div className="flex justify-end gap-3 border-t border-slate-100 p-5 dark:border-slate-800">
           <Button as={Link} to="/routes" variant="outline" type="button">

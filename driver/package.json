@@ -1,25 +1,59 @@
 {
   "name": "awabus-driver",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.1.0",
-  "description": "AwaBus Driver App - scaffold only. Screens are not built yet; the server API at /api/driver-app is ready to be wired up here.",
-  "type": "module",
+  "main": "expo-router/entry",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "expo start",
+    "start:codespace": "sh scripts/start-codespace.sh",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "rebuild:android": "expo prebuild --clean --platform android && expo run:android",
+    "rebuild:ios": "expo prebuild --clean --platform ios && expo run:ios",
+    "build:dev:android": "npx -y eas-cli@latest build --profile development --platform android",
+    "build:preview:android": "node scripts/build-preview.mjs android",
+    "build:dev:ios": "npx -y eas-cli@latest build --profile development --platform ios",
+    "lint": "expo lint",
+    "doctor": "expo-doctor",
+    "api": "node scripts/set-api.mjs",
+    "api:render": "node scripts/set-api.mjs render",
+    "api:codespace": "node scripts/set-api.mjs codespace",
+    "postinstall": "patch-package"
   },
   "dependencies": {
-    "axios": "^1.7.4",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.0"
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/netinfo": "12.0.1",
+    "@tanstack/react-query": "^5.103.2",
+    "axios": "^1.20.0",
+    "expo": "~57.0.25",
+    "expo-constants": "~57.0.19",
+    "expo-dev-client": "~57.0.19",
+    "expo-haptics": "~57.0.3",
+    "expo-keep-awake": "~57.0.2",
+    "expo-linking": "~57.0.11",
+    "expo-location": "~57.0.20",
+    "expo-router": "~57.0.23",
+    "expo-secure-store": "~57.0.4",
+    "expo-splash-screen": "~57.0.9",
+    "expo-status-bar": "~57.0.1",
+    "expo-task-manager": "~57.0.20",
+    "expo-updates": "~57.0.23",
+    "lucide-react-native": "^1.47.0",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
+    "react-native-worklets": "0.10.1",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.41",
-    "tailwindcss": "^3.4.10",
-    "vite": "^5.4.0"
+    "expo-doctor": "^1.20.4",
+    "patch-package": "^8.0.1"
+  },
+  "overrides": {
+    "react-dom": "19.2.3"
   }
 }

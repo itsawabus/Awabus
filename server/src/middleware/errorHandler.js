@@ -1,4 +1,5 @@
 // Central error handler + 404 fallthrough for the Express app.
+import { recordError } from '../utils/errorLog.js';
 
 export const notFound = (req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
@@ -32,9 +33,13 @@ export const errorHandler = (err, req, res, next) => {
       .join(', ');
   }
 
+  if (statusCode >= 500) recordError(err, req, statusCode);
+
   res.status(statusCode).json({
     success: false,
     message,
-    stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,
+    ...(err.errorCode ? { code: err.errorCode } : {}),
+    // Code details only when explicitly developing; never on a deployed server.
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 };

@@ -1,6 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import Trip from '../models/Trip.js';
 import { getPagination, buildPaginationMeta } from '../utils/pagination.js';
+import { searchPattern } from '../utils/search.js';
 
 const populateTrip = (query) =>
   query
@@ -15,7 +16,7 @@ export const getTrips = asyncHandler(async (req, res) => {
   const { page, limit, skip } = getPagination(req.query);
 
   const filter = {};
-  if (q) filter.tripCode = { $regex: q, $options: 'i' };
+  if (q) filter.tripCode = { $regex: searchPattern(q), $options: 'i' };
   if (status && status !== 'All') filter.status = status;
   if (driver && driver !== 'All') filter.driver = driver;
   if (bus && bus !== 'All') filter.bus = bus;

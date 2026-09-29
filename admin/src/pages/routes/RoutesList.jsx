@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { MoreVertical, Plus, Milestone, SearchX } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Upload, Plus, Milestone, SearchX, CircleCheck, Bus as BusIcon, GraduationCap } from 'lucide-react';
+import StatCard from '../../components/ui/StatCard.jsx';
 import usePageHeader from '../../hooks/usePageHeader.js';
 import useDebounce from '../../hooks/useDebounce.js';
-import { getRoutes, deleteRoute } from '../../api/routes.js';
+import { getRoutes, updateRoute } from '../../api/routes.js';
 import Card from '../../components/ui/Card.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -13,18 +14,26 @@ import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import EmptyState from '../../components/ui/EmptyState.jsx';
 import Modal from '../../components/ui/Modal.jsx';
+import RowActions from '../../components/ui/RowActions.jsx';
+import BulkUploadModal from '../../components/import/BulkUploadModal.jsx';
+import useListSelection from '../../hooks/useListSelection.jsx';
+import ListToolbar from '../../components/ui/ListToolbar.jsx';
+import { ROUTE_STATUSES } from '../../lib/options.js';
+import { UNDO_SECONDS, usePendingDeleteIds, useUndoDeleteStore } from '../../store/undoDeleteStore.js';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
+import { formatRunTime } from '../../lib/sessions.js';
 
 export default function RoutesList() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [openMenuId, setOpenMenuId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const debouncedSearch = useDebounce(search);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   usePageHeader({
-    breadcrumb: ['Routes', 'Routes'],
+    breadcrumb: ['AwaBus', 'Routes'],
     searchPlaceholder: 'Search routes, buses, students...',
     searchValue: search,
     onSearchChange: (v) => {
@@ -38,16 +47,54 @@ export default function RoutesList() {
     queryFn: () => getRoutes({ page, q: debouncedSearch }),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => deleteRoute(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['routes'] });
-      setDeleteTarget(null);
+  const scheduleDelete = useUndoDeleteStore((st) => st.scheduleDelete);
+  const pendingIds = usePendingDeleteIds();
+
+  // Items waiting out their undo time are hidden already.
+  const routes = (data?.data || []).filter((item) => !pendingIds.has(item._id));
+  const getLabel = (r) => `${r.routeId} - ${r.name}`;
+  const invalidate = ['routes', 'route-options'];
+  const selection = useListSelection({
+    items: routes,
+    getLabel,
+    deletePath: (id) => `/routes/${id}`,
+    noun: 'routes',
+    singular: 'route',
+    invalidate,
+    bulkEdit: {
+      updateOne: updateRoute,
+      fields: [
+        { key: 'status', label: 'Status', type: 'select', options: ROUTE_STATUSES, get: (r) => r.status || '' },
+        {
+          key: 'morningStartTime',
+          label: 'Morning pick-up starts',
+          type: 'time',
+          get: (r) => formatRunTime(r.morningStartTime),
+          validate: (v) => (v && v >= '12:00' ? 'Must be before 12:00 noon' : ''),
+          hint: 'Leave empty to clear it.',
+        },
+        {
+          key: 'eveningStartTime',
+          label: 'Afternoon drop-off starts',
+          type: 'time',
+          get: (r) => formatRunTime(r.eveningStartTime),
+          validate: (v) => (v && v < '12:00' ? 'Must be 12:00 noon or later' : ''),
+          hint: 'Leave empty to clear it.',
+        },
+      ],
     },
   });
-
-  const routes = data?.data || [];
+  const confirmDelete = (item) => {
+    scheduleDelete({
+      title: getLabel(item),
+      items: [{ id: item._id, label: getLabel(item), path: `/routes/${item._id}` }],
+      onFinished: () =>
+        Promise.all([...invalidate, 'dashboard'].map((key) => queryClient.invalidateQueries({ queryKey: [key] }))),
+    });
+    setDeleteTarget(null);
+  };
   const meta = data?.meta;
+  const stats = data?.stats || {};
   const hasAnyRoutes = meta && (meta.total > 0 || debouncedSearch);
 
   return (
@@ -55,12 +102,24 @@ export default function RoutesList() {
       <PageHeader
         title="Routes"
         subtitle="Manage operational lines, assign drivers, and monitor service capacity."
-        action={
-          <Button as={Link} to="/routes/new">
-            <Plus className="h-4 w-4" /> Add Route
-          </Button>
-        }
       />
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total Routes" value={stats.totalRoutes ?? 0} hint="Lines your buses run" icon={Milestone} />
+        <StatCard label="Active Routes" value={stats.active ?? 0} hint="Currently in service" icon={CircleCheck} />
+        <StatCard label="Routes Without a Bus" value={stats.withoutBus ?? 0} hint="Need a bus assigned" icon={BusIcon} tone="amber" />
+        <StatCard label="Students on Routes" value={stats.studentsOnRoutes ?? 0} hint="Students assigned to a route" icon={GraduationCap} tone="slate" />
+      </div>
+
+      <ListToolbar left={meta ? <p className="text-sm text-slate-500 dark:text-slate-400">{meta.total} routes</p> : null}>
+        {selection.toolbarButton}
+        <Button variant="outline" onClick={() => setBulkOpen(true)}>
+          <Upload className="h-4 w-4" /> Bulk upload
+        </Button>
+        <Button as={Link} to="/routes/new">
+          <Plus className="h-4 w-4" /> Add Route
+        </Button>
+      </ListToolbar>
 
       <Card>
         {isLoading ? (
@@ -93,16 +152,20 @@ export default function RoutesList() {
           <>
             <Table>
               <Thead>
+                {selection.headerCell}
                 <Th>Route ID</Th>
                 <Th>Route Name</Th>
                 <Th>Assigned Driver</Th>
                 <Th>Students</Th>
+                <Th>Stops</Th>
+                <Th>Runs</Th>
                 <Th>Status</Th>
                 <Th className="text-right">Actions</Th>
               </Thead>
               <Tbody>
                 {routes.map((route) => (
-                  <Tr key={route._id}>
+                  <Tr key={route._id} {...selection.rowProps(route, () => navigate(`/routes/${route._id}/edit`))}>
+                    {selection.cell(route)}
                     <Td className="font-bold text-slate-900 dark:text-white">{route.routeId}</Td>
                     <Td>{route.name}</Td>
                     <Td>
@@ -111,36 +174,27 @@ export default function RoutesList() {
                         : '—'}
                     </Td>
                     <Td>{route.studentCount ?? route.students?.length ?? 0}</Td>
+                    <Td>{route.stops?.length ? route.stops.length : <span className="text-amber-600 dark:text-amber-400">None yet</span>}</Td>
+                    <Td className="whitespace-nowrap text-sm">
+                      {route.morningStartTime || route.eveningStartTime ? (
+                        <>
+                          <span className="block">Pick-up {formatRunTime(route.morningStartTime, '—')}</span>
+                          <span className="block text-slate-500 dark:text-slate-400">Drop-off {formatRunTime(route.eveningStartTime, '—')}</span>
+                        </>
+                      ) : (
+                        <span className="text-amber-600 dark:text-amber-400">Not set</span>
+                      )}
+                    </Td>
                     <Td>
                       <Badge tone={route.status === 'Active' ? 'success' : 'neutral'}>{route.status}</Badge>
                     </Td>
-                    <Td className="relative text-right">
-                      <button
-                        onClick={() => setOpenMenuId(openMenuId === route._id ? null : route._id)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-navy"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
-                      {openMenuId === route._id && (
-                        <div className="absolute right-4 top-10 z-10 w-36 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-left shadow-lg dark:border-slate-700 dark:bg-navy-light">
-                          <Link
-                            to={`/routes/${route._id}/edit`}
-                            className="block px-3.5 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-navy"
-                            onClick={() => setOpenMenuId(null)}
-                          >
-                            Edit route
-                          </Link>
-                          <button
-                            onClick={() => {
-                              setDeleteTarget(route);
-                              setOpenMenuId(null);
-                            }}
-                            className="block w-full px-3.5 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                          >
-                            Delete route
-                          </button>
-                        </div>
-                      )}
+                    <Td className="text-right">
+                      <RowActions
+                        items={[
+                          { label: 'Edit route', to: `/routes/${route._id}/edit` },
+                          { label: 'Delete route', danger: true, onClick: () => setDeleteTarget(route) },
+                        ]}
+                      />
                     </Td>
                   </Tr>
                 ))}
@@ -159,6 +213,8 @@ export default function RoutesList() {
           </>
         )}
       </Card>
+      {selection.bar}
+      {selection.dialog}
 
       <Modal
         open={Boolean(deleteTarget)}
@@ -169,14 +225,14 @@ export default function RoutesList() {
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>
               Cancel
             </Button>
-            <Button variant="danger" loading={deleteMutation.isPending} onClick={() => deleteMutation.mutate(deleteTarget._id)}>
+            <Button variant="danger" onClick={() => confirmDelete(deleteTarget)}>
               Delete Route
             </Button>
           </>
         }
       >
         <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
-          This action is permanent and cannot be undone.
+          You'll have {UNDO_SECONDS} seconds to undo. After that it's permanent.
         </p>
         {deleteTarget && (
           <div className="space-y-2 rounded-lg bg-slate-50 p-4 text-sm dark:bg-navy">
@@ -191,6 +247,7 @@ export default function RoutesList() {
           </div>
         )}
       </Modal>
+      <BulkUploadModal open={bulkOpen} onClose={() => setBulkOpen(false)} entity="routes" label="Routes" singular="route" />
     </div>
   );
 }

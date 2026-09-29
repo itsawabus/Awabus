@@ -19,6 +19,11 @@ export const useUiStore = create((set, get) => ({
     applyTheme(next);
     set({ darkMode: next });
   },
-  sidebarCollapsed: false,
-  toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+
+  // Sidebar is a mobile drawer: closed by default, opened via hamburger,
+  // and always visible (via lg:translate-x-0) on large screens.
+  sidebarOpen: false,
+  openSidebar: () => set({ sidebarOpen: true }),
+  closeSidebar: () => set({ sidebarOpen: false }),
+  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
 }));

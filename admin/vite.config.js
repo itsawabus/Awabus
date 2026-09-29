@@ -10,6 +10,13 @@ export default defineConfig({
         target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:5000',
         changeOrigin: true,
       },
+      // Live updates (socket.io), forwarded the same way so they also work in
+      // a Codespace, where the browser cannot reach localhost:5000.
+      '/socket.io': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:5000',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 });

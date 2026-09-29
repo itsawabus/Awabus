@@ -3,34 +3,131 @@ import jwt from 'jsonwebtoken';
 import Admin from '../models/Admin.js';
 import OtpToken from '../models/OtpToken.js';
 import generateToken from '../utils/generateToken.js';
-import { generateOtpCode, sendOtpSms, getOtpExpiry } from '../utils/otp.js';
+import { generateOtpCode, sendOtpEmail, getOtpExpiry } from '../utils/otp.js';
+import { tenantContext } from '../utils/tenantContext.js';
+import { checkPasswordStrength } from '../utils/password.js';
+import { schoolStatus, accessError, SCHOOL_SUSPENDED_MESSAGE } from '../utils/access.js';
+import { signResetToken, readResetToken } from '../utils/resetToken.js';
+import { checkSetupCode, clearSetupCode, SETUP_CODE_MESSAGES } from '../utils/setupCode.js';
+
+// Wrong guesses allowed per code before a new one has to be requested.
+export const MAX_OTP_ATTEMPTS = 5;
+
+// These routes all run before anyone is authenticated, so there's no
+// req.school / tenant context yet — finding out *which* school an admin
+// belongs to is the whole point of the lookup. That's the one legitimate
+// reason to reach for tenantContext.runAsSystem() instead of a normal query:
+// it's a deliberate, explicit cross-tenant lookup, not an accidental leak.
+// Once an admin is found, `admin.school` goes into the JWT and every
+// subsequent request is scoped by protectAdmin (middleware/auth.js).
+const findAdminByEmail = (email) =>
+  tenantContext.runAsSystem(async () =>
+    Admin.findOne({
+      email: email.toLowerCase().trim(),
+    })
+  );
+
+const saveAdminAsSystem = (admin) => tenantContext.runAsSystem(() => admin.save());
+
+// @desc    Check if an email exists and whether the account has a password set
+// @route   POST /api/auth/check-email
+// @access  Public
+export const checkEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    res.status(400);
+    throw new Error('Email is required');
+  }
+
+  const admin = await findAdminByEmail(email);
+
+  if (!admin) {
+    res.status(404);
+    throw new Error('No account found with this email address');
+  }
+
+  res.json({
+    success: true,
+    exists: true,
+    hasPassword: Boolean(admin.password),
+  });
+});
+
+// @desc    Set a password for a first-time account and sign in
+// @route   POST /api/auth/set-password
+// @access  Public
+export const setPassword = asyncHandler(async (req, res) => {
+  const { email, password, setupCode } = req.body;
+
+  if (!email || !password) {
+    res.status(400);
+    throw new Error('Email and password are required');
+  }
+
+  const admin = await tenantContext.runAsSystem(async () =>
+    Admin.findOne({ email: String(email).toLowerCase().trim() }).select('+setupCodeHash +setupCodeAttempts')
+  );
+
+  if (!admin) {
+    res.status(404);
+    throw new Error('No account found with this email address');
+  }
+
+  if (admin.password) {
+    res.status(400);
+    throw new Error('This account already has a password set');
+  }
+
+  // Only the person the account was made for has the setup code.
+  const codeCheck = checkSetupCode(admin, setupCode);
+  if (codeCheck !== 'ok') {
+    if (codeCheck === 'wrong' || codeCheck === 'locked') await saveAdminAsSystem(admin);
+    res.status(400);
+    throw new Error(SETUP_CODE_MESSAGES[codeCheck]);
+  }
+
+  const weak = checkPasswordStrength(password, { email: admin.email, name: admin.name });
+  if (weak) {
+    res.status(400);
+    throw new Error(weak);
+  }
+
+  admin.password = password;
+  clearSetupCode(admin);
+  await saveAdminAsSystem(admin);
+
+  res.json({
+    success: true,
+    token: generateToken(admin._id, 'admin', { school: admin.school, role: admin.role }),
+    admin: admin.toSafeObject(),
+  });
+});
 
 // @desc    Sign in to the Admin Portal
 // @route   POST /api/auth/login
 // @access  Public
 export const login = asyncHandler(async (req, res) => {
-  const { phone, password, rememberDevice, deviceId } = req.body;
+  const { email, password } = req.body;
 
-  if (!phone || !password) {
+  if (!email || !password) {
     res.status(400);
-    throw new Error('Phone number and password are required');
+    throw new Error('Email and password are required');
   }
 
-  const admin = await Admin.findOne({ phone });
+  const admin = await findAdminByEmail(email);
 
   if (!admin || !(await admin.matchPassword(password))) {
     res.status(401);
-    throw new Error('The phone number or password you entered is incorrect.');
+    throw new Error('The email or password you entered is incorrect.');
   }
-
-  if (rememberDevice && deviceId && !admin.rememberedDevices.includes(deviceId)) {
-    admin.rememberedDevices.push(deviceId);
-    await admin.save();
+  if (admin.role !== 'superadmin' && (await schoolStatus(admin.school)) !== 'Active') {
+    throw accessError(res, 'SCHOOL_SUSPENDED', SCHOOL_SUSPENDED_MESSAGE);
   }
 
   res.json({
     success: true,
-    token: generateToken(admin._id, 'admin'),
+    token: generateToken(admin._id, 'admin', { school: admin.school, role: admin.role }),
     admin: admin.toSafeObject(),
   });
 });
@@ -42,46 +139,51 @@ export const getMe = asyncHandler(async (req, res) => {
   res.json({ success: true, admin: req.admin.toSafeObject() });
 });
 
-// @desc    Request an OTP to begin the password reset flow
+// Admins sign in with their email, so password reset codes go to the email
+// address too. (Drivers reset by phone - see driverAppController.)
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const RESEND_COOLDOWN_MS = 30 * 1000;
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
+
+// Issues a fresh reset code for `email`, invalidating any earlier ones.
+async function issueResetCode(email) {
+  await OtpToken.updateMany({ target: email, purpose: 'password_reset', consumed: false }, { consumed: true });
+  const code = generateOtpCode();
+  // OtpToken isn't tenant-scoped (no `school` field), so it needs no wrapping.
+  await OtpToken.create({ target: email, code, purpose: 'password_reset', expiresAt: getOtpExpiry() });
+  await sendOtpEmail(email, code, { purpose: 'admin_password_reset' });
+}
+
+// @desc    Request an OTP (by email) to begin the password reset flow
 // @route   POST /api/auth/forgot-password
 // @access  Public
 export const forgotPassword = asyncHandler(async (req, res) => {
-  const { phone } = req.body;
-  if (!phone) {
+  const email = normalizeEmail(req.body.email);
+  if (!EMAIL_RE.test(email)) {
     res.status(400);
-    throw new Error('Phone number is required');
+    throw new Error('Enter a valid email address');
   }
 
-  const admin = await Admin.findOne({ phone });
-  if (!admin) {
-    // Avoid leaking account existence; respond the same way either way.
-    res.json({ success: true, message: 'If that phone number exists, an OTP has been sent.' });
-    return;
-  }
+  // Respond the same way whether or not the account exists, to avoid
+  // revealing which emails are registered.
+  const admin = await findAdminByEmail(email);
+  if (admin) await issueResetCode(email);
 
-  const code = generateOtpCode();
-  await OtpToken.create({
-    phone,
-    code,
-    purpose: 'password_reset',
-    expiresAt: getOtpExpiry(),
-  });
-  await sendOtpSms(phone, code);
-
-  res.json({ success: true, message: 'A 6-digit verification code has been sent.' });
+  res.json({ success: true, message: 'If an account uses that email, a 6-digit code has been sent to it.' });
 });
 
-// @desc    Verify the OTP sent to the admin's phone
+// @desc    Verify the OTP sent to the admin's email
 // @route   POST /api/auth/verify-otp
 // @access  Public
 export const verifyOtp = asyncHandler(async (req, res) => {
-  const { phone, code } = req.body;
-  if (!phone || !code) {
+  const email = normalizeEmail(req.body.email);
+  const { code } = req.body;
+  if (!email || !code) {
     res.status(400);
-    throw new Error('Phone number and code are required');
+    throw new Error('Email and code are required');
   }
 
-  const otp = await OtpToken.findOne({ phone, purpose: 'password_reset', consumed: false }).sort({
+  const otp = await OtpToken.findOne({ target: email, purpose: 'password_reset', consumed: false }).sort({
     createdAt: -1,
   });
 
@@ -95,7 +197,12 @@ export const verifyOtp = asyncHandler(async (req, res) => {
     throw new Error('The code has expired');
   }
 
-  if (otp.code !== code) {
+  if (otp.attempts >= MAX_OTP_ATTEMPTS) {
+    res.status(429);
+    throw new Error('Too many incorrect attempts. Request a new code.');
+  }
+
+  if (otp.code !== String(code).trim()) {
     otp.attempts += 1;
     await otp.save();
     res.status(400);
@@ -105,26 +212,29 @@ export const verifyOtp = asyncHandler(async (req, res) => {
   otp.consumed = true;
   await otp.save();
 
-  const resetToken = jwt.sign({ phone, purpose: 'password_reset' }, process.env.JWT_SECRET, {
-    expiresIn: '15m',
-  });
+  const resetToken = signResetToken({ email, purpose: 'password_reset' }, await findAdminByEmail(email));
 
   res.json({ success: true, resetToken });
 });
 
-// @desc    Resend a fresh OTP
+// @desc    Resend a fresh OTP to the admin's email
 // @route   POST /api/auth/resend-otp
 // @access  Public
 export const resendOtp = asyncHandler(async (req, res) => {
-  const { phone } = req.body;
-  if (!phone) {
+  const email = normalizeEmail(req.body.email);
+  if (!EMAIL_RE.test(email)) {
     res.status(400);
-    throw new Error('Phone number is required');
+    throw new Error('Enter a valid email address');
   }
-  const code = generateOtpCode();
-  await OtpToken.create({ phone, code, purpose: 'password_reset', expiresAt: getOtpExpiry() });
-  await sendOtpSms(phone, code);
-  res.json({ success: true, message: 'A new verification code has been sent.' });
+
+  const recent = await OtpToken.findOne({ target: email, purpose: 'password_reset' }).sort({ createdAt: -1 });
+  if (recent && Date.now() - recent.createdAt.getTime() < RESEND_COOLDOWN_MS) {
+    res.status(429);
+    throw new Error('Please wait a few seconds before requesting another code.');
+  }
+
+  if (await findAdminByEmail(email)) await issueResetCode(email);
+  res.json({ success: true, message: 'If an account uses that email, a new code has been sent to it.' });
 });
 
 // @desc    Reset password using a verified reset token
@@ -137,27 +247,26 @@ export const resetPassword = asyncHandler(async (req, res) => {
     throw new Error('Reset token and new password are required');
   }
 
-  let payload;
-  try {
-    payload = jwt.verify(resetToken, process.env.JWT_SECRET);
-  } catch (err) {
+  const read = readResetToken(resetToken, (p) => (p.email ? findAdminByEmail(p.email) : null));
+  if (read.error || read.payload.purpose !== 'password_reset') {
     res.status(400);
-    throw new Error('Reset session expired. Please restart the password reset process.');
+    throw new Error(read.error || 'Invalid reset session');
   }
+  const checked = await read.check();
+  if (checked.error) {
+    res.status(checked.status || 400);
+    throw new Error(checked.error);
+  }
+  const { account: admin } = checked;
 
-  if (payload.purpose !== 'password_reset') {
+  const weak = checkPasswordStrength(newPassword, { email: admin.email, name: admin.name });
+  if (weak) {
     res.status(400);
-    throw new Error('Invalid reset session');
-  }
-
-  const admin = await Admin.findOne({ phone: payload.phone });
-  if (!admin) {
-    res.status(404);
-    throw new Error('Account not found');
+    throw new Error(weak);
   }
 
   admin.password = newPassword;
-  await admin.save();
+  await saveAdminAsSystem(admin);
 
   res.json({ success: true, message: 'You can now sign in with your new password' });
 });

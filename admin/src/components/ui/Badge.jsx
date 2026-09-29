@@ -9,8 +9,9 @@ const TONE_CLASSES = {
   brand: 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300',
 };
 
-export default function Badge({ children, tone, className }) {
-  const resolvedTone = tone || statusToneMap[children] || 'neutral';
+export default function Badge({ children, tone, className, title }) {
+  const key = Array.isArray(children) ? children[children.length - 1] : children;
+  const resolvedTone = tone || statusToneMap[key] || 'neutral';
   return (
     <span
       className={cn(
@@ -18,6 +19,7 @@ export default function Badge({ children, tone, className }) {
         TONE_CLASSES[resolvedTone],
         className
       )}
+      title={title}
     >
       {children}
     </span>

@@ -11,6 +11,10 @@ import Avatar from '../../components/ui/Avatar.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Tabs from '../../components/ui/Tabs.jsx';
 import { formatDate, formatDateTime } from '../../lib/utils.js';
+import { formatPhone } from '../../lib/phone.js';
+import { languageLabel } from '../../lib/languages.js';
+import { rideSessionLabel } from '../../lib/sessions.js';
+import RideCancellationsCard from '../../components/students/RideCancellationsCard.jsx';
 
 const InfoRow = ({ label, value }) => (
   <div>
@@ -40,6 +44,7 @@ export default function StudentProfile() {
                 {student.firstName} {student.lastName}
               </h1>
               <Badge tone={student.status === 'Active' ? 'success' : 'neutral'}>{student.status}</Badge>
+              {student.todayStatus && <Badge title="Today, from the driver's roll call and boarding scans">Today: {student.todayStatus}</Badge>}
             </div>
           </div>
         </div>
@@ -68,7 +73,12 @@ export default function StudentProfile() {
               <InfoRow label="Class / Grade" value={student.classGrade} />
               <InfoRow label="Gender" value={student.gender} />
               <InfoRow label="Date of Birth" value={formatDate(student.dob)} />
-              <InfoRow label="Emergency Phone" value={student.secondContactPhone} />
+              <InfoRow label="Emergency Phone" value={formatPhone(student.secondContactPhone)} />
+              <InfoRow label="Rides" value={rideSessionLabel(student.rideSession)} />
+              <InfoRow
+                label="Arrival calls"
+                value={student.arrivalCalls === false ? 'Off: the parent is not called when the bus nears home' : 'On: the parent is called when the bus nears home'}
+              />
               <InfoRow label="Home Address" value={student.homeAddress} className="sm:col-span-2" />
             </div>
           </Card>
@@ -79,8 +89,28 @@ export default function StudentProfile() {
               <InfoRow label="Geofence" value={`${student.geofenceRadius || 200}m buffer zone around residence`} />
               <InfoRow label="Latitude" value={student.lat?.toFixed?.(4)} />
               <InfoRow label="Longitude" value={student.lng?.toFixed?.(4)} />
+              <div className="sm:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Shares home with</p>
+                {student.householdMembers?.length ? (
+                  <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm font-medium">
+                    {student.householdMembers.map((m) => (
+                      <Link key={m._id} to={`/students/${m._id}`} className="text-brand-600 hover:underline">
+                        {m.firstName} {m.lastName}
+                      </Link>
+                    ))}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">—</p>
+                )}
+              </div>
             </div>
           </Card>
+        </div>
+      )}
+
+      {tab === 'info' && (
+        <div className="mt-6">
+          <RideCancellationsCard student={student} />
         </div>
       )}
 
@@ -90,10 +120,11 @@ export default function StudentProfile() {
           <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2">
             <InfoRow label="Full Name" value={guardian ? `${guardian.firstName} ${guardian.lastName}` : '—'} />
             <InfoRow label="Relation" value={guardian?.relation} />
-            <InfoRow label="Phone" value={guardian?.phone} />
+            <InfoRow label="Phone" value={formatPhone(guardian?.phone)} />
             <InfoRow label="Email" value={guardian?.email} />
+            <InfoRow label="Language for calls" value={guardian ? languageLabel(guardian.preferredLanguage) : '—'} />
             <InfoRow label="Second Contact" value={student.secondContactName} />
-            <InfoRow label="Second Contact Phone" value={student.secondContactPhone} />
+            <InfoRow label="Second Contact Phone" value={formatPhone(student.secondContactPhone)} />
             <InfoRow label="Emergency Instructions" value={student.emergencyInstructions} className="sm:col-span-2" />
           </div>
         </Card>
@@ -125,7 +156,7 @@ export default function StudentProfile() {
           <Card>
             <CardHeader title="Transit Association" />
             <div className="space-y-5 p-5">
-              <InfoRow label="Assigned Bus" value={student.bus ? `${student.bus.plateNumber} (${student.bus.name})` : '—'} />
+              <InfoRow label="Assigned Bus" value={student.bus ? `${student.bus.name} (${student.bus.plateNumber})` : '—'} />
               <InfoRow label="Assigned Route" value={student.route?.name} />
               <InfoRow
                 label="Assigned Driver"

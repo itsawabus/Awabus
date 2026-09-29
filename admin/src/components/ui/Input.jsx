@@ -1,4 +1,4 @@
-import { forwardRef, useState } from 'react';
+import { forwardRef, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../lib/utils.js';
 
@@ -39,30 +39,58 @@ export const Input = forwardRef(({ className, error, icon: Icon, wrapperClassNam
 ));
 Input.displayName = 'Input';
 
-export const PasswordInput = forwardRef(({ className, error, ...props }, ref) => {
-  const [visible, setVisible] = useState(false);
+// Pass `visible` + `onToggleVisible` to control the eye button yourself;
+// otherwise it toggles freely. `noReveal` hides the eye button altogether.
+export const PasswordInput = forwardRef(({ className, error, visible: visibleProp, onToggleVisible, noReveal, value, ...props }, ref) => {
+  const [visibleState, setVisibleState] = useState(false);
+  const controlled = visibleProp !== undefined;
+  const visible = controlled ? visibleProp : visibleState;
+  const toggle = () => (controlled ? onToggleVisible?.(!visible) : setVisibleState((v) => !v));
+
+  // `value` is deliberately not passed to the <input>: React copies a
+  // controlled value into the HTML value="..." attribute, which would show the
+  // typed password in the page's HTML (DevTools, extensions). The browser keeps
+  // the text itself; onChange still reports every keystroke, and a new value
+  // from the parent (e.g. clearing the form) is written to the field directly.
+  const inputRef = useRef(null);
+  const setRefs = useCallback(
+    (el) => {
+      inputRef.current = el;
+      if (typeof ref === 'function') ref(el);
+      else if (ref) ref.current = el;
+    },
+    [ref]
+  );
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (el && value !== undefined && el.value !== String(value ?? '')) el.value = value ?? '';
+  }, [value]);
+
   return (
     <div className="relative">
       <input
-        ref={ref}
-        type={visible ? 'text' : 'password'}
+        ref={setRefs}
+        type={visible && !noReveal ? 'text' : 'password'}
         className={cn(
           baseInputClasses,
-          'h-11 pr-10',
+          'h-11',
+          !noReveal && 'pr-10',
           error ? 'border-red-400 focus:border-red-400 focus:ring-red-100' : 'border-slate-200 dark:border-slate-700',
           className
         )}
         {...props}
       />
-      <button
-        type="button"
-        tabIndex={-1}
-        onClick={() => setVisible((v) => !v)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-        aria-label={visible ? 'Hide password' : 'Show password'}
-      >
-        {visible ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
-      </button>
+      {!noReveal && (
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={toggle}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+          aria-label={visible ? 'Hide password' : 'Show password'}
+        >
+          {visible ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+        </button>
+      )}
     </div>
   );
 });
