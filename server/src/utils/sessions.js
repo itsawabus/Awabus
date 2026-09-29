@@ -102,3 +102,17 @@ export const runWords = (session) => RUN_WORDS[session] || RUN_WORDS.evening;
 
 /** Does a student riding `rideSession` belong on a `session` trip? */
 export const ridesIn = (rideSession, session) => !session || !rideSession || rideSession === 'both' || rideSession === session;
+
+/**
+ * Is this child still waiting on the run, so a delay affects them?
+ * Morning pick-up: only children still to be picked up (not those already
+ * on the bus or at school). Afternoon drop-off: children not yet dropped
+ * home (at school or on the bus). Never absent, cancelled or "not here".
+ */
+export function delayAffects(row, session) {
+  if (!row || row.attendance === 'Absent' || row.attendance === 'Cancelled') return false;
+  const status = row.dropoffStatus || 'Pending';
+  if (status === 'Not on board' || status === 'Dropped off') return false;
+  if (session === 'morning') return status === 'Pending' || status === 'Boarding now';
+  return true;
+}

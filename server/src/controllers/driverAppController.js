@@ -25,7 +25,7 @@ import { notify, describeTrip } from '../services/notify.js';
 import { emitToSchool } from '../sockets/rooms.js';
 import { checkSetupCode, clearSetupCode, SETUP_CODE_MESSAGES } from '../utils/setupCode.js';
 import { inGhana } from '../utils/geo.js';
-import { sessionFor, ridesIn, runWords } from '../utils/sessions.js';
+import { sessionFor, ridesIn, runWords, delayAffects } from '../utils/sessions.js';
 import { alertForScan } from '../services/parentAlerts.js';
 import { driverReading } from '../services/busPosition.js';
 import { cancelledStudentIds, dateKey } from '../services/rideCancellations.js';
@@ -712,9 +712,9 @@ export const sendDelayBroadcast = asyncHandler(async (req, res) => {
     throw refuseTrip(res, 429, 'DELAY_TOO_SOON', `A delay message was sent a few minutes ago. You can send another in ${Math.ceil(waitMs / 60000)} min.`);
   }
 
-  const attendingIds = trip.studentProgress
-    .filter((p) => p.attendance === 'Present')
-    .map((p) => p.student);
+  // Only parents still waiting on this run: not those whose child is already
+  // picked up / dropped (utils/sessions.js delayAffects).
+  const attendingIds = trip.studentProgress.filter((p) => delayAffects(p, trip.session)).map((p) => p.student);
 
   const students = await Student.find({ _id: { $in: attendingIds } }).populate('primaryGuardian', 'phone');
   const guardianPhones = [...new Set(students.map((s) => s.primaryGuardian?.phone).filter(Boolean))];

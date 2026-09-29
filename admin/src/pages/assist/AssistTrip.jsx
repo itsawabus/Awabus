@@ -628,12 +628,12 @@ function DelayModal({ api, open, trip, onClose, onSent }) {
     >
       {send.isSuccess ? (
         <p className="flex items-center gap-2 text-sm font-medium text-green-700 dark:text-green-400">
-          <CheckCircle2 className="h-4 w-4" /> Delay notice sent to the parents of the children riding.
+          <CheckCircle2 className="h-4 w-4" /> Delay notice sent to the parents still waiting.
         </p>
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Every parent with a child riding gets an SMS. At most {trip?.limits?.delay?.perTrip || 3} per trip.
+            {trip?.session === 'morning' ? 'Parents of children still waiting to be picked up get an SMS.' : 'Parents of children not yet dropped home get an SMS.'} Children already {trip?.session === 'morning' ? 'picked up' : 'dropped'} are left out. At most {trip?.limits?.delay?.perTrip || 3} per trip.
           </p>
           <div>
             <Label>Reason</Label>
