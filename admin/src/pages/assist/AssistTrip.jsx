@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Bus, CheckCircle2, Clock, ListChecks, MessageSquare, Navigation, Phone, RefreshCw, Search, UserRound, X } from 'lucide-react';
+import { AlertTriangle, Bus, CheckCircle2, CheckSquare, Circle, Clock, CornerUpRight, ListChecks, MessageSquare, Navigation, Phone, RefreshCw, Search, UserRound, X } from 'lucide-react';
 import { API_URL } from '../../api/client.js';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -121,6 +121,11 @@ function AssistBoard({ pass, name, onChangeName }) {
   const [flash, setFlash] = useState('');
   const [search, setSearch] = useState('');
   const [view, setView] = useState(null); // 'nearest' | 'az' (null = pick for the trip's state)
+  // Selecting several students: a status for all of them, or one SMS to their parents.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState([]); // student ids
+  const [groupMessage, setGroupMessage] = useState(null); // students
+  const [bulkBusy, setBulkBusy] = useState(false);
   const lastOrder = useRef({ order: [], bus: null });
 
   const { data: trip, error, isLoading, refetch, isFetching } = useQuery({
@@ -190,7 +195,7 @@ function AssistBoard({ pass, name, onChangeName }) {
 
   // Nearest first from the bus's last position; the order holds still while
   // a dialog is open, so nothing moves under a tap.
-  const frozen = Boolean(confirm || messageTo);
+  const frozen = Boolean(confirm || messageTo || selecting || groupMessage);
   // The teacher's own position (when sharing) is the freshest view of where the bus is.
   const ownFix = backup.on && backup.position && Date.now() - backup.position.at < 60000 && backup.state !== 'not_on_bus' ? backup.position : null;
   const bus = frozen ? lastOrder.current.bus : ownFix || trip.liveLocation || null;
@@ -204,10 +209,64 @@ function AssistBoard({ pass, name, onChangeName }) {
   const nameOf = (p) => `${p.student?.firstName || ''} ${p.student?.lastName || ''}`.trim();
   const azRows = [...rows].sort((a, b) => nameOf(a).localeCompare(nameOf(b))).filter((p) => matchesSearch(p, search));
   const nextUp = ordered.next[0];
-  const renderCard = (p, distance = '') => (
+  const toggle = (id) => setSelected((was) => (was.includes(id) ? was.filter((x) => x !== id) : [...was, id]));
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelected([]);
+  };
+  const selectedRows = rows.filter((p) => selected.includes(p.student?._id));
+  const w = runWords(trip.session);
+  const riderRow = (p) => !['Absent', 'Cancelled'].includes(p.attendance);
+  const waitingRow = (p) => !p.dropoffStatus || ['Pending', 'Boarding now'].includes(p.dropoffStatus);
+  const BULK = {
+    'On board': { word: w.board, fits: (p) => riderRow(p) && (waitingRow(p) || p.dropoffStatus === 'Not on board'), body: { dropoffStatus: 'On board' } },
+    'Dropped off': { word: w.drop, fits: (p) => riderRow(p) && p.dropoffStatus === 'On board', body: { dropoffStatus: 'Dropped off' } },
+    'Not on board': { word: w.notHere, fits: (p) => riderRow(p) && waitingRow(p), body: { dropoffStatus: 'Not on board' }, danger: true },
+    Present: { word: 'Attending', fits: (p) => p.attendance === 'Absent', body: { attendance: 'Present' } },
+    Absent: { word: 'Not attending', fits: (p) => p.attendance !== 'Absent' && p.attendance !== 'Cancelled', body: { attendance: 'Absent' }, danger: true },
+  };
+  const askBulk = (stepKey) => {
+    const step = BULK[stepKey];
+    const fits = selectedRows.filter(step.fits);
+    const skipped = selectedRows.length - fits.length;
+    if (!fits.length) {
+      setFlash(`None of the selected students can be marked "${step.word}".`);
+      return;
+    }
+    ask(
+      `Mark ${fits.length} student${fits.length === 1 ? '' : 's'} as "${step.word}"?`,
+      `${fits.map((p) => p.student?.firstName).join(', ')}.${skipped ? ` ${skipped} other${skipped === 1 ? '' : 's'} selected can't be marked "${step.word}" and stay as they are.` : ''}`,
+      'Yes',
+      async () => {
+        setBulkBusy(true);
+        const failed = [];
+        // One after another, so the changes never clash on the server.
+        for (const p of fits) {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            await api.post(`/assist/students/${p.student._id}/attendance`, step.body);
+          } catch (e) {
+            failed.push(`${p.student?.firstName}: ${e.message}`);
+          }
+        }
+        setBulkBusy(false);
+        stopSelecting();
+        qc.invalidateQueries({ queryKey: key });
+        if (failed.length) setFlash(`Not saved for ${failed.join('; ')}`);
+      },
+      step.danger
+    );
+  };
+  // Google Maps turn-by-turn directions to a child's home (opens the Maps app on phones).
+  const directionsUrl = (st) =>
+    Number.isFinite(st?.lat) && Number.isFinite(st?.lng)
+      ? `https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lng}&travelmode=driving`
+      : '';
+  const renderCard = (p, distance = '', withDirections = false) => (
+    <Selectable key={p.student?._id} selecting={selecting} isSelected={selected.includes(p.student?._id)} onToggle={() => toggle(p.student?._id)}>
     <StudentCard
-      key={p.student?._id}
       p={p}
+      directions={withDirections ? directionsUrl(p.student) : ''}
       photo={photos[p.student?._id]}
       distance={distance}
       session={trip.session}
@@ -219,6 +278,7 @@ function AssistBoard({ pass, name, onChangeName }) {
         ask(label, confirmText, 'Yes', () => mark.mutate({ studentId: p.student._id, body }), danger)
       }
     />
+    </Selectable>
   );
 
   return (
@@ -305,6 +365,16 @@ function AssistBoard({ pass, name, onChangeName }) {
               {nextUp.metres != null ? ` · ${formatDistance(nextUp.metres)}` : nextUp.noHome ? ' · no home location saved' : ''}
             </p>
           </div>
+          {directionsUrl(nextUp.p.student) && (
+            <a
+              href={directionsUrl(nextUp.p.student)}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-lg bg-white px-3 py-2 text-sm font-bold text-navy"
+            >
+              <CornerUpRight className="h-4 w-4" /> Directions
+            </a>
+          )}
         </div>
       )}
 
@@ -329,6 +399,16 @@ function AssistBoard({ pass, name, onChangeName }) {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold shadow-sm',
+            selecting ? 'bg-navy text-white' : 'bg-white text-slate-700 dark:bg-navy-light dark:text-slate-200'
+          )}
+        >
+          <CheckSquare className="h-3.5 w-3.5" /> {selecting ? 'Done selecting' : 'Select'}
+        </button>
         <label className="flex min-w-[12rem] flex-1 items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm dark:bg-navy-light">
           <Search className="h-4 w-4 shrink-0 text-slate-400" />
           <input
@@ -357,7 +437,7 @@ function AssistBoard({ pass, name, onChangeName }) {
                 {sec.title} · {sec.rows.length}
               </p>
               {sec.rows.map((r) =>
-                renderCard(r.p, sec.key === 'next' && live ? (r.metres != null ? `${formatDistance(r.metres)} away` : r.noHome ? 'No home location saved' : '') : '')
+                renderCard(r.p, sec.key === 'next' && live ? (r.metres != null ? `${formatDistance(r.metres)} away` : r.noHome ? 'No home location saved' : '') : '', sec.key === 'next' && live)
               )}
             </div>
           ))}
@@ -373,7 +453,9 @@ function AssistBoard({ pass, name, onChangeName }) {
           ) : (
             <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm dark:divide-slate-800 dark:bg-navy-light">
               {azRows.map((p) => (
-                <AzRow key={p.student?._id} p={p} session={trip.session} photo={photos[p.student?._id]} />
+                <Selectable key={p.student?._id} selecting={selecting} isSelected={selected.includes(p.student?._id)} onToggle={() => toggle(p.student?._id)} flat>
+                  <AzRow p={p} session={trip.session} photo={photos[p.student?._id]} />
+                </Selectable>
               ))}
             </div>
           )}
@@ -383,7 +465,61 @@ function AssistBoard({ pass, name, onChangeName }) {
         </div>
       )}
 
-      <p className="mt-6 text-center text-xs text-slate-400">
+      {selecting && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white px-4 pb-4 pt-3 shadow-lg dark:border-slate-700 dark:bg-navy-light">
+          <div className="mx-auto max-w-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-extrabold text-slate-900 dark:text-white">
+                {selected.length ? `${selected.length} selected` : 'Tap students to select them'}
+              </p>
+              <div className="flex gap-4 text-sm font-semibold text-brand-600">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelected((shownView === 'nearest' ? sections.flatMap((sec) => sec.rows.map((r) => r.p)) : azRows).map((p) => p.student?._id).filter(Boolean))
+                  }
+                >
+                  Select all
+                </button>
+                <button type="button" onClick={stopSelecting}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+            {selected.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {live ? (
+                  <>
+                    <Button size="sm" loading={bulkBusy} onClick={() => askBulk('On board')}>
+                      {w.board}
+                    </Button>
+                    <Button size="sm" loading={bulkBusy} onClick={() => askBulk('Dropped off')}>
+                      {w.drop}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => askBulk('Not on board')}>
+                      {w.notHere}
+                    </Button>
+                  </>
+                ) : trip.status === 'Scheduled' ? (
+                  <>
+                    <Button size="sm" loading={bulkBusy} onClick={() => askBulk('Present')}>
+                      Attending
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => askBulk('Absent')}>
+                      Not attending
+                    </Button>
+                  </>
+                ) : null}
+                <Button size="sm" variant="outline" onClick={() => setGroupMessage(selectedRows.map((p) => p.student).filter(Boolean))}>
+                  <MessageSquare className="h-4 w-4" /> SMS parents
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <p className={cn('mt-6 text-center text-xs text-slate-400', selecting && 'pb-36')}>
         Helping as <span className="font-semibold">{name}</span> ·{' '}
         <button type="button" className="underline" onClick={onChangeName}>
           change
@@ -403,8 +539,141 @@ function AssistBoard({ pass, name, onChangeName }) {
         }}
       />
       <MessageModal api={api} student={messageTo} onClose={() => setMessageTo(null)} />
+      <GroupMessageModal
+        api={api}
+        students={groupMessage}
+        session={trip.session}
+        onClose={(sent) => {
+          setGroupMessage(null);
+          if (sent) stopSelecting();
+        }}
+      />
       <DelayModal api={api} open={delayOpen} trip={trip} onClose={() => setDelayOpen(false)} onSent={() => qc.invalidateQueries({ queryKey: key })} />
     </Shell>
+  );
+}
+
+// While selecting, a tap on a student adds or removes them (their own buttons pause).
+function Selectable({ selecting, isSelected, onToggle, flat = false, children }) {
+  if (!selecting) return children;
+  return (
+    <div
+      role="checkbox"
+      aria-checked={isSelected}
+      tabIndex={0}
+      onClick={onToggle}
+      onKeyDown={(e) => (e.key === ' ' || e.key === 'Enter') && (e.preventDefault(), onToggle())}
+      className={cn('relative cursor-pointer', !flat && 'rounded-2xl', isSelected && (flat ? 'bg-brand-50 dark:bg-brand-500/10' : 'ring-2 ring-brand-600'))}
+    >
+      <div className="pointer-events-none">{children}</div>
+      <span className="absolute right-3 top-3">
+        {isSelected ? <CheckCircle2 className="h-5 w-5 text-brand-600" /> : <Circle className="h-5 w-5 text-slate-300" />}
+      </span>
+    </div>
+  );
+}
+
+const groupQuickMessages = (session) => [
+  session === 'evening' ? 'The bus has left school and is on the way home.' : 'The bus is on the way to your pick-up point.',
+  'The bus will reach you in about 5 minutes.',
+  'The bus is running a few minutes late today.',
+  session === 'evening' ? 'Please be ready to meet your child at the drop-off point.' : 'Please have your child ready at the pick-up point.',
+];
+
+/** One SMS to the parents of several students (each parent once). */
+function GroupMessageModal({ api, students, session, onClose }) {
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+  useEffect(() => {
+    setText('');
+    setResult(null);
+  }, [students]);
+  const list = students || [];
+  const noPhone = list.filter((s) => !s.primaryGuardian?.phone);
+  const seen = new Set();
+  const byParent = list.filter((s) => {
+    const phone = s.primaryGuardian?.phone;
+    if (!phone || seen.has(phone)) return false;
+    seen.add(phone);
+    return true;
+  });
+  const send = async () => {
+    setSending(true);
+    const out = { sent: 0, saved: 0, failed: noPhone.map((s) => `${s.firstName}: no parent phone`) };
+    for (const s of byParent) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const r = await api.post(`/assist/students/${s._id}/message`, { text: text.trim() });
+        if (r.data?.status === 'sent') out.sent += 1;
+        else out.saved += 1;
+      } catch (e) {
+        out.failed.push(`${s.firstName}: ${e.message}`);
+      }
+    }
+    setSending(false);
+    setResult(out);
+  };
+  const close = () => !sending && onClose(Boolean(result));
+  return (
+    <Modal
+      open={Boolean(students)}
+      onClose={close}
+      title={`Message ${byParent.length} parent${byParent.length === 1 ? '' : 's'}`}
+      footer={
+        result ? (
+          <Button onClick={() => onClose(true)}>Done</Button>
+        ) : (
+          <>
+            <Button variant="outline" onClick={close} disabled={sending}>
+              Cancel
+            </Button>
+            <Button onClick={send} loading={sending} disabled={!text.trim() || !byParent.length}>
+              Send to {byParent.length} parent{byParent.length === 1 ? '' : 's'}
+            </Button>
+          </>
+        )
+      }
+    >
+      {result ? (
+        <div className="space-y-2 text-sm">
+          <p className="flex items-center gap-2 font-medium text-green-700 dark:text-green-400">
+            <CheckCircle2 className="h-4 w-4" />
+            {result.sent ? `Sent to ${result.sent} parent${result.sent === 1 ? '' : 's'}.` : ''}
+            {result.saved ? ` ${result.saved} saved: they go out once SMS is switched on for the school.` : ''}
+          </p>
+          {result.failed.map((f) => (
+            <p key={f} className="text-red-600">
+              {f}
+            </p>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            For {list.map((s) => s.firstName).join(', ')}. Sent as an SMS from AwaBus; brothers and sisters share one message.
+          </p>
+          <div className="space-y-2">
+            {groupQuickMessages(session).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setText(m)}
+                className={cn(
+                  'w-full rounded-lg border px-3 py-2 text-left text-sm text-slate-700 dark:text-slate-200',
+                  text === m ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'
+                )}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <Textarea value={text} onChange={(e) => setText(e.target.value.slice(0, 140))} placeholder="Or type a short message" />
+          <p className="text-right text-xs text-slate-400">{text.length}/140</p>
+          {noPhone.length > 0 && <p className="text-xs text-amber-700">No parent phone for {noPhone.map((s) => s.firstName).join(', ')}.</p>}
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -447,7 +716,7 @@ const Stat = ({ label, value }) => (
   </div>
 );
 
-function StudentCard({ p, photo, distance, session, live, scheduled, busy, onAction, onMessage }) {
+function StudentCard({ p, photo, directions, distance, session, live, scheduled, busy, onAction, onMessage }) {
   const w = runWords(session);
   const s = p.student || {};
   const g = s.primaryGuardian;
@@ -472,7 +741,16 @@ function StudentCard({ p, photo, distance, session, live, scheduled, busy, onAct
               .filter(Boolean)
               .join(' · ')}
           </p>
-          {distance && <p className="mt-0.5 text-xs font-semibold text-slate-600 dark:text-slate-300">{distance}</p>}
+          {(distance || directions) && (
+            <p className="mt-0.5 flex items-center gap-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              {distance}
+              {directions && (
+                <a href={directions} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-bold text-brand-600">
+                  <CornerUpRight className="h-3.5 w-3.5" /> Directions
+                </a>
+              )}
+            </p>
+          )}
           {call && <p className={cn('mt-0.5 text-xs font-bold', CALL_TONE[call.tone])}>{call.text}</p>}
         </div>
         <Badge tone={['Dropped off', 'On board'].includes(p.dropoffStatus) && !out ? 'success' : status === 'Attending' ? 'success' : out || p.dropoffStatus === 'Not on board' ? 'danger' : 'neutral'}>
