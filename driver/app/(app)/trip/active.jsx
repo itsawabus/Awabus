@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { useKeepAwake } from 'expo-keep-awake';
 import { AlertTriangle, ListChecks, Navigation, Search, X } from 'lucide-react-native';
 import TripHeader from '../../../src/components/layout/TripHeader.jsx';
 import Card from '../../../src/components/ui/Card.jsx';
@@ -24,9 +25,12 @@ import { formatClock, formatDate, formatLat, formatLng, timeAgo } from '../../..
 import { colors, radii } from '../../../src/lib/theme.js';
 import { runWords } from '../../../src/lib/runs.js';
 import { orderTrip, sectionsFor, matchesSearch, callInfo, formatDistance, CALL_IN_PROGRESS } from '../../../src/lib/nearest.js';
+import BackgroundLocationBanner from '../../../src/components/BackgroundLocationBanner.jsx';
 import { BusOfflineBanner, useConnectionStatus } from '../../../src/components/ConnectionStatus.jsx';
 
 export default function ActiveTrip() {
+  // The screen stays on while the trip screen is open, so the list can be read at a glance.
+  useKeepAwake('awabus-trip');
   const queryClient = useQueryClient();
   const isOnline = useConnectionStore((s) => s.isOnline);
   const { busOnline } = useConnectionStatus();
@@ -230,6 +234,8 @@ export default function ActiveTrip() {
             <Text style={styles.offlineText}>GPS is off: {gpsError} The school cannot see the bus until location is allowed.</Text>
           </View>
         ) : null}
+
+        <BackgroundLocationBanner />
 
         {/* Location off (data is fine): the school can't see the bus. */}
         {!gpsError && isOnline ? <BusOfflineBanner /> : null}

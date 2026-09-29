@@ -22,7 +22,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.awabus.driver",
       "infoPlist": {
-        "UIBackgroundModes": []
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
     },
     "android": {
@@ -35,7 +37,11 @@
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.WAKE_LOCK"
       ]
     },
     "plugins": [
@@ -44,7 +50,12 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "AwaBus Driver uses your location while a trip is active to share your bus's live position with the school and parents."
+          "locationWhenInUsePermission": "AwaBus Driver uses your location while a trip is active to share your bus's live position with the school and parents.",
+          "locationAlwaysAndWhenInUsePermission": "AwaBus Driver keeps sharing your bus's live position with the school and parents while a trip is running, even when the screen is off or another app is open. It stops when the trip ends.",
+          "locationAlwaysPermission": "AwaBus Driver keeps sharing your bus's live position while a trip is running, even when the screen is off.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true
         }
       ],
       [

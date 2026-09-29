@@ -12,6 +12,8 @@ import { useOfflineQueueStore } from '../src/store/offlineQueueStore.js';
 import { useOfflineSync } from '../src/hooks/useOfflineSync.js';
 import BrandSplash from '../src/components/layout/BrandSplash.jsx';
 import BackgroundWork from '../src/components/BackgroundWork.jsx';
+// Defines the screen-off location task; must load when the app starts.
+import '../src/lib/backgroundLocation.js';
 
 // How long the in-app splash stays up at minimum, so it doesn't just flicker.
 const MIN_SPLASH_MS = 1200;

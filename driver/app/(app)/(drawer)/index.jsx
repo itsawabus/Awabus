@@ -12,6 +12,7 @@ import Modal from '../../../src/components/ui/Modal.jsx';
 import ConfirmDialog from '../../../src/components/ui/ConfirmDialog.jsx';
 import StudentMeta, { guardianName } from '../../../src/components/StudentMeta.jsx';
 import MessageParentSheet from '../../../src/components/MessageParentSheet.jsx';
+import BackgroundLocationBanner from '../../../src/components/BackgroundLocationBanner.jsx';
 import { ConnectionBadges, BusOfflineBanner } from '../../../src/components/ConnectionStatus.jsx';
 import { formatPhone } from '../../../src/lib/phone.js';
 import { PageLoader } from '../../../src/components/ui/Spinner.jsx';
@@ -189,6 +190,7 @@ export default function Home() {
         </Card>
 
         <BusOfflineBanner />
+        <BackgroundLocationBanner />
 
         <Text style={styles.sectionLabel}>Attendance Summary</Text>
         <View style={styles.statsRow}>

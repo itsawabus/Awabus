@@ -6,6 +6,10 @@ export const useLiveGpsStore = create((set) => ({
   position: null, // { lat, lng, heading, recordedAt }
   lastSentAt: null,
   error: null,
+  // Screen-off tracking (src/lib/backgroundLocation.js):
+  // 'off' | 'running' | 'no_permission' | 'failed'
+  background: 'off',
+  setBackground: (background) => set({ background }),
   setPosition: (position) => set({ position }),
   setError: (error) => set({ error }),
   markSent: () => set({ lastSentAt: Date.now() }),

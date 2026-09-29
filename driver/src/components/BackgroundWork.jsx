@@ -9,9 +9,9 @@ import { useOfflineQueueStore } from '../store/offlineQueueStore.js';
 import { useConnectionStore } from '../store/connectionStore.js';
 import { useAuthStore } from '../store/authStore.js';
 import { useUiStore } from '../store/uiStore.js';
+import { startTripTracking, stopTripTracking, PUSH_EVERY_MS } from '../lib/backgroundLocation.js';
 
-// A new position goes to the school at most this often...
-const PUSH_EVERY_MS = 8000;
+// A new position goes to the school at most every PUSH_EVERY_MS (8 s)...
 // ...and at least this often while the trip runs, even when the bus is parked,
 // so Live Tracking keeps showing the bus as live instead of "not reporting".
 const HEARTBEAT_MS = 30000;
@@ -39,11 +39,13 @@ export default function BackgroundWork() {
   // changes (the next request carries the new X-Location reading).
   const queryClient = useQueryClient();
   useLocationStatus(() => queryClient.invalidateQueries({ queryKey: ['todays-trip'] }));
-  const lastPushRef = useRef(0);
+  // When the last position went out, shared with the screen-off tracker so
+  // the two never send the same moment twice.
+  const sinceLastSend = () => Date.now() - (useLiveGpsStore.getState().lastSentAt || 0);
 
   const send = (payload) => {
     if (!tripId) return;
-    lastPushRef.current = Date.now();
+    useLiveGpsStore.getState().markSent();
     pushLocation(tripId, payload)
       .then(() => {
         useConnectionStore.getState().markSynced();
@@ -60,7 +62,7 @@ export default function BackgroundWork() {
   useEffect(() => {
     if (!position) return;
     useLiveGpsStore.getState().setPosition(position);
-    if (Date.now() - lastPushRef.current >= PUSH_EVERY_MS) send(position);
+    if (sinceLastSend() >= PUSH_EVERY_MS) send(position);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position, tripId]);
 
@@ -73,11 +75,34 @@ export default function BackgroundWork() {
     const timer = setInterval(() => {
       const last = useLiveGpsStore.getState().position;
       const fixIsRecent = last && Date.now() - new Date(last.recordedAt || 0).getTime() < FIX_TRUSTED_MS;
-      if (last && fixIsRecent && Date.now() - lastPushRef.current >= HEARTBEAT_MS) send({ ...last, recordedAt: new Date().toISOString() });
+      if (last && fixIsRecent && sinceLastSend() >= HEARTBEAT_MS) send({ ...last, recordedAt: new Date().toISOString() });
     }, 5000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId]);
+
+  // Screen off or another app open: keep sending from the background while
+  // the trip runs (needs "Allow all the time" location), and stop at the end.
+  const background = useLiveGpsStore((s) => s.background);
+  useEffect(() => {
+    let cancelled = false;
+    if (tripId) {
+      startTripTracking(tripId, driverId).then((state) => {
+        if (!cancelled) useLiveGpsStore.getState().setBackground(state);
+      });
+    } else {
+      stopTripTracking();
+      useLiveGpsStore.getState().setBackground('off');
+    }
+    return () => {
+      cancelled = true;
+    };
+    // 'retry' (set after the driver allows "all the time") starts it again.
+  }, [tripId, driverId, background === 'retry']);
+  // Signed out (this component goes away): stop tracking.
+  useEffect(() => () => {
+    stopTripTracking();
+  }, []);
 
   // New notifications: a short vibration if the driver wants it.
   const { data: notifications } = useQuery({ queryKey: ['driver-notifications'], queryFn: getNotifications, refetchInterval: 5 * 60 * 1000 });
