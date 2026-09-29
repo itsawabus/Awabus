@@ -5,6 +5,7 @@ import {
   assistMarkAttendance,
   assistMessageParent,
   assistDelayBroadcast,
+  assistPushLocation,
 } from '../controllers/assistController.js';
 
 // Bus assistant page (no account; the pass from the driver's QR code).
@@ -15,5 +16,6 @@ router.get('/trip', getAssistTrip);
 router.post('/students/:studentId/attendance', assistMarkAttendance);
 router.post('/students/:studentId/message', assistMessageParent);
 router.post('/delay-broadcast', assistDelayBroadcast);
+router.post('/location', assistPushLocation);
 
 export default router;

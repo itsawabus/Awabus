@@ -8,6 +8,8 @@ import Trip from '../models/Trip.js';
 import Driver from '../models/Driver.js';
 import { tenantContext } from '../utils/tenantContext.js';
 import { resolvePass } from '../services/assistPass.js';
+import { assistantReading } from '../services/busPosition.js';
+import { inGhana } from '../utils/geo.js';
 import {
   STUDENT_FOR_DRIVER,
   DELAY_LIMITS,
@@ -60,7 +62,7 @@ export const forPassTrip = (handler) => (req, res, next) => {
 export const getAssistTrip = asyncHandler(async (req, res) => {
   const [trip, driver] = await Promise.all([
     Trip.findById(req.assistTrip._id)
-      .select('tripCode status session route bus date startedAt studentProgress delayBroadcasts parentMessages liveLocation')
+      .select('tripCode status session route bus date startedAt studentProgress delayBroadcasts parentMessages liveLocation locationSource driverSeenAt')
       .populate('route', 'routeId name')
       .populate('bus', 'plateNumber name')
       .populate(STUDENT_FOR_DRIVER)
@@ -81,3 +83,41 @@ export const getAssistTrip = asyncHandler(async (req, res) => {
 export const assistMarkAttendance = forPassTrip(markAttendance);
 export const assistMessageParent = forPassTrip(messageParent);
 export const assistDelayBroadcast = forPassTrip(sendDelayBroadcast);
+
+// @desc    Backup bus position from the assistant's phone. Used only while the
+//          driver's phone is not reporting (services/busPosition.js).
+// @route   POST /api/assist/location   body: { lat, lng, heading?, accuracy? }
+export const assistPushLocation = asyncHandler(async (req, res) => {
+  const lat = Number(req.body.lat);
+  const lng = Number(req.body.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !inGhana(lat, lng)) {
+    res.status(400);
+    throw new Error('That position is not in Ghana. Check that location is switched on.');
+  }
+  const trip = await Trip.findById(req.assistTrip._id).select(
+    'status bus startedAt locationSource driverLocation driverSeenAt assistantLocation assistantOnBus'
+  );
+  if (!trip || !['In Progress', 'Delayed'].includes(trip.status)) {
+    res.status(409);
+    const err = new Error('The trip is not running, so the bus position is not shared.');
+    err.errorCode = 'TRIP_NOT_LIVE';
+    throw err;
+  }
+  const heading = Number(req.body.heading);
+  const accuracy = Number(req.body.accuracy);
+  const location = {
+    lat,
+    lng,
+    heading: Number.isFinite(heading) && heading >= 0 && heading <= 360 ? heading : 0,
+    updatedAt: new Date(),
+  };
+  const result = await assistantReading({
+    trip,
+    location,
+    accuracy: Number.isFinite(accuracy) ? accuracy : undefined,
+    name: req.assistant.name,
+    io: req.app.get('io'),
+    school: req.school,
+  });
+  res.json({ success: true, data: result });
+});

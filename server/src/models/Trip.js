@@ -109,6 +109,14 @@ const tripSchema = new mongoose.Schema(
       updatedAt: Date,
     },
     gpsSignal: { type: String, enum: ['ok', 'lost', 'offline'], default: 'ok' },
+    // Whose phone liveLocation came from: the driver's, or the bus assistant's
+    // as a backup while the driver's phone is not reporting (services/busPosition.js).
+    locationSource: { type: String, enum: ['driver', 'assistant'], default: 'driver' },
+    driverLocation: { lat: Number, lng: Number, heading: Number, updatedAt: Date },
+    driverSeenAt: { type: Date, default: null }, // last live reading from the driver (server time)
+    assistantLocation: { lat: Number, lng: Number, heading: Number, accuracy: Number, updatedAt: Date, name: String },
+    // Is the assistant's phone on the bus (near the driver's)? null = not compared yet.
+    assistantOnBus: { type: Boolean, default: null },
     distanceCoveredKm: { type: Number, default: 0 },
     etaMinutes: { type: Number, default: 0 },
 

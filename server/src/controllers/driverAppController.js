@@ -26,7 +26,8 @@ import { emitToSchool } from '../sockets/rooms.js';
 import { checkSetupCode, clearSetupCode, SETUP_CODE_MESSAGES } from '../utils/setupCode.js';
 import { inGhana } from '../utils/geo.js';
 import { sessionFor, ridesIn, runWords } from '../utils/sessions.js';
-import { alertForScan, checkGeofences } from '../services/parentAlerts.js';
+import { alertForScan } from '../services/parentAlerts.js';
+import { driverReading } from '../services/busPosition.js';
 import { cancelledStudentIds, dateKey } from '../services/rideCancellations.js';
 import { createPass, revokePass } from '../services/assistPass.js';
 
@@ -558,7 +559,9 @@ export const pushLocation = asyncHandler(async (req, res) => {
   }
   const heading = Number(req.body.heading);
 
-  const trip = await Trip.findOne({ _id: req.params.id, driver: req.driver._id }).select('status bus liveLocation');
+  const trip = await Trip.findOne({ _id: req.params.id, driver: req.driver._id }).select(
+    'status bus liveLocation locationSource driverLocation driverSeenAt assistantLocation assistantOnBus startedAt'
+  );
   if (!trip) {
     res.status(404);
     throw new Error('Trip not found');
@@ -570,8 +573,9 @@ export const pushLocation = asyncHandler(async (req, res) => {
   const now = Date.now();
   const taken = req.body.recordedAt ? new Date(req.body.recordedAt).getTime() : NaN;
   const recordedAt = new Date(Number.isFinite(taken) && taken <= now + 60 * 1000 ? Math.min(taken, now) : now);
-  // A reading older than the one already shown (a late offline one) must not move the bus back.
-  const shown = trip.liveLocation?.updatedAt ? new Date(trip.liveLocation.updatedAt).getTime() : 0;
+  // A reading older than the driver's last one (a late offline one) must not move the bus back.
+  const lastFromDriver = trip.driverLocation?.updatedAt || (trip.locationSource !== 'assistant' ? trip.liveLocation?.updatedAt : null);
+  const shown = lastFromDriver ? new Date(lastFromDriver).getTime() : 0;
   if (recordedAt.getTime() < shown) return res.json({ success: true, data: trip.liveLocation, ignored: 'older than the last position' });
 
   const location = {
@@ -580,14 +584,11 @@ export const pushLocation = asyncHandler(async (req, res) => {
     heading: Number.isFinite(heading) && heading >= 0 && heading <= 360 ? heading : 0,
     updatedAt: recordedAt,
   };
-  // Only these fields change, so this never overwrites a scan saved at the same moment.
-  await Trip.updateOne({ _id: trip._id }, { $set: { liveLocation: location, gpsSignal: 'ok' } });
-  await Bus.updateOne({ _id: trip.bus }, { $set: { lastKnownLocation: location, gpsSignal: 'ok', locationSeenAt: new Date() } });
-
-  emitToSchool(req.app.get('io'), req.school, 'bus:location', { tripId: trip._id, busId: trip.bus, location });
-  res.json({ success: true, data: location });
-  // Near-home check after answering, so the driver's phone never waits on SMS.
-  checkGeofences({ tripId: trip._id, position: location, school: req.school });
+  // The driver's position always wins over the bus assistant's backup
+  // (services/busPosition.js). Only location fields change, so this never
+  // overwrites a scan saved at the same moment.
+  const { shown: isShown } = await driverReading({ trip, location, io: req.app.get('io'), school: req.school });
+  res.json({ success: true, data: location, ...(isShown ? {} : { ignored: 'the bus assistant has a newer position' }) });
 });
 
 // @desc    Mark a student's attendance (pre-trip roll call) and/or boarding

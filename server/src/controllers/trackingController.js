@@ -40,6 +40,10 @@ export const getTrackingOverview = asyncHandler(async (req, res) => {
       // and the bus's location being read (location on).
       driverOnline: Boolean(t.driver?.online),
       busOnline: Boolean(t.bus?.online),
+      // 'assistant' while the bus assistant's phone covers for the driver's.
+      locationSource: t.locationSource || 'driver',
+      assistantName: t.assistantLocation?.name || '',
+      driverSeenAt: t.driverSeenAt,
     }));
 
   const counts = {

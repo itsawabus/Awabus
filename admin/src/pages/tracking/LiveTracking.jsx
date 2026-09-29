@@ -80,8 +80,10 @@ export default function LiveTracking() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  useSocketEvent('bus:location', ({ tripId, location }) => {
-    setLiveBuses((prev) => prev.map((b) => (b.tripId === tripId ? { ...b, liveLocation: location, gpsSignal: 'ok', busOnline: true } : b)));
+  useSocketEvent('bus:location', ({ tripId, location, source }) => {
+    setLiveBuses((prev) =>
+      prev.map((b) => (b.tripId === tripId ? { ...b, liveLocation: location, gpsSignal: 'ok', busOnline: true, locationSource: source || b.locationSource } : b))
+    );
   });
   // A trip starting or ending changes which buses are on the map: reload now
   // instead of waiting for the next 15-second refresh.
@@ -232,6 +234,7 @@ export default function LiveTracking() {
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">GPS Signal</p>
                 <GpsState gps={selected.gps} />
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{selected.gps.detail}</p>
+                <LocationSource source={selected.locationSource} assistantName={selected.assistantName} />
 
                 <Button className="mt-6 w-full" onClick={() => navigate(`/live-tracking/${selected.tripId}`)}>
                   View Trip Details →
@@ -247,6 +250,16 @@ export default function LiveTracking() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Whose phone the bus position comes from, when it isn't the driver's. */
+export function LocationSource({ source, assistantName }) {
+  if (source !== 'assistant') return null;
+  return (
+    <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+      Location from the bus assistant{assistantName ? ` (${assistantName})` : ''}: the driver&apos;s phone is not reporting.
+    </p>
   );
 }
 

@@ -12,7 +12,7 @@ import { PillTabs } from '../../components/ui/Tabs.jsx';
 import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
 import { formatLat, formatLng, gpsFreshness } from '../../lib/gps.js';
 import useNow from '../../hooks/useNow.js';
-import { GpsState } from './LiveTracking.jsx';
+import { GpsState, LocationSource } from './LiveTracking.jsx';
 import { ConnectionPair } from '../../components/buses/BusOnlineStatus.jsx';
 import { runWords, sessionLabel, statusLabel } from '../../lib/sessions.js';
 
@@ -108,6 +108,7 @@ export default function LiveTripDetail() {
                     Lat/Lng: {formatLat(trip.liveLocation.lat)}, {formatLng(trip.liveLocation.lng)}
                   </p>
                   <GpsState gps={gps} />
+                  <LocationSource source={trip.locationSource} assistantName={trip.assistantLocation?.name} />
                 </>
               ) : (
                 <p>No location reported yet.</p>

@@ -12,6 +12,8 @@ import Input, { Label, Textarea, Select } from '../../components/ui/Input.jsx';
 import { formatPhone } from '../../lib/phone.js';
 import { cn } from '../../lib/utils.js';
 import { runWords, sessionLabel, statusLabel } from '../../lib/sessions.js';
+import useBackupLocation from './useBackupLocation.js';
+import BackupLocationCard from './BackupLocationCard.jsx';
 import { orderTrip, sectionsFor, matchesSearch, callInfo, formatDistance, CALL_IN_PROGRESS } from '../../lib/nearest.js';
 
 // Bus assistant page: opened by the teacher on bus duty from the driver's QR
@@ -129,6 +131,9 @@ function AssistBoard({ pass, name, onChangeName }) {
     retry: (count, err) => ![401, 410].includes(err?.status) && count < 2,
   });
 
+  // The teacher's phone as a backup bus position (hooks must run before any early return).
+  const backup = useBackupLocation(api, pass, ['In Progress', 'Delayed'].includes(trip?.status));
+
   const mark = useMutation({
     mutationFn: ({ studentId, body }) => api.post(`/assist/students/${studentId}/attendance`, body).then((r) => r.data.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
@@ -177,7 +182,9 @@ function AssistBoard({ pass, name, onChangeName }) {
   // Nearest first from the bus's last position; the order holds still while
   // a dialog is open, so nothing moves under a tap.
   const frozen = Boolean(confirm || messageTo);
-  const bus = frozen ? lastOrder.current.bus : trip.liveLocation || null;
+  // The teacher's own position (when sharing) is the freshest view of where the bus is.
+  const ownFix = backup.on && backup.position && Date.now() - backup.position.at < 60000 && backup.state !== 'not_on_bus' ? backup.position : null;
+  const bus = frozen ? lastOrder.current.bus : ownFix || trip.liveLocation || null;
   const ordered = orderTrip({ progress: rows, session: trip.session, bus, previous: lastOrder.current.order });
   lastOrder.current = { order: ordered.order, bus };
   const shownView = view || (live ? 'nearest' : 'az');
@@ -256,6 +263,8 @@ function AssistBoard({ pass, name, onChangeName }) {
           <p className="mt-2 text-xs text-slate-400">The driver hasn&apos;t started the trip yet. You can do the roll call now.</p>
         )}
       </div>
+
+      {(live || trip.status === 'Scheduled') && <BackupLocationCard backup={backup} />}
 
       {flash && (
         <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
