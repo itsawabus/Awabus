@@ -56,19 +56,21 @@ export default function Assistant() {
     };
   }, [tripId]);
 
-  // A code whose pass was stopped or has run out is not shown any more.
+  // A code whose pass was stopped or has run out is not shown any more. Only
+  // a status fetched after the code was made counts (right after "Show QR
+  // code" the previous, pre-code status is still on screen for a moment).
   const active = status.data?.active;
   useEffect(() => {
-    if (status.data && !active && qr) {
+    if (status.data && !active && qr && status.dataUpdatedAt > (qr.shownAt || 0)) {
       setQr(null);
       clearQr();
     }
-  }, [status.data, active, qr]);
+  }, [status.data, status.dataUpdatedAt, active, qr]);
 
   const create = useMutation({
     mutationFn: () => createAssistPass(tripId),
     onSuccess: (data) => {
-      const value = { tripId, url: data.url, qrSvg: data.qrSvg, expiresAt: data.expiresAt };
+      const value = { tripId, url: data.url, qrSvg: data.qrSvg, expiresAt: data.expiresAt, shownAt: Date.now() };
       setQr(value);
       saveQr(value);
       qc.invalidateQueries({ queryKey: ['assist-pass', tripId] });
@@ -108,7 +110,7 @@ export default function Assistant() {
             <Card style={styles.card}>
               <Text style={styles.empty}>There is no trip right now. Open this page when today&apos;s trip is ready.</Text>
             </Card>
-          ) : qr && active ? (
+          ) : qr && (active || !(status.dataUpdatedAt > (qr.shownAt || 0))) ? (
             <Card style={[styles.card, styles.qrCard]}>
               <View style={styles.qrBox}>
                 <SvgXml xml={qr.qrSvg} width={240} height={240} />
