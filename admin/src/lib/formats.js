@@ -95,9 +95,10 @@ export const digitsOnly = (raw, maxLength = 4) => String(raw ?? '').replace(/\D/
 
 export const CAPACITY_MIN = 4;
 export const CAPACITY_MAX = 100;
+// Capacity is optional: blank is fine.
 export const capacityError = (v) => {
   const n = Number(v);
-  if (v === '' || v == null) return 'Capacity is required';
+  if (v === '' || v == null) return '';
   return Number.isInteger(n) && n >= CAPACITY_MIN && n <= CAPACITY_MAX
     ? ''
     : `Capacity must be between ${CAPACITY_MIN} and ${CAPACITY_MAX} seats`;

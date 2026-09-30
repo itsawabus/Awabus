@@ -55,7 +55,7 @@ export default function BusProfile() {
             <div className="px-5">
               <InfoRow label="Bus Plate Number" value={bus.plateNumber} />
               <InfoRow label="Name/Nickname" value={bus.name} />
-              <InfoRow label="Total Capacity" value={`${bus.capacity} Passengers`} />
+              <InfoRow label="Total Capacity" value={bus.capacity ? `${bus.capacity} Passengers` : 'Not set'} />
               <InfoRow label="Current Route" value={bus.assignedRoute?.name} />
               <InfoRow label="Status" value={<Badge>{bus.status}</Badge>} />
               <InfoRow

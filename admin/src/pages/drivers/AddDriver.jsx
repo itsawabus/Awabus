@@ -497,7 +497,7 @@ export default function AddDriver() {
                 <Card className="mt-6 bg-slate-50 dark:bg-navy">
                   <CardHeader title="Selected Shift Summary" />
                   <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                    <SummaryStat label="Capacity" value={`${selectedBus.capacity} Seater Coach`} />
+                    <SummaryStat label="Capacity" value={selectedBus.capacity ? `${selectedBus.capacity} Seater Coach` : 'Not set'} />
                     <SummaryStat label="Stops On Route" value={selectedRoute ? `${selectedRoute.stops?.length || 0} Scheduled Stops` : '—'} />
                     <SummaryStat label="Students On Route" value={selectedRoute ? `${selectedRoute.students?.length || 0} Registered Students` : '—'} />
                   </CardBody>

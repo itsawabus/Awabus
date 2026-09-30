@@ -13,7 +13,7 @@ const busSchema = new mongoose.Schema(
       enum: ['Cruiser', 'Coaster', 'Standard', 'Mini'],
       default: 'Standard',
     },
-    capacity: { type: Number, required: true },
+    capacity: { type: Number, default: null }, // seats; optional
     assignedRoute: { type: mongoose.Schema.Types.ObjectId, ref: 'Route', default: null },
     assignedDriver: { type: mongoose.Schema.Types.ObjectId, ref: 'Driver', default: null },
     status: { type: String, enum: ['Active', 'Idle', 'Maintenance'], default: 'Idle' },

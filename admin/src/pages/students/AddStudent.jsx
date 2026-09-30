@@ -450,7 +450,7 @@ export default function AddStudent() {
                   <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-3">
                     <SummaryStat label="Stops On Route" value={`${selectedRoute.stops?.length || 0} Scheduled Stops`} />
                     <SummaryStat label="Bus Driver" value={selectedRoute.assignedDriver ? `${selectedRoute.assignedDriver.firstName} ${selectedRoute.assignedDriver.lastName}` : 'Not assigned yet'} />
-                    <SummaryStat label="Seats Available" value={selectedBus ? `${selectedBus.capacity} Seats` : '—'} />
+                    <SummaryStat label="Seats Available" value={selectedBus?.capacity ? `${selectedBus.capacity} Seats` : '—'} />
                     <SummaryStat label="Morning pick-up" value={formatRunTime(selectedRoute.morningStartTime)} />
                     <SummaryStat label="Afternoon drop-off" value={formatRunTime(selectedRoute.eveningStartTime)} />
                   </CardBody>

@@ -79,7 +79,7 @@ export default function RegisterBus() {
           <div className="mt-6 space-y-3 rounded-xl bg-slate-50 p-4 text-left text-sm dark:bg-navy">
             <Row label="Plate Number" value={created.plateNumber} />
             <Row label="Bus Nickname" value={created.name} />
-            <Row label="Capacity" value={`${created.capacity} Seats`} />
+            <Row label="Capacity" value={created.capacity ? `${created.capacity} Seats` : 'Not set'} />
             <Row label="Assigned Route" value={created.assignedRoute?.name || '—'} />
           </div>
           <p className="mt-4 text-xs text-slate-400">Next, assign a driver to this bus from the Drivers page.</p>
@@ -106,7 +106,7 @@ export default function RegisterBus() {
     const next = { plateNumber: plateError(form.plateNumber), capacity: capacityError(form.capacity), name: form.name.trim() ? '' : 'Bus name is required' };
     setErrors(next);
     if (Object.values(next).some(Boolean)) return;
-    mutation.mutate({ ...form, capacity: Number(form.capacity) });
+    mutation.mutate({ ...form, capacity: form.capacity === '' || form.capacity == null ? null : Number(form.capacity) });
   };
 
   return (
@@ -136,8 +136,8 @@ export default function RegisterBus() {
               <FieldError>{errors.name}</FieldError>
             </div>
             <div>
-              <Label required>Capacity (Seats)</Label>
-              <Input inputMode="numeric" value={form.capacity} onChange={(e) => set('capacity')(digitsOnly(e.target.value, 3))} error={Boolean(errors.capacity)} placeholder={`e.g. 45 (max ${CAPACITY_MAX})`} required />
+              <Label>Capacity (Seats, optional)</Label>
+              <Input inputMode="numeric" value={form.capacity} onChange={(e) => set('capacity')(digitsOnly(e.target.value, 3))} error={Boolean(errors.capacity)} placeholder={`e.g. 45 (max ${CAPACITY_MAX}), or leave empty`} />
               <FieldError>{errors.capacity}</FieldError>
             </div>
             <div>
