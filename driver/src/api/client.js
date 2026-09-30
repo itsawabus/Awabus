@@ -46,15 +46,31 @@ apiClient.interceptors.response.use(
     const codespacePortPrivate =
       error?.response?.status === 401 && !error?.response?.data?.message && /\.app\.github\.dev/.test(error?.config?.baseURL || '');
 
+    // An answer that is not from AwaBus (no message): a stopped Codespace
+    // (GitHub's 404 page) or a server still starting up (Render: 502/503).
+    const base = error?.config?.baseURL || '';
+    const onCodespace = /\.app\.github\.dev/.test(base);
+    const notAwaBus = Boolean(error?.response) && !error?.response?.data?.message && [404, 502, 503, 504].includes(error.response.status);
+    const serverDown = notAwaBus
+      ? onCodespace
+        ? 'This app is set to use a Codespace server, and that Codespace is stopped. Start it (with port 5000 public), or install an app built for the Render server.'
+        : /onrender\.com/.test(base)
+          ? 'The AwaBus server is waking up. Wait about a minute and try again.'
+          : "The AwaBus server isn't answering right now. Try again in a minute."
+      : null;
+
     const message =
       error?.response?.data?.message ||
+      serverDown ||
       (codespacePortPrivate
         ? "The server in the Codespace isn't open to phones yet: in the Codespace Ports tab, set port 5000 to Public, then try again."
         : null) ||
       (deviceIsOffline
         ? 'No internet connection. Check your data or Wi-Fi and try again.'
         : noResponse
-          ? "Can't reach the AwaBus server. Check that the server is running and EXPO_PUBLIC_API_URL is set to your computer's address, not localhost."
+          ? onCodespace
+            ? "Can't reach the AwaBus server. This app is set to use a Codespace server: it only works while that Codespace is running."
+            : "Can't reach the AwaBus server. Check your internet and try again."
           : error?.message) ||
       'Something went wrong. Please try again.';
     const wrapped = new Error(message);

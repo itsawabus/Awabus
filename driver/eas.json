@@ -18,7 +18,7 @@
       },
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://special-winner-x5wp44j5v9gw2v6r6-5000.app.github.dev/api"
+        "EXPO_PUBLIC_API_URL": "https://awabus.onrender.com/api"
       }
     },
     "production": {
