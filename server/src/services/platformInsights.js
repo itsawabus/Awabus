@@ -84,6 +84,7 @@ export async function buildInsights({ days = 30, schoolId = null, now = new Date
         studentsWithBus: 0,
         buses: 0,
         capacity: 0,
+        seatedOnSized: 0, // students on buses whose seats are known (capacity is optional)
         busStatus: { Active: 0, Idle: 0, Maintenance: 0 },
         busesNoDriver: 0,
         overCapacityBuses: [],
@@ -128,6 +129,7 @@ export async function buildInsights({ days = 30, schoolId = null, now = new Date
     if (!s) return;
     s.buses += 1;
     s.capacity += b.capacity || 0;
+    if (b.capacity) s.seatedOnSized += perBus.get(String(b._id)) || 0;
     if (s.busStatus[b.status] !== undefined) s.busStatus[b.status] += 1;
     if (!b.assignedDriver) s.busesNoDriver += 1;
     const riders = perBus.get(String(b._id)) || 0;
@@ -189,7 +191,7 @@ export async function buildInsights({ days = 30, schoolId = null, now = new Date
       prevTripsTotal: ran(s.prevTrips) + s.prevTrips.cancelled,
       onTimeRate: pct(s.trips.onTime, s.trips.onTime + s.trips.delayed),
       prevOnTimeRate: pct(s.prevTrips.onTime, s.prevTrips.onTime + s.prevTrips.delayed),
-      seatUse: pct(s.studentsWithBus, s.capacity),
+      seatUse: pct(s.seatedOnSized, s.capacity),
       absenceRate: pct(so.absent, rostered),
       rostered,
     };
@@ -226,8 +228,8 @@ export async function buildInsights({ days = 30, schoolId = null, now = new Date
     studentsNoRoute: sum('studentsNoRoute'),
     buses: sum('buses'),
     capacity,
-    seatsUsed: sum('studentsWithBus'),
-    seatUse: pct(sum('studentsWithBus'), capacity),
+    seatsUsed: sum('seatedOnSized'),
+    seatUse: pct(sum('seatedOnSized'), capacity),
     busStatus: sumObj('busStatus', ['Active', 'Idle', 'Maintenance']),
     drivers: sum('drivers'),
     licenseExpired: sum('licenseExpired'),

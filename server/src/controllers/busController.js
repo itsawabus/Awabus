@@ -87,9 +87,9 @@ export const getBusById = asyncHandler(async (req, res) => {
 // @route   POST /api/buses
 export const createBus = asyncHandler(async (req, res) => {
   const { plateNumber, name, type, capacity, assignedRoute, status } = req.body;
-  if (!plateNumber || !name || !capacity) {
+  if (!plateNumber || !name) {
     res.status(400);
-    throw new Error('Plate number, name and capacity are required');
+    throw new Error('Plate number and name are required');
   }
   assertFormats(res, { plateNumber, capacity });
   if (!assignedRoute) {
@@ -111,7 +111,7 @@ export const createBus = asyncHandler(async (req, res) => {
     plateNumber: normalizePlate(plateNumber),
     name,
     type: type || 'Standard',
-    capacity,
+    capacity: capacity === '' || capacity == null ? null : Number(capacity), // optional
     assignedRoute,
     status: status || 'Idle',
   });
@@ -142,6 +142,8 @@ export const updateBus = asyncHandler(async (req, res) => {
   const previousStatus = bus.status;
   const fields = ['plateNumber', 'name', 'type', 'capacity', 'status'];
   if (req.body.plateNumber !== undefined) req.body.plateNumber = normalizePlate(req.body.plateNumber);
+  // Capacity is optional: an empty value clears it.
+  if (req.body.capacity !== undefined) req.body.capacity = req.body.capacity === '' || req.body.capacity === null ? null : Number(req.body.capacity);
   fields.forEach((f) => {
     if (req.body[f] !== undefined) bus[f] = req.body[f];
   });

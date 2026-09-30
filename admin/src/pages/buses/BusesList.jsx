@@ -78,7 +78,7 @@ export default function BusesList() {
         type: 'number',
         get: (b) => b.capacity ?? '',
         validate: (v) => capacityError(v),
-        hint: `Whole number from ${CAPACITY_MIN} to ${CAPACITY_MAX}.`,
+        hint: `Optional. Whole number from ${CAPACITY_MIN} to ${CAPACITY_MAX}; leave empty if not known.`,
       },
     ],
     },
@@ -185,7 +185,7 @@ export default function BusesList() {
                     </Td>
                     <Td>{bus.assignedDriver ? `${bus.assignedDriver.firstName} ${bus.assignedDriver.lastName}` : '—'}</Td>
                     <Td>
-                      {bus.seatsFilled ?? 0} / {bus.capacity}
+                      {bus.capacity ? `${bus.seatsFilled ?? 0} / ${bus.capacity}` : `${bus.seatsFilled ?? 0} students`}
                     </Td>
                     <Td className="text-right">
                       <RowActions

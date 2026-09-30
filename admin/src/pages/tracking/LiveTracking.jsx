@@ -296,7 +296,8 @@ export default function LiveTracking() {
                   <Badge tone={selected.status === 'Delayed' ? 'warning' : 'success'}>{selected.status}</Badge>
                 </div>
                 <p className="text-sm text-slate-400">
-                  Plate: {selected.bus?.plateNumber} · {selected.bus?.capacity} Seater
+                  Plate: {selected.bus?.plateNumber}
+                  {selected.bus?.capacity ? ` · ${selected.bus.capacity} Seater` : ''}
                 </p>
 
                 <div className="my-4 h-px bg-slate-100 dark:bg-slate-800" />

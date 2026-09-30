@@ -58,7 +58,7 @@ export const SPECS = {
       { key: 'plateNumber', header: 'Plate Number', required: true, kind: 'plate', example: 'GR-1234-20', help: 'Region letters - number - year, e.g. GR-1234-20' },
       { key: 'name', header: 'Bus Name', required: true, kind: 'text', min: 2, max: 60, example: 'Bus A (Yellow)', help: 'A nickname staff will recognise' },
       { key: 'type', header: 'Bus Type', kind: 'list', options: ['Cruiser', 'Coaster', 'Standard', 'Mini'], example: 'Coaster', help: 'Leave blank for Standard' },
-      { key: 'capacity', header: 'Capacity (Seats)', required: true, kind: 'int', min: 4, max: 100, example: 30, help: 'Whole number from 4 to 100' },
+      { key: 'capacity', header: 'Capacity (Seats)', kind: 'int', min: 4, max: 100, example: 30, help: 'Optional. Whole number from 4 to 100' },
       { key: 'route', header: 'Route', required: true, kind: 'ref', ref: 'routesWithoutBus', example: 'RT-001 - West Legon - Ashongman', help: 'Pick from the list. Only routes that have no bus yet are listed' },
       { key: 'status', header: 'Status', kind: 'list', options: ['Active', 'Idle', 'Maintenance'], example: 'Idle', help: 'Leave blank for Idle' },
     ],

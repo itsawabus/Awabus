@@ -40,6 +40,6 @@ export const busPickerOptions = (buses = [], holders = new Map(), currentDriverI
         ? `Already driven by ${takenBy}`
         : noRoute
           ? 'Not on a route yet. Give this bus a route first'
-          : `Capacity: ${b.capacity} · no driver yet`,
+          : `${b.capacity ? `Capacity: ${b.capacity}` : 'Capacity not set'} · no driver yet`,
     };
   });

@@ -38,7 +38,7 @@ export default function EditBus() {
     return {
       plateNumber: bus.plateNumber,
       name: bus.name,
-      capacity: bus.capacity,
+      capacity: bus.capacity ?? '',
       assignedRoute: bus.assignedRoute?._id || null,
       status: bus.status,
     };
@@ -92,7 +92,7 @@ export default function EditBus() {
     };
     setErrors(next);
     if (Object.values(next).some(Boolean)) return;
-    updateMutation.mutate({ ...form, capacity: Number(form.capacity) });
+    updateMutation.mutate({ ...form, capacity: form.capacity === '' || form.capacity == null ? null : Number(form.capacity) });
   };
 
   return (
@@ -118,7 +118,7 @@ export default function EditBus() {
               <FieldError>{errors.name}</FieldError>
             </div>
             <div>
-              <Label required>Capacity (Seats)</Label>
+              <Label>Capacity (Seats, optional)</Label>
               <Input inputMode="numeric" value={form.capacity} onChange={(e) => set('capacity')(digitsOnly(e.target.value, 3))} error={Boolean(errors.capacity)} />
               <FieldError>{errors.capacity}</FieldError>
             </div>
