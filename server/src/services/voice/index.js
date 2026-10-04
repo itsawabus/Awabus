@@ -29,7 +29,9 @@ export const CUT_UNDER_SECONDS = 5;
 export function voiceProviderStatus() {
   const wanted = (process.env.VOICE_PROVIDER || '').toLowerCase();
   if (wanted === 'arkesel') {
-    const missing = ['ARKESEL_API_KEY', 'ARKESEL_VOICE_FILE_URL', 'VOICE_WEBHOOK_TOKEN'].filter((k) => !process.env[k]);
+    const missing = ['ARKESEL_API_KEY', 'ARKESEL_VOICE_FILE_URL', 'ARKESEL_VOICE_ID', 'VOICE_WEBHOOK_TOKEN'].filter(
+      (k) => !process.env[k]
+    );
     if (!missing.length) return { provider: 'arkesel', live: true };
     return { provider: 'none', live: false, reason: `VOICE_PROVIDER=arkesel but ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} missing` };
   }
