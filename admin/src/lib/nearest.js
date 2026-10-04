@@ -148,7 +148,6 @@ export function callInfo(p) {
     const secs = Number(p.callSeconds);
     let text = `Call: ${CALL_LABELS[p.callStatus]}`;
     if (p.callStatus === 'answered' && Number.isFinite(secs) && secs > 0) text += ` (${Math.round(secs)}s)`;
-    if (p.callFallback && p.callFallback !== 'Sending text') text += p.callFallback === 'Sent' ? ' · text sent' : ' · text not sent';
     const tone = CALL_IN_PROGRESS.includes(p.callStatus) ? 'info' : p.callStatus === 'answered' ? 'good' : 'bad';
     return { text, tone };
   }
