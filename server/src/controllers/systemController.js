@@ -39,6 +39,7 @@ const CONFIG = [
   { key: 'ARKESEL_API_KEY', group: 'SMS (Arkesel)', note: 'From the Arkesel dashboard' },
   { key: 'ARKESEL_SENDER_ID', group: 'SMS (Arkesel)', note: 'Approved sender name, max 11 characters' },
   { key: 'ARKESEL_SANDBOX', group: 'SMS (Arkesel)', note: '"true" = test mode, messages are not delivered or charged' },
+  { key: 'PARENT_ALERTS', group: 'Parent alerts', note: 'On by default; "false" switches off boarding / near-home alerts' },
   { key: 'VOICE_PROVIDER', group: 'Arrival calls (Arkesel voice)', note: 'Set to "arkesel" to call parents when the bus is near home (a missed call is the alert; no text follows)' },
   { key: 'ARKESEL_VOICE_FILE_URL', group: 'Arrival calls (Arkesel voice)', note: 'Public URL of the recorded message parents hear (fetched and re-uploaded to Arkesel on each call)' },
   { key: 'ARKESEL_VOICE_ID', group: 'Arrival calls (Arkesel voice)', note: 'Caller-ID number shown to parents when they receive the call' },

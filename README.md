@@ -33,31 +33,11 @@ designs.
 cd server
 cp .env.example .env      # point MONGO_URI at your MongoDB instance
 npm install
-npm run seed               # wipes and repopulates the DB with demo data (test databases only)
 npm run dev                # http://localhost:5000
 ```
 
 A MongoDB instance is required (local `mongod`, Docker, or Atlas) — set
 `MONGO_URI` in `server/.env` accordingly.
-
-The seed script deletes **every** school's data, so it refuses to run when
-`NODE_ENV=production` or when the database holds any school other than the
-demo one (add `--wipe-everything` only if you really mean it). It creates one
-demo school and prints ready-to-use credentials for both apps, e.g.:
-
-```
-Admin Portal:
-  school:   Awabus Demo School (AWA-001)
-  email:    itsawabus@gmail.com
-  password: Awabus@123
-
-Driver App:
-  phone:    +233244123456
-  password: Driver@123
-```
-
-These are public demo credentials: never seed them into a database real
-schools use, and change them anywhere the demo is reachable from the internet.
 
 To create a platform superadmin (who can create/suspend schools from
 `/platform` in the Admin Portal), set `SEED_SUPERADMIN_EMAIL`,
@@ -77,7 +57,7 @@ npm install
 npm run dev                # http://localhost:5173
 ```
 
-Sign in with the admin email/password printed by the seed script. Admin
+Sign in with the superadmin account you created (see above). Admin
 sign-in is email-based: enter an email, and the app either asks for your
 password (existing account) or has you create one (first login for an
 admin a superadmin just added). Creating that first password needs the
@@ -99,7 +79,7 @@ with EAS. Full setup, environment variable notes (physical devices can't use
 `localhost`), and step-by-step `eas build`/`eas update` instructions live in
 [`driver/README.md`](./driver/README.md).
 
-Sign in with the driver phone/password printed by the seed script. The
+Sign in with the phone number and password of a driver your school admin added. The
 first time a driver opens the app for a given day, their trip is
 auto-provisioned from their current bus/route assignment — nothing needs
 to be scheduled manually in the Admin Portal first.
@@ -112,7 +92,7 @@ Every tenant-owned model (`Admin`, `Driver`, `Bus`, `Route`, `Student`,
 carried via `AsyncLocalStorage` (`server/src/utils/tenantContext.js`) and
 established once in `protectAdmin`/`protectDriver` from the JWT — every
 controller downstream just calls `Model.find()`/`create()` etc as normal and
-gets scoped automatically. Cross-tenant operations (seeding, the Superadmin
+gets scoped automatically. Cross-tenant operations (the Superadmin
 dashboard) opt in explicitly via `tenantContext.runAsSystem()`.
 
 **Known gap:** `Guardian` is not yet tenant-scoped (no `school` field), so
