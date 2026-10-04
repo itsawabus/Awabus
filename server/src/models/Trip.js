@@ -43,8 +43,6 @@ const studentProgressSchema = new mongoose.Schema(
     callStatus: { type: String, default: '' },
     callAt: { type: Date, default: null },
     callSeconds: { type: Number, default: null },
-    // Text sent instead when the call was not picked up ('' = none needed yet).
-    callFallback: { type: String, default: '' },
     // When and where the bus was at this student's last step (picked up,
     // dropped, not here), for the trail on Live Tracking.
     scannedAt: { type: Date, default: null },

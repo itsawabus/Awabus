@@ -186,7 +186,7 @@ export const GUIDE = [
           'Select several students at once (driver: hold a student; teacher: tap Select) to mark them all picked up / dropped / not here, or send one SMS to their parents.',
           'Directions: the next child\'s card has a Directions button that opens Google Maps turn-by-turn navigation to their home.',
           'The teacher can switch on "Share my location as backup". The driver\'s phone always comes first; if it stops reporting for about 45 seconds (for example its data drops), the teacher\'s phone shows the bus position until the driver\'s is back, and Live Tracking says so. The teacher\'s phone is only used while it is near the driver\'s, and only while the page stays open with the screen on.',
-          'When arrival calls are switched on (Arkesel voice), each student card shows how the call to the parent went: calling, ringing, answered, call cut, declined, not picked up or didn\'t go through. If the parent doesn\'t pick up, a text is sent instead.',
+          'When arrival calls are switched on (Arkesel voice), each student card shows how the call to the parent went: calling, ringing, answered, call cut, declined, not picked up or didn\'t go through. A missed call from the school bus line is the alert; no text follows.',
         ],
       },
       {
