@@ -41,6 +41,7 @@ app.use((req, res, next) => {
 
 const allowedOrigins = [
   process.env.CLIENT_URL,
+  process.env.CLIENT_URL2,
   process.env.DEPLOYED_URL,
   process.env.CODESPACE_URL,
 ];

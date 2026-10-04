@@ -1,7 +1,7 @@
 // Text alerts to parents when their child boards or is dropped off, and when
-// the bus comes near home. Off unless PARENT_ALERTS=true, because every alert
-// is a paid SMS; until then each scan records "Not sent (alerts are off)"
-// instead of claiming an alert went out.
+// the bus comes near home. On by default; set PARENT_ALERTS=false to switch
+// them off (each alert is a paid SMS / call). While off, each scan records
+// "Not sent (alerts are off)" instead of claiming an alert went out.
 import Student from '../models/Student.js';
 import Bus from '../models/Bus.js';
 import Trip from '../models/Trip.js';
@@ -11,7 +11,7 @@ import { tenantContext } from '../utils/tenantContext.js';
 import { emitToSchool } from '../sockets/rooms.js';
 import { voiceLive, placeCall, normalizeCallStatus, callMovesTo, CALL_LABELS } from './voice/index.js';
 
-export const parentAlertsEnabled = () => process.env.PARENT_ALERTS === 'true';
+export const parentAlertsEnabled = () => String(process.env.PARENT_ALERTS || '').trim().toLowerCase() !== 'false';
 
 // What the admin sees in the trip's "Alert" column.
 export const ALERT_STATUS = {

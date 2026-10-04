@@ -12,15 +12,15 @@ export const MESSAGE_PURPOSES = {
   delay_broadcast: { channel: 'sms', label: 'Delay notice to parents', where: 'Driver app > Report delay', wired: true },
   parent_message: { channel: 'sms', label: 'Message from the bus to one parent', where: 'Driver app > student list > message button', wired: true },
   test: { channel: 'sms', label: 'Test message', where: 'System page > Send test SMS', wired: true },
-  boarding_alert: { channel: 'sms', label: 'Child boarded / dropped off alert to parents', where: 'Driver app scan (on with PARENT_ALERTS=true)', wired: true, switch: 'PARENT_ALERTS' },
-  approaching_call: { channel: 'voice', label: 'Bus near home call to parents (a missed call is the alert, no text follows)', where: 'Live GPS vs the student\'s notification zone (on with PARENT_ALERTS=true and VOICE_PROVIDER set)', wired: true, switch: 'PARENT_ALERTS' },
-  approaching_alert: { channel: 'sms', label: 'Bus near home alert (geofence)', where: 'Live GPS vs the student\'s notification zone (on with PARENT_ALERTS=true)', wired: true, switch: 'PARENT_ALERTS' },
+  boarding_alert: { channel: 'sms', label: 'Child boarded / dropped off alert to parents', where: 'Driver app scan (on unless PARENT_ALERTS=false)', wired: true, switch: 'PARENT_ALERTS' },
+  approaching_call: { channel: 'voice', label: 'Bus near home call to parents (a missed call is the alert, no text follows)', where: 'Live GPS vs the student\'s notification zone (on unless PARENT_ALERTS=false; needs VOICE_PROVIDER set)', wired: true, switch: 'PARENT_ALERTS' },
+  approaching_alert: { channel: 'sms', label: 'Bus near home alert (geofence)', where: 'Live GPS vs the student\'s notification zone (on unless PARENT_ALERTS=false)', wired: true, switch: 'PARENT_ALERTS' },
 };
 
 // The purposes with `on` filled in: false for built messages switched off in the environment.
 export const messagePurposes = () =>
   Object.fromEntries(
-    Object.entries(MESSAGE_PURPOSES).map(([k, p]) => [k, { ...p, on: p.wired && (!p.switch || process.env[p.switch] === 'true') }])
+    Object.entries(MESSAGE_PURPOSES).map(([k, p]) => [k, { ...p, on: p.wired && (!p.switch || String(process.env[p.switch] || '').trim().toLowerCase() !== 'false') }])
   );
 
 export function smsProviderStatus() {
