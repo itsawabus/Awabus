@@ -27,7 +27,7 @@ import PhoneInput from '../../components/ui/PhoneInput.jsx';
 import { PageLoader } from '../../components/ui/Spinner.jsx';
 import { formatPhone } from '../../lib/phone.js';
 import { cn, formatDateTime, timeAgo } from '../../lib/utils.js';
-import { clearServerErrors, getMessageLog, getServerErrors, getSystemHealth, sendTestSms } from '../../api/system.js';
+import { clearServerErrors, getMessageLog, getServerErrors, getSystemHealth, sendTestSms, getLiveTest, startLiveTest, stopLiveTest } from '../../api/system.js';
 
 const TABS = [
   { value: 'health', label: 'Health' },
@@ -323,7 +323,7 @@ function MessagingTab({ h }) {
                       {!p.wired ? (
                         <State warn>Not built</State>
                       ) : p.on === false ? (
-                        <State warn>Off (set {p.switch}=true)</State>
+                        <State warn>Off ({p.switch}=false)</State>
                       ) : (
                         <State ok>Connected</State>
                       )}
@@ -336,6 +336,7 @@ function MessagingTab({ h }) {
         </Card>
         <div className="space-y-6">
           <TestSms status={h.messaging.sms} onSent={() => qc.invalidateQueries({ queryKey: ['superadmin', 'system'] })} />
+          <LiveTest sms={h.messaging.sms} />
           <ArkeselSetup status={h.messaging.sms} />
         </div>
       </div>
@@ -437,6 +438,140 @@ function TestSms({ status, onSent }) {
         </Button>
         {send.isError && <State>{send.error.message}</State>}
         {r && (r.status === 'sent' ? <State ok>Sent{r.providerMessageId ? ` (Arkesel id ${r.providerMessageId})` : ''}</State> : r.status === 'logged' ? <State warn>Logged only: no SMS provider is on</State> : <State>Failed: {r.error}</State>)}
+      </CardBody>
+    </Card>
+  );
+}
+
+const LIVE_STATUS_TONE = { sent: 'ok', Answered: 'ok', logged: 'warn', 'not placed': 'warn', calling: 'warn', Ringing: 'warn' };
+
+// Fires SMS and/or arrival calls to a few numbers every N seconds, so Arkesel
+// can be tried without a bus on a trip. Uses real credit unless sandbox is on.
+function LiveTest({ sms }) {
+  const qc = useQueryClient();
+  const [numbers, setNumbers] = useState('');
+  const [mode, setMode] = useState('both');
+  const [intervalSeconds, setIntervalSeconds] = useState('60');
+  const [rounds, setRounds] = useState('3');
+  const q = useQuery({
+    queryKey: ['superadmin', 'system', 'live-test'],
+    queryFn: getLiveTest,
+    refetchInterval: (query) => (query.state.data?.run?.state === 'running' ? 3000 : 15000),
+  });
+  const refresh = (data) => qc.setQueryData(['superadmin', 'system', 'live-test'], data);
+  const start = useMutation({
+    mutationFn: () =>
+      startLiveTest({
+        numbers: numbers.split(/[\n,;]+/).map((n) => n.trim()).filter(Boolean),
+        mode,
+        intervalSeconds: Number(intervalSeconds),
+        rounds: Number(rounds),
+      }),
+    onSuccess: refresh,
+  });
+  const stop = useMutation({ mutationFn: stopLiveTest, onSuccess: refresh });
+  const run = q.data?.run;
+  const limits = q.data?.limits;
+  const running = run?.state === 'running';
+
+  return (
+    <Card>
+      <CardHeader
+        title="Live test (SMS and calls)"
+        subtitle={`Sends to your own numbers every few seconds, no bus needed.${sms.sandbox ? ' SMS is in sandbox mode (not delivered).' : ' Uses real credit.'}`}
+      />
+      <CardBody className="space-y-4">
+        <div>
+          <Label htmlFor="lt-numbers">Phone numbers (one per line, up to {limits?.maxNumbers ?? 3})</Label>
+          <Textarea id="lt-numbers" rows={3} value={numbers} onChange={(e) => setNumbers(e.target.value)} placeholder={'024 412 3456\n055 123 4567'} disabled={running} />
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <Label htmlFor="lt-mode">Send</Label>
+            <Select id="lt-mode" value={mode} onChange={(e) => setMode(e.target.value)} disabled={running}>
+              <option value="both">SMS and call</option>
+              <option value="sms">SMS only</option>
+              <option value="call">Call only</option>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="lt-interval">Every</Label>
+            <Select id="lt-interval" value={intervalSeconds} onChange={(e) => setIntervalSeconds(e.target.value)} disabled={running}>
+              <option value="30">30 seconds</option>
+              <option value="60">1 minute</option>
+              <option value="120">2 minutes</option>
+              <option value="300">5 minutes</option>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="lt-rounds">Times (max {limits?.maxRounds ?? 10})</Label>
+            <Select id="lt-rounds" value={rounds} onChange={(e) => setRounds(e.target.value)} disabled={running}>
+              {[1, 2, 3, 5, 10].map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </Select>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {running ? (
+            <Button variant="outline" onClick={() => stop.mutate()} loading={stop.isPending}>
+              <XCircle className="h-4 w-4" /> Stop
+            </Button>
+          ) : (
+            <Button onClick={() => start.mutate()} loading={start.isPending} disabled={!numbers.trim()}>
+              <Send className="h-4 w-4" /> Start test
+            </Button>
+          )}
+          {run && (
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {running ? `Round ${Math.max(run.round, 1)} of ${run.rounds}${run.nextAt && run.round >= 1 ? `, next at ${formatDateTime(run.nextAt)}` : ''}` : run.state === 'finished' ? 'Finished' : 'Stopped'}
+            </span>
+          )}
+        </div>
+        {start.isError && <State>{start.error.message}</State>}
+        {run?.events?.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[420px] text-xs">
+              <thead>
+                <tr className="text-left uppercase tracking-wide text-slate-400">
+                  <th className="py-1.5 pr-3 font-semibold">Time</th>
+                  <th className="py-1.5 pr-3 font-semibold">To</th>
+                  <th className="py-1.5 pr-3 font-semibold">Type</th>
+                  <th className="py-1.5 font-semibold">Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                {run.events.map((e) => (
+                  <tr key={e.id} className="border-t border-slate-100 dark:border-slate-800">
+                    <td className="py-1.5 pr-3 whitespace-nowrap">{formatDateTime(e.at)}</td>
+                    <td className="py-1.5 pr-3 whitespace-nowrap">{formatPhone(e.to)}</td>
+                    <td className="py-1.5 pr-3">{e.kind === 'sms' ? 'SMS' : 'Call'}</td>
+                    <td className="py-1.5">
+                      <State ok={LIVE_STATUS_TONE[e.status] === 'ok'} warn={LIVE_STATUS_TONE[e.status] === 'warn'}>
+                        {e.status}
+                        {e.detail ? `: ${e.detail}` : ''}
+                      </State>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {q.data?.webhooks?.length > 0 && (
+          <div>
+            <p className="mb-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">What Arkesel reported about calls (latest)</p>
+            <ul className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
+              {q.data.webhooks.slice(0, 8).map((w, i) => (
+                <li key={`${w.at}-${i}`} className="break-all">
+                  {formatDateTime(w.at)} · "{w.status || '?'}"{w.seconds != null ? ` · ${w.seconds}s` : ''} → {w.normalized || 'not understood'}
+                  {w.matchedTrip ? ' (a real trip)' : ''}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {!q.data?.webhooks?.length && <p className="text-xs text-slate-400">Call results from Arkesel will appear here once a call has been placed.</p>}
       </CardBody>
     </Card>
   );
