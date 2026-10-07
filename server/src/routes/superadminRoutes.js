@@ -2,7 +2,7 @@ import express from 'express';
 import { protectAdmin } from '../middleware/auth.js';
 import { requireSuperadmin } from '../middleware/superadmin.js';
 import { limit } from '../middleware/rateLimit.js';
-import { getHealth, getMessages, sendTestSms, getErrors, deleteErrors } from '../controllers/systemController.js';
+import { getHealth, getMessages, sendTestSms, getErrors, deleteErrors, getLiveTest, postLiveTest, deleteLiveTest } from '../controllers/systemController.js';
 import {
   getAnalytics,
   getInsights,
@@ -23,6 +23,11 @@ router.get('/insights', getInsights);
 router.get('/system/health', getHealth);
 router.get('/system/messages', getMessages);
 router.post('/system/messages/test', limit('test-sms', { max: 10, windowMinutes: 60, by: (req) => req.admin?._id }), sendTestSms);
+router
+  .route('/system/live-test')
+  .get(getLiveTest)
+  .post(limit('live-test', { max: 5, windowMinutes: 60, by: (req) => req.admin?._id }), postLiveTest)
+  .delete(deleteLiveTest);
 router.route('/system/errors').get(getErrors).delete(deleteErrors);
 router.get('/schools', listSchools);
 router.post('/schools', createSchool);

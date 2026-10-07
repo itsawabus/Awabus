@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import asyncHandler from 'express-async-handler';
 import { handleCallResult } from '../services/parentAlerts.js';
 import { readWebhook } from '../services/voice/index.js';
+import { noteWebhook } from '../services/liveTest.js';
 
 const router = express.Router();
 
@@ -30,7 +31,10 @@ router.all(
     const results = [];
     for (const event of events) {
       // eslint-disable-next-line no-await-in-loop
-      results.push(await handleCallResult({ ...readWebhook(event), io: req.app.get('io') }));
+      const parsed = readWebhook(event);
+      const result = await handleCallResult({ ...parsed, io: req.app.get('io') });
+      noteWebhook({ raw: event, ...parsed, matchedTrip: result.found });
+      results.push(result);
     }
     res.json({ success: true, results });
   })
