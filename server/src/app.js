@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import morgan from 'morgan';
 
@@ -90,6 +92,10 @@ app.use('/api/webhooks', webhookRoutes);
 
 // Driver App API (mobile client not built yet, API is ready)
 app.use('/api/driver-app', driverAppRoutes);
+
+// Public audio for arrival calls: the server fetches it from here and uploads it
+// to Arkesel. Only this folder is served; ARKESEL_VOICE_FILE_URL points to it.
+app.use('/voice', express.static(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public', 'voice'), { index: false, fallthrough: true, maxAge: '1h' }));
 
 app.use(notFound);
 app.use(errorHandler);
