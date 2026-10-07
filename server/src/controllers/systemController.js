@@ -14,6 +14,7 @@ import {
   smsProviderStatus,
   emailProviderStatus,
 } from '../services/messaging/index.js';
+import { startLiveTest, stopLiveTest, liveTestStatus } from '../services/liveTest.js';
 import { sweeperStatus, STALE_TRIP_HOURS } from '../services/staleTrips.js';
 import { simulatorStatus } from '../sockets/tripSimulator.js';
 import { recentErrors, clearErrors } from '../utils/errorLog.js';
@@ -152,6 +153,43 @@ export const sendTestSms = asyncHandler(async (req, res) => {
   }
   const result = await sendSms({ to, text, purpose: 'test' });
   res.json({ success: true, data: { ...result, provider: smsProviderStatus().provider } });
+});
+
+// @desc    Live test: fire SMS / calls to a few numbers at an interval (no bus needed)
+// @route   GET|POST|DELETE /api/superadmin/system/live-test
+export const getLiveTest = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: liveTestStatus() });
+});
+
+export const postLiveTest = asyncHandler(async (req, res) => {
+  const raw = Array.isArray(req.body?.numbers) ? req.body.numbers : [];
+  const numbers = [...new Set(raw.map((n) => normalizeGhanaPhone(n)).filter(Boolean))];
+  if (!numbers.length || numbers.some((n) => !isValidGhanaPhone(n))) {
+    res.status(400);
+    throw new Error('Enter valid Ghana phone numbers, e.g. 024 412 3456');
+  }
+  const text = String(req.body?.text || '').trim();
+  if (text.length > 160) {
+    res.status(400);
+    throw new Error('Keep the test text to 160 characters (1 SMS)');
+  }
+  try {
+    const data = startLiveTest({
+      numbers,
+      mode: req.body?.mode,
+      intervalSeconds: Number(req.body?.intervalSeconds),
+      rounds: Number(req.body?.rounds),
+      text,
+    });
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    res.status(400);
+    throw err;
+  }
+});
+
+export const deleteLiveTest = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: stopLiveTest() });
 });
 
 // @desc    Recent server errors (since the last restart)
