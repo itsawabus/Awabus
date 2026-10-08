@@ -74,6 +74,12 @@ async function getVoiceFileBytes() {
   const res = await fetch(fileUrl, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) throw new Error(`Could not fetch the voice message file (HTTP ${res.status})`);
   const buffer = Buffer.from(await res.arrayBuffer());
+  // Arkesel checks the real file type, not the name. A phone recording (3GPP/MP4)
+  // renamed to .mp3 is rejected with "The voice file must be a file of type: ...".
+  if (buffer.length < 100) throw new Error('The voice message file is empty or too small');
+  if (buffer.subarray(4, 10).toString('latin1') === 'ftyp3g') {
+    throw new Error('The voice message file is a 3GPP phone recording renamed to .mp3. Convert it to a real MP3 (or WAV) and upload it again');
+  }
   const contentType = res.headers.get('content-type') || 'audio/mpeg';
   voiceFileCache = { at: Date.now(), buffer, contentType };
   return voiceFileCache;
