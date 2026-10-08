@@ -1,139 +1,151 @@
 # AwaBus
 
-A multi-tenant school bus operations platform — live GPS tracking, route/
-driver/student/bus management, trip history, and a native driver mobile app —
-built as a MERN stack rebuild of the AwaBus Admin Portal and Driver App
-designs.
+AwaBus is a multi-tenant school bus platform for Ghana. Schools follow their
+buses live, parents are told when their child boards and when the bus is near
+home, and drivers run each trip from a native mobile app.
 
-## Repository layout
+| Part | What it is | Built with |
+|---|---|---|
+| [`server/`](./server) | REST API, live-tracking feed, SMS and voice integration | Node, Express, MongoDB (Mongoose), Socket.io |
+| [`admin/`](./admin) | Admin Portal for school staff, plus a Superadmin area for the platform owners | React, Vite, Tailwind |
+| [`driver/`](./driver) | Driver App for Android and iOS | React Native, Expo (Expo Router, EAS) |
+
+## What it does
+
+**For schools (Admin Portal)**
+- Manage routes, buses, drivers and students (with guardians, photos, home
+  location and a notification zone for each child). Add records one by one or
+  upload them from spreadsheets (samples in [`docs/sample-uploads`](./docs/sample-uploads)).
+- Follow every running trip on a live map, with each student's status, the
+  bus position trail, and the parent alert and call result for each child.
+- Trip history with timelines, delays and what happened to each student.
+- Cancel a child's morning or afternoon ride on a parent's behalf.
+- Notifications, a help guide, dark mode, and responsive screens.
+
+**For drivers (Driver App)**
+- Sign in with a phone number, see today's trip, take attendance, start the trip.
+- Scan students on and off the bus. The nearest child is shown first, with
+  search, directions to the next stop and the parent's contact.
+- Keeps working through weak signal: scans and GPS points are queued on the
+  phone and sent when the connection returns.
+- Text one parent, or send an SMS to all waiting parents (for example when late).
+- Share a code with a teacher on bus duty (the **bus assistant**), who can help
+  with roll call, boarding, messages and GPS from their own phone.
+
+**For parents**
+- A text when their child boards the bus or is dropped off.
+- A phone call when the bus is near home. A missed call is itself the alert,
+  and no text follows it. Each call's result shows on the student's card.
+- Choose a language for calls (English, Twi, Ewe, Hausa) and switch arrival
+  calls on or off per child.
+
+**For the platform owners (Superadmin)**
+- Create, suspend and support schools, with platform-wide figures.
+- A **System** page with server health, the message log, recent errors, the
+  provider settings that are switched on, and a **live test** that sends SMS
+  and calls to your own numbers on a timer, so the integrations can be checked
+  without a bus on the road.
+
+## How it fits together
 
 ```
-/server   Node/Express + MongoDB (Mongoose) API for the Admin Portal, the
-          Driver App, and a platform-level Superadmin surface, plus a
-          Socket.io live-tracking feed. Multi-tenant: every school's data is
-          isolated via a `school` field + an AsyncLocalStorage-backed
-          tenant-scoping plugin (see server/src/plugins/tenantScope.js).
-/admin    The AwaBus Admin Portal — React + Vite + Tailwind. Every screen
-          from the design (auth, dashboard, routes, drivers, students,
-          buses, trip history, live tracking) plus a Superadmin "Platform"
-          dashboard for creating/suspending schools.
-/driver   The AwaBus Driver App — a native mobile app built with React
-          Native + Expo (Expo Router, EAS Build). Sign in, a pre-trip roster
-          with attendance toggling, live GPS trip tracking with offline
-          queuing, delay SMS broadcasts to parents, trip/broadcast history,
-          and settings. See driver/README.md for how to run it and build it
-          with EAS.
+ Driver App  ──►  API (Express)  ◄──  Admin Portal
+ (GPS, scans)      │   │   │         (live map via Socket.io)
+                   │   │   └── MongoDB (one database, every record tagged by school)
+                   │   └────── Arkesel: SMS and outbound voice calls
+                   └────────── call results come back to /api/webhooks/voice/<token>
 ```
 
-## Quick start
+- **Multi-tenant.** Each school's data is isolated by a `school` field and a
+  Mongoose plugin ([`server/src/plugins/tenantScope.js`](./server/src/plugins/tenantScope.js));
+  the school comes from the sign-in token. Platform-wide work is done
+  explicitly in a "system" context.
+- **Parent alerts** ([`server/src/services/parentAlerts.js`](./server/src/services/parentAlerts.js)):
+  boarding texts, a "near home" call when the bus enters a child's zone (once
+  per family per trip), and the result of each call.
+- **Messaging** ([`server/src/services/messaging`](./server/src/services/messaging)):
+  every SMS goes through one function, is logged, and uses Arkesel when it is
+  switched on. Voice calls are in [`server/src/services/voice`](./server/src/services/voice).
+- **Ride cancellations** ([`server/src/services/rideCancellations.js`](./server/src/services/rideCancellations.js)):
+  the rules for a parent cancelling a morning or afternoon ride are written and
+  used by the school office. A phone menu (IVR) for parents to cancel by calling
+  is **not connected yet**; it needs an inbound voice provider.
 
-### 1. Server
+## Run it locally
+
+You need Node 18 or newer and a MongoDB database (local or Atlas).
+
+```bash
+# 1. API
+cd server
+cp .env.example .env     # set MONGO_URI and JWT_SECRET at least
+npm install
+npm run dev              # http://localhost:5000
+
+# 2. Admin Portal (new terminal)
+cd admin
+cp .env.example .env
+npm install
+npm run dev              # http://localhost:5173
+
+# 3. Driver App (new terminal) - see driver/README.md
+cd driver
+cp .env.example .env     # point EXPO_PUBLIC_API_URL at your API
+npm install
+npm start
+```
+
+**First sign-in.** Create the platform owner account once, then sign in to the
+Admin Portal and create a school from the Superadmin area:
 
 ```bash
 cd server
-cp .env.example .env      # point MONGO_URI at your MongoDB instance
-npm install
-npm run dev                # http://localhost:5000
-```
-
-A MongoDB instance is required (local `mongod`, Docker, or Atlas) — set
-`MONGO_URI` in `server/.env` accordingly.
-
-To create a platform superadmin (who can create/suspend schools from
-`/platform` in the Admin Portal), set `SEED_SUPERADMIN_EMAIL`,
-`SEED_SUPERADMIN_PASSWORD`, `SEED_SUPERADMIN_NAME` and `SEED_SUPERADMIN_PHONE`
-(see `server/.env.example`), then run:
-
-```bash
+MONGO_URI=... SEED_SUPERADMIN_EMAIL=you@example.com SEED_SUPERADMIN_PASSWORD='...' \
+SEED_SUPERADMIN_NAME='Your Name' SEED_SUPERADMIN_PHONE=0241234567 \
 node src/scripts/seedSuperadmin.js
 ```
 
-### 2. Admin Portal
+The superadmin gives each new school admin a one-time setup code to create their
+password; school admins do the same for their drivers.
 
-```bash
-cd admin
-cp .env.example .env      # defaults to http://localhost:5000/api
-npm install
-npm run dev                # http://localhost:5173
-```
+## Configuration
 
-Sign in with the superadmin account you created (see above). Admin
-sign-in is email-based: enter an email, and the app either asks for your
-password (existing account) or has you create one (first login for an
-admin a superadmin just added). Creating that first password needs the
-one-time setup code the superadmin was shown when adding the school; drivers
-likewise need the setup code their school admin was shown.
+All settings are environment variables; [`server/.env.example`](./server/.env.example)
+documents each one. Only `MONGO_URI` and `JWT_SECRET` are needed to start.
 
-### 3. Driver App
+| Group | Variables | Notes |
+|---|---|---|
+| Core | `MONGO_URI`, `JWT_SECRET`, `NODE_ENV`, `PORT` | Use `NODE_ENV=production` when live |
+| Web access | `CLIENT_URL`, `CLIENT_URL2`, `DEPLOYED_URL` | Admin site addresses allowed to call the API |
+| SMS (Arkesel) | `SMS_PROVIDER=arkesel`, `ARKESEL_API_KEY`, `ARKESEL_SENDER_ID`, `ARKESEL_SANDBOX` | Needs an approved sender ID; sandbox sends nothing |
+| Arrival calls | `VOICE_PROVIDER=arkesel`, `ARKESEL_VOICE_FILE_URL`, `ARKESEL_VOICE_ID`, `VOICE_WEBHOOK_TOKEN`, `SERVER_PUBLIC_URL` | The audio must be a real MP3 or WAV; `ARKESEL_VOICE_ID` is the caller number parents see |
+| Alerts | `PARENT_ALERTS` | On by default; set `false` to switch alerts off |
 
-```bash
-cd driver
-cp .env.example .env      # point EXPO_PUBLIC_API_URL at your server (see driver/README.md)
-npm install
-npm start                  # opens the Expo dev tools
-```
+Without provider settings, messages are written to the server log instead of
+being sent, so the rest of the app can be tried safely.
 
-The Driver App is a native React Native/Expo app, not a website — run it in
-Expo Go or a custom dev client on your phone, or build an installable APK/IPA
-with EAS. Full setup, environment variable notes (physical devices can't use
-`localhost`), and step-by-step `eas build`/`eas update` instructions live in
-[`driver/README.md`](./driver/README.md).
+## Deployment
 
-Sign in with the phone number and password of a driver your school admin added. The
-first time a driver opens the app for a given day, their trip is
-auto-provisioned from their current bus/route assignment — nothing needs
-to be scheduled manually in the Admin Portal first.
+- **API** on a Node host such as Render (root of the repo, commands run in `server/`).
+- **Admin Portal** on a static host such as Vercel (`admin/`, build `npm run build`).
+- **Driver App** is built and updated with EAS; see [`driver/README.md`](./driver/README.md).
+- The arrival-call message is served by the API at `/voice/school-bus.mp3`; replace
+  the file in `server/public/voice/` to change the recording.
 
-## Multi-tenancy
+Before real use, check the live server has `NODE_ENV=production`, that the
+demo switches are off (`TRIP_SIMULATOR` unset or `false`, `ARKESEL_SANDBOX=false`,
+`RATE_LIMITS` unset), and that the voice recording is final.
 
-Every tenant-owned model (`Admin`, `Driver`, `Bus`, `Route`, `Student`,
-`Trip`) has a `school` field and the `tenantScope` Mongoose plugin
-(`server/src/plugins/tenantScope.js`). Request-scoped tenant context is
-carried via `AsyncLocalStorage` (`server/src/utils/tenantContext.js`) and
-established once in `protectAdmin`/`protectDriver` from the JWT — every
-controller downstream just calls `Model.find()`/`create()` etc as normal and
-gets scoped automatically. Cross-tenant operations (the Superadmin
-dashboard) opt in explicitly via `tenantContext.runAsSystem()`.
+## Project status and next steps
 
-**Known gap:** `Guardian` is not yet tenant-scoped (no `school` field), so
-guardian search/linking currently returns results across all schools. Worth
-fixing before this goes further multi-school in production.
+- Working: school management, live tracking, driver app, parent texts and arrival
+  calls with results, the bus assistant, ride cancellations by the office, spreadsheet import.
+- Not yet connected: parents cancelling a ride by phone (IVR), and call recordings
+  in Twi, Ewe and Hausa.
+- There is no automated test suite yet. The System page's live test and the
+  providers' sandbox modes are the main ways to check the integrations.
 
-## What's implemented
+## About how this was built
 
-**Server** — Multi-tenant auth: email-based admin sign-in (check-email →
-enter/create password) with an OTP-based forgot-password flow, and
-phone-based driver sign-in with its own OTP forgot-password flow. Full CRUD +
-search/pagination/stats for Routes, Drivers (incl. a mock DVLA license
-validation endpoint), Students (+ Guardians), Buses, Trip history, a Live
-Tracking read API, a Superadmin namespace (school creation/suspension,
-platform analytics), a full `/api/driver-app` namespace (login, today's
-trip — auto-provisioned on first request, start/end trip, GPS pings,
-attendance/boarding scans, delay SMS broadcasts, trip + broadcast history),
-a Socket.io feed for live bus positions, and a demo GPS simulator so Live
-Tracking has something to show without a live driver.
-
-**Admin Portal** — Sign in / forgot password / OTP verification / reset
-password, Dashboard, Routes (list, add, edit, delete), Drivers (list, profile,
-5-step add wizard with license validation, edit), Students (list, profile,
-5-step add wizard incl. guardian linking & geofencing, edit with an
-interactive map picker), Buses (list, register, profile, edit), Trip History
-(list + filters, trip detail with timeline & student progress), Live
-Tracking (map with live bus markers via Socket.io, per-bus detail panel, trip
-detail sub-view), and a Superadmin "Platform" dashboard. Dark mode,
-responsive tables, empty/error/loading states, and reusable UI primitives
-are shared across all of it.
-
-**Driver App** (native, React Native + Expo) — Sign in (with wrong-password/
-offline states), forgot password/OTP/reset, a pre-trip Home screen (driver +
-bus/route card, attendance summary, tap-to-toggle student roster, Start Trip
-confirmation), an Active Trip screen (live elapsed timer, on-device GPS via
-`expo-location` pushed to the server, online/offline banner, a local action
-queue backed by AsyncStorage that replays scans and GPS pings once
-connectivity returns, a searchable boarding roster with haptic feedback on
-scan), a Delay Broadcast flow (reason + message + live SMS preview → send →
-delivery summary), an End Trip confirmation that warns about unscanned
-students, a Trip Completed summary, Trip History + detail, Broadcast
-History, and a Settings screen (profile, notification/vibration/theme/
-auto-sync preferences persisted locally, Help & Support) plus a native
-drawer navigation shell with `expo-secure-store`-backed auth.
+AwaBus was built by the AwaBus team, with AI coding assistance used for parts of
+the code. The team reviews and tests what ships.
