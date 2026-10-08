@@ -32,7 +32,7 @@ const OPEN = ['Scheduled', 'In Progress', 'Delayed'];
 /**
  * Bus assistant: the teacher on bus duty scans this QR code with their own
  * phone to help with the trip (roll call, boarding, messages to parents,
- * delay notices). The code works only until this trip ends.
+ * delay notices). The code follows the driver to their next trips today.
  */
 export default function Assistant() {
   return <AssistantScreen />;
@@ -129,7 +129,7 @@ export function AssistantScreen({ back = false }) {
               </View>
               <Text style={styles.intro}>
                 Let the teacher on bus duty help you: they scan the code with their phone and can do the roll call, mark
-                boarding and drop-off, text parents and send a delay notice. It stops working when this trip ends.
+                boarding and drop-off, text parents and send a delay notice. It carries on to your next trips today, until it runs out (12 hours) or you stop sharing.
               </Text>
             </View>
           </Card>

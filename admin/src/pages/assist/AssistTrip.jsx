@@ -45,6 +45,7 @@ function useAssistApi(pass, name) {
       (error) => {
         const err = new Error(error?.response?.data?.message || (error?.response ? error.message : "Can't reach AwaBus. Check your internet connection."));
         err.status = error?.response?.status;
+        err.code = error?.response?.data?.code;
         return Promise.reject(err);
       }
     );
@@ -176,7 +177,9 @@ function AssistBoard({ pass, name, onChangeName }) {
     queryFn: () => api.get('/assist/trip').then((r) => r.data.data),
     // Faster while a parent's phone is ringing, so the call result shows quickly.
     refetchInterval: (q) =>
-      q.state.error ? false : q.state.data?.studentProgress?.some((p) => CALL_IN_PROGRESS.includes(p.callStatus)) ? 5000 : 10000,
+      q.state.error
+        ? q.state.error.code === 'ASSIST_ENDED' ? 10000 : false // ended: wait for the driver's next trip
+        : q.state.data?.studentProgress?.some((p) => CALL_IN_PROGRESS.includes(p.callStatus)) ? 5000 : 10000,
     retry: (count, err) => ![401, 410].includes(err?.status) && count < 2,
   });
 
@@ -209,7 +212,7 @@ function AssistBoard({ pass, name, onChangeName }) {
       <Shell>
         <div className="rounded-2xl bg-white p-6 text-center shadow-sm dark:bg-navy-light">
           <CheckCircle2 className="mx-auto h-10 w-10 text-slate-300" />
-          <h1 className="mt-3 text-lg font-extrabold text-slate-900 dark:text-white">This link no longer works</h1>
+          <h1 className="mt-3 text-lg font-extrabold text-slate-900 dark:text-white">{error.code === 'ASSIST_ENDED' ? 'Waiting for the next trip' : 'This link no longer works'}</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{error.message}</p>
           <p className="mt-3 text-xs text-slate-400">This page was opened with a link ending <span className="font-mono">{String(pass).slice(-6)}</span>. The driver's screen shows the code the link should end with.</p>
         </div>
