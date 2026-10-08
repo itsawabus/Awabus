@@ -114,7 +114,16 @@ export async function arkeselCall(to) {
     body: form,
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
-  const data = await res.json().catch(() => null);
+  const text = await res.text().catch(() => '');
+  let data = null;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    /* not JSON: logged below */
+  }
+  // What Arkesel actually answered (kept short, no secrets in it), to check the
+  // response shape against a real call.
+  console.log(`[voice] Arkesel replied HTTP ${res.status}: ${text.slice(0, 400)}`);
   if (!res.ok || (data?.status && data.status !== 'success')) {
     throw new Error(data?.message || `Arkesel responded with HTTP ${res.status}`);
   }

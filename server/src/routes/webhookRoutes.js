@@ -32,6 +32,7 @@ router.all(
     for (const event of events) {
       // eslint-disable-next-line no-await-in-loop
       const parsed = readWebhook(event);
+      console.log(`[voice] webhook received: ${JSON.stringify(event).slice(0, 400)}`);
       const result = await handleCallResult({ ...parsed, io: req.app.get('io') });
       noteWebhook({ raw: event, ...parsed, matchedTrip: result.found });
       results.push(result);
