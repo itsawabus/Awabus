@@ -409,7 +409,7 @@ export default function ActiveTrip() {
       ) : (
               <SafeAreaView edges={['bottom']} style={styles.footer}>
           <Button variant="outline" style={{ flex: 1 }} onPress={() => router.push('/trip/delay-broadcast')}>
-            Delay SMS
+            Broadcast SMS
           </Button>
           <Button variant="danger" style={{ flex: 1 }} onPress={() => setEndOpen(true)}>
             End trip
