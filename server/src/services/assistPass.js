@@ -3,9 +3,11 @@
 // link opens the assistant page on the admin website, no account needed.
 //
 // - One pass per trip; making a new one cancels the old one.
-// - It works only while that trip has not ended (Scheduled / In Progress /
-//   Delayed), and never longer than PASS_HOURS. If AwaBus (not the driver)
-//   closed the trip, it follows the driver to their current trip.
+// - It works while that trip is running (Scheduled / In Progress / Delayed)
+//   and, when that trip ends (the driver ended it, or AwaBus closed it), it
+//   follows the same driver to their next trip today, until PASS_HOURS pass or
+//   the driver stops sharing / makes a new code. Between trips the page just
+//   waits.
 // - Only a SHA-256 hash of the pass is stored.
 import crypto from 'node:crypto';
 import Trip from '../models/Trip.js';
@@ -13,6 +15,7 @@ import { tenantContext } from '../utils/tenantContext.js';
 
 export const PASS_HOURS = 12;
 const OPEN = ['Scheduled', 'In Progress', 'Delayed'];
+const NO_PASS = { hash: '', createdAt: null, expiresAt: null };
 
 // A bus assistant counts as connected while their page reached AwaBus this recently.
 export const ASSIST_CONNECTED_MS = 45 * 1000;
@@ -56,6 +59,10 @@ export async function createPass(trip) {
   const pass = crypto.randomBytes(24).toString('base64url');
   const now = new Date();
   const expiresAt = new Date(now.getTime() + PASS_HOURS * 60 * 60 * 1000);
+  // One code per driver: a new one replaces the old one, also on the driver's earlier trips
+  // (their links follow the driver, so they must not outlive a newer code).
+  const owner = trip.driver || (await Trip.findById(trip._id).select('driver').lean())?.driver;
+  if (owner) await Trip.updateMany({ driver: owner, _id: { $ne: trip._id }, 'assistPass.hash': { $ne: '' } }, { $set: { assistPass: NO_PASS } });
   await Trip.updateOne({ _id: trip._id }, { $set: { assistPass: { hash: hashOf(pass), createdAt: now, expiresAt } } });
   const url = `${assistBaseUrl()}/assist/${pass}`;
   // Where the QR opens (the admin site's address only, never the pass), to check it is the site people sign in to.
@@ -72,9 +79,12 @@ export async function createPass(trip) {
   return { url, qrSvg, expiresAt };
 }
 
-/** Stops the current pass for a trip. */
-export const revokePass = (tripId) =>
-  Trip.updateOne({ _id: tripId }, { $set: { assistPass: { hash: '', createdAt: null, expiresAt: null } } });
+/** Stops sharing: the trip's pass and any earlier pass of the same driver that would follow them. */
+export async function revokePass(tripId) {
+  const t = await Trip.findById(tripId).select('driver').lean();
+  const filter = t?.driver ? { $or: [{ _id: tripId }, { driver: t.driver, 'assistPass.hash': { $ne: '' } }] } : { _id: tripId };
+  return Trip.updateMany(filter, { $set: { assistPass: NO_PASS } });
+}
 
 /**
  * Finds the trip for a pass. Returns { trip } when it is usable, or
@@ -98,7 +108,7 @@ export async function resolvePass(pass) {
       // Which trip the link belongs to, so "it hasn't ended" can be checked against the trip that is running.
       console.log(`[assist] link is for trip ${ended.tripCode} (${ended.status}), which is not running`);
       return {
-        error: `This trip has ended, so this link no longer works. Ask the driver to show the QR code again. (Link is for trip ${ended.tripCode}, ${ended.status.toLowerCase()}.)`,
+        error: `This trip has ended. This page will pick up the driver's next trip by itself once it starts (link is for trip ${ended.tripCode}, ${ended.status.toLowerCase()}).`,
         status: 410,
         code: 'ASSIST_ENDED',
       };
@@ -108,15 +118,12 @@ export async function resolvePass(pass) {
 }
 
 /**
- * The driver did not end this trip: AwaBus closed it (a run prepared before
- * noon and started after noon is replaced by a fresh afternoon trip; a trip
- * left running for hours is ended automatically). The bus is still out with
- * the same driver, so the teacher's link moves to the driver's current trip
- * today, unless the driver already made a new code for it. A trip the driver
- * ended himself keeps its link ended.
+ * The trip the pass was made for is over (the driver ended it, it was replaced
+ * by a fresh run, or AwaBus ended it). The bus is still with the same driver, so
+ * the teacher's link moves to the driver's current trip today, unless the driver
+ * already made a new code for it. With no next trip yet, the link waits.
  */
 async function followDriver(old) {
-  if (!(old.status === 'Cancelled' || old.autoEnded)) return null;
   return tenantContext.run(String(old.school), async () => {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);

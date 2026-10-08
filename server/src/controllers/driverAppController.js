@@ -202,7 +202,7 @@ export const getAssistPass = asyncHandler(async (req, res) => {
 // @desc    New bus assistant QR code for a trip (any earlier one stops working)
 // @route   POST /api/driver-app/trips/:id/assist-pass
 export const createAssistPass = asyncHandler(async (req, res) => {
-  const trip = await Trip.findOne({ _id: req.params.id, driver: req.driver._id }).select('status');
+  const trip = await Trip.findOne({ _id: req.params.id, driver: req.driver._id }).select('status driver');
   if (!trip) {
     res.status(404);
     throw new Error('Trip not found');
