@@ -18,11 +18,14 @@ const tokenOk = (given) => {
 };
 
 // @desc    Call results from the voice provider (ringing, answered, not picked up...)
-// @route   POST|GET /api/webhooks/voice?token=VOICE_WEBHOOK_TOKEN
+// @route   POST|GET /api/webhooks/voice/VOICE_WEBHOOK_TOKEN  (or ...?token=VOICE_WEBHOOK_TOKEN)
+// Arkesel adds its own query (?campaign_id=...&recipient=...&status=ANSWERED) and
+// drops one we send, so the token goes in the path.
 router.all(
-  '/voice',
+  '/voice/:token?',
   asyncHandler(async (req, res) => {
-    if (!tokenOk(req.query.token || req.get('x-webhook-token'))) {
+    if (!tokenOk(req.params.token || req.query.token || req.get('x-webhook-token'))) {
+      console.warn(`[voice] webhook rejected (missing or wrong token): ${req.method} ${req.path} query keys: ${Object.keys(req.query).join(',')}`);
       res.status(404);
       throw new Error('Not found');
     }
@@ -32,7 +35,9 @@ router.all(
     for (const event of events) {
       // eslint-disable-next-line no-await-in-loop
       const parsed = readWebhook(event);
-      console.log(`[voice] webhook received: ${JSON.stringify(event).slice(0, 400)}`);
+      // eslint-disable-next-line no-unused-vars
+      const { token: _hidden, ...loggable } = event || {};
+      console.log(`[voice] webhook received: ${JSON.stringify(loggable).slice(0, 400)}`);
       const result = await handleCallResult({ ...parsed, io: req.app.get('io') });
       noteWebhook({ raw: event, ...parsed, matchedTrip: result.found });
       results.push(result);

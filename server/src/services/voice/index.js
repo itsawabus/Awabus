@@ -100,8 +100,10 @@ export function callMovesTo(current, next) {
 /** Pulls the call id, status and length out of a provider's webhook body. */
 export function readWebhook(body = {}) {
   const b = { ...(body.data && typeof body.data === 'object' && !Array.isArray(body.data) ? body.data : {}), ...body };
-  const callId = String(b.call_id || b.callId || b.id || b.session_id || b.sessionId || b.message_id || '').trim();
+  // Arkesel's report: ?campaign_id=...&recipient=...&status=ANSWERED
+  const callId = String(b.campaign_id || b.call_id || b.callId || b.id || b.session_id || b.sessionId || b.message_id || '').trim();
+  const recipient = String(b.recipient || b.to || b.phone || '').trim();
   const status = b.status || b.call_status || b.callStatus || b.state || '';
   const seconds = b.duration ?? b.call_duration ?? b.callDuration ?? b.seconds ?? null;
-  return { callId, status, seconds: seconds === null || seconds === '' ? null : Number(seconds) };
+  return { callId, recipient, status, seconds: seconds === null || seconds === '' ? null : Number(seconds) };
 }
