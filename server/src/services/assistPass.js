@@ -81,7 +81,7 @@ export const revokePass = (tripId) =>
 export async function resolvePass(pass) {
   if (!pass || String(pass).length < 20) return { error: 'This bus assistant link is not valid.', status: 401, code: 'ASSIST_INVALID' };
   let trip = await tenantContext.runAsSystem(() =>
-    Trip.findOne({ 'assistPass.hash': hashOf(pass) }).select('_id school driver status autoEnded createdAt assistPass assistants')
+    Trip.findOne({ 'assistPass.hash': hashOf(pass) }).select('_id tripCode school driver status autoEnded createdAt assistPass assistants')
   );
   if (!trip) {
     return { error: 'This link no longer works. Ask the driver to show the QR code again.', status: 401, code: 'ASSIST_INVALID' };
@@ -90,8 +90,17 @@ export async function resolvePass(pass) {
     return { error: 'This link has expired. Ask the driver to show a new QR code.', status: 410, code: 'ASSIST_EXPIRED' };
   }
   if (!OPEN.includes(trip.status)) {
+    const ended = trip;
     trip = await followDriver(trip);
-    if (!trip) return { error: 'This trip has ended, so this link no longer works. Ask the driver to show the QR code again.', status: 410, code: 'ASSIST_ENDED' };
+    if (!trip) {
+      // Which trip the link belongs to, so "it hasn't ended" can be checked against the trip that is running.
+      console.log(`[assist] link is for trip ${ended.tripCode} (${ended.status}), which is not running`);
+      return {
+        error: `This trip has ended, so this link no longer works. Ask the driver to show the QR code again. (Link is for trip ${ended.tripCode}, ${ended.status.toLowerCase()}.)`,
+        status: 410,
+        code: 'ASSIST_ENDED',
+      };
+    }
   }
   return { trip };
 }
