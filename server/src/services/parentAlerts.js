@@ -9,6 +9,7 @@ import { sendSms } from './messaging/index.js';
 import { runWords } from '../utils/sessions.js';
 import { tenantContext } from '../utils/tenantContext.js';
 import { emitToSchool } from '../sockets/rooms.js';
+import { phoneKey } from './voice/phoneKey.js';
 import { voiceLive, placeCall, normalizeCallStatus, callMovesTo, CALL_LABELS } from './voice/index.js';
 
 export const parentAlertsEnabled = () => String(process.env.PARENT_ALERTS || '').trim().toLowerCase() !== 'false';
@@ -185,13 +186,19 @@ export async function checkGeofences({ tripId, position, school }) {
  * updates the student's card. A call that was not picked up is not followed
  * by a text: the parent's missed call is the alert. Returns { found, changed, callStatus }.
  */
-export async function handleCallResult({ callId, status, seconds, io }) {
-  if (!callId) return { found: false };
+export async function handleCallResult({ callId, recipient, status, seconds, io }) {
+  // A call is found by the id Arkesel reports, or by the recipient's number when
+  // the id returned at dial time was unusable (stored as "phone:<last 9 digits>").
+  const ids = [callId, phoneKey(recipient)].filter(Boolean);
+  if (!ids.length) return { found: false };
   return tenantContext.runAsSystem(async () => {
-    const trip = await Trip.findOne({ 'studentProgress.callId': callId }).select('school session studentProgress');
+    const trip = await Trip.findOne({ 'studentProgress.callId': { $in: ids } })
+      .sort({ _id: -1 })
+      .select('school session studentProgress');
     if (!trip) return { found: false };
-    const index = trip.studentProgress.findIndex((r) => r.callId === callId);
+    const index = trip.studentProgress.findIndex((r) => ids.includes(r.callId));
     const row = trip.studentProgress[index];
+    callId = row.callId; // the id this row was stored under
     const next = normalizeCallStatus(status, seconds);
     if (!callMovesTo(row.callStatus, next)) return { found: true, changed: false, callStatus: row.callStatus };
 

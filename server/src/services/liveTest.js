@@ -8,6 +8,7 @@
 // tests), so you can see exactly what Arkesel reports for a call.
 import { randomUUID } from 'node:crypto';
 import { sendSms } from './messaging/index.js';
+import { phoneKey } from './voice/phoneKey.js';
 import { placeCall, normalizeCallStatus, callMovesTo, CALL_LABELS } from './voice/index.js';
 
 export const LIVE_TEST_LIMITS = { maxNumbers: 3, minIntervalSeconds: 30, maxIntervalSeconds: 3600, maxRounds: 10 };
@@ -110,11 +111,11 @@ export const liveTestStatus = () => ({ limits: LIVE_TEST_LIMITS, run, webhooks }
  * Every call-result webhook Arkesel sends is kept here (what it said, and what
  * we made of it). If the call belongs to a live test, the test row is updated.
  */
-export function noteWebhook({ raw, callId, status, seconds, matchedTrip }) {
+export function noteWebhook({ raw, callId, recipient, status, seconds, matchedTrip }) {
   const normalized = normalizeCallStatus(status, seconds);
   webhooks.unshift({ at: now(), callId, status: String(status || ''), seconds, normalized, matchedTrip: Boolean(matchedTrip), raw: JSON.stringify(raw || {}).slice(0, 500) });
   if (webhooks.length > MAX_WEBHOOKS) webhooks.length = MAX_WEBHOOKS;
-  const e = callIndex.get(callId);
+  const e = callIndex.get(callId) || callIndex.get(phoneKey(recipient));
   if (e && normalized && callMovesTo(e.callState, normalized)) {
     e.callState = normalized;
     e.status = CALL_LABELS[normalized] || normalized;

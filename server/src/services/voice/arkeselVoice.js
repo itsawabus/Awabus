@@ -48,6 +48,8 @@
 //   ARKESEL_VOICE_URL        optional: the voice-call API address, if not the default below
 //   VOICE_WEBHOOK_TOKEN      a long random word; the webhook address given to
 //                            Arkesel is https://<server>/api/webhooks/voice?token=<it>
+import { phoneKey } from './phoneKey.js';
+
 const TIMEOUT_MS = 15000;
 const url = () => process.env.ARKESEL_VOICE_URL || 'https://sms.arkesel.com/api/v2/sms/voice/send';
 
@@ -98,7 +100,7 @@ export async function arkeselCall(to) {
   if (process.env.SERVER_PUBLIC_URL && process.env.VOICE_WEBHOOK_TOKEN) {
     form.append(
       'callback_url',
-      `${process.env.SERVER_PUBLIC_URL.replace(/\/$/, '')}/api/webhooks/voice?token=${process.env.VOICE_WEBHOOK_TOKEN}`
+      `${process.env.SERVER_PUBLIC_URL.replace(/\/$/, '')}/api/webhooks/voice/${process.env.VOICE_WEBHOOK_TOKEN}`
     );
   }
   // Unconfirmed for voice specifically (same flag name as the SMS sandbox
@@ -128,7 +130,9 @@ export async function arkeselCall(to) {
     throw new Error(data?.message || `Arkesel responded with HTTP ${res.status}`);
   }
   const first = Array.isArray(data?.data) ? data.data[0] : data?.data;
-  const callId = String(first?.id || first?.call_id || data?.id || '');
+  // Arkesel names the call a "campaign"; its result report carries the same id.
+  // If the reply has no usable id, the call is matched by the recipient's number.
+  const callId = String(first?.id || first?.call_id || first?.campaign_id || data?.campaign_id || data?.id || '') || phoneKey(to);
   if (!callId) throw new Error('Arkesel did not return a call id');
   return { callId };
 }
