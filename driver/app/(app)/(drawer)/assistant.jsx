@@ -182,7 +182,7 @@ export function AssistantScreen({ back = false }) {
           ) : (
             <Card style={styles.card}>
               {active ? (
-                <Text style={styles.empty}>A teacher already has a link for this trip. Show a new code to add someone (the old code stops working).</Text>
+                <Text style={styles.empty}>A teacher already has a link for this trip. Another teacher can scan the same code. Showing a new code replaces it: everyone using the old code must scan the new one.</Text>
               ) : null}
               <Button onPress={() => create.mutate()} loading={create.isPending} style={{ marginTop: active ? 12 : 0 }}>
                 Show QR code

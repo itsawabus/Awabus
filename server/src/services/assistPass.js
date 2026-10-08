@@ -86,7 +86,7 @@ export async function resolvePass(pass) {
     Trip.findOne({ 'assistPass.hash': hashOf(pass) }).select('_id tripCode school driver status autoEnded createdAt assistPass assistants')
   );
   if (!trip) {
-    return { error: 'This link no longer works. Ask the driver to show the QR code again.', status: 401, code: 'ASSIST_INVALID' };
+    return { error: 'This link no longer works. The driver may have made a newer QR code (each new code replaces the old one) or stopped sharing the trip. Ask the driver to show the current QR code.', status: 401, code: 'ASSIST_INVALID' };
   }
   if (trip.assistPass?.expiresAt && Date.now() > new Date(trip.assistPass.expiresAt).getTime()) {
     return { error: 'This link has expired. Ask the driver to show a new QR code.', status: 410, code: 'ASSIST_EXPIRED' };
