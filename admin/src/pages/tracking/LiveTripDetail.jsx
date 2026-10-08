@@ -12,6 +12,7 @@ import { PillTabs } from '../../components/ui/Tabs.jsx';
 import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/ui/Table.jsx';
 import { formatLat, formatLng, gpsFreshness } from '../../lib/gps.js';
 import useNow from '../../hooks/useNow.js';
+import { useSocketEvent } from '../../hooks/useSocket.js';
 import { GpsState, LocationSource, AssistantLocationLine } from './LiveTracking.jsx';
 import { ConnectionPair } from '../../components/buses/BusOnlineStatus.jsx';
 import { runWords, sessionLabel, statusLabel } from '../../lib/sessions.js';
@@ -19,13 +20,17 @@ import { runWords, sessionLabel, statusLabel } from '../../lib/sessions.js';
 export default function LiveTripDetail() {
   const { tripId } = useParams();
   const [filter, setFilter] = useState('all');
-  const { data: trip, isLoading } = useQuery({
+  const { data: trip, isLoading, refetch } = useQuery({
     queryKey: ['tracking-trip', tripId],
     queryFn: () => getTrackingTripDetail(tripId),
     refetchInterval: 15000,
   });
 
   usePageHeader({ breadcrumb: ['AwaBus', 'Live Tracking', trip?.tripCode || 'Trip Detail'] });
+  // A parent's call result (answered, not picked up...) arrives from Arkesel after the call; refresh at once.
+  useSocketEvent('trip:call', (e) => {
+    if (!e?.tripId || String(e.tripId) === String(tripId)) refetch();
+  });
   const now = useNow(15000);
 
   if (isLoading || !trip) return <PageLoader />;
