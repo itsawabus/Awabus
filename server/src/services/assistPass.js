@@ -58,6 +58,8 @@ export async function createPass(trip) {
   const expiresAt = new Date(now.getTime() + PASS_HOURS * 60 * 60 * 1000);
   await Trip.updateOne({ _id: trip._id }, { $set: { assistPass: { hash: hashOf(pass), createdAt: now, expiresAt } } });
   const url = `${assistBaseUrl()}/assist/${pass}`;
+  // Where the QR opens (the admin site's address only, never the pass), to check it is the site people sign in to.
+  console.log(`[assist] new pass for trip ${trip._id}; its QR opens ${assistBaseUrl()}/assist/... (DEPLOYED_URL ${process.env.DEPLOYED_URL ? 'is set' : 'is NOT set'}, ASSIST_APP_URL ${process.env.ASSIST_APP_URL ? 'is set' : 'is not set'})`);
   // Loaded only when a code is made, so the server still starts (and
   // everything else works) if "npm install" has not been run yet.
   let QRCode;
