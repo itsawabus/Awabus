@@ -211,6 +211,7 @@ function AssistBoard({ pass, name, onChangeName }) {
           <CheckCircle2 className="mx-auto h-10 w-10 text-slate-300" />
           <h1 className="mt-3 text-lg font-extrabold text-slate-900 dark:text-white">This link no longer works</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{error.message}</p>
+          <p className="mt-3 text-xs text-slate-400">This page was opened with a link ending <span className="font-mono">{String(pass).slice(-6)}</span>. The driver's screen shows the code the link should end with.</p>
         </div>
       </Shell>
     );

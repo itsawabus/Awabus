@@ -141,12 +141,13 @@ export function AssistantScreen({ back = false }) {
           ) : qr && (active || !(status.dataUpdatedAt > (qr.shownAt || 0))) ? (
             <Card style={[styles.card, styles.qrCard]}>
               <View style={styles.qrBox}>
-                <SvgXml xml={qr.qrSvg} width={240} height={240} />
+                <SvgXml key={qr.url} xml={qr.qrSvg} width={240} height={240} />
               </View>
               <Text style={styles.qrHint}>Ask the teacher to scan this with their phone camera.</Text>
               <Text style={styles.link} selectable>
                 {qr.url}
               </Text>
+              <Text style={styles.qrHint}>Code ends: {String(qr.url).slice(-6)}</Text>
               <Button
                 variant="ghost"
                 onPress={() =>
