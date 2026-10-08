@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Linking, RefreshControl, ScrollView, Text, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -50,6 +50,10 @@ export default function Home() {
   // this one. (This screen stays loaded behind others; checking only when it
   // is in view stops background refreshes from pulling the driver away.)
   const live = trip?.status === 'In Progress' || trip?.status === 'Delayed';
+  // A trip that is already running never asks to be started: drop any popup left open.
+  useEffect(() => {
+    if (live) setConfirmOpen(false);
+  }, [live]);
   const photos = useTripPhotos(trip?._id);
   useFocusEffect(
     useCallback(() => {
@@ -78,6 +82,10 @@ export default function Home() {
   const startMutation = useMutation({
     mutationFn: () => startTrip(trip._id),
     onSuccess: () => {
+      // Close the "Start trip?" popup: this screen stays loaded behind the trip
+      // screen, and a popup left open would come back over the running trip
+      // when a lost connection recovers and this screen redraws.
+      setConfirmOpen(false);
       queryClient.invalidateQueries({ queryKey: ['todays-trip'] });
       router.push('/trip/active');
     },
@@ -258,7 +266,7 @@ export default function Home() {
       <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
       <MessageParentSheet target={messageTo} onClose={() => setMessageTo(null)} />
 
-      <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+      <Modal open={confirmOpen && !live} onClose={() => setConfirmOpen(false)}>
         <Text style={styles.modalTitle}>
           {trip.session ? `Start the ${runWords(trip.session).name.toLowerCase()}?` : trip.completedToday ? 'Start another trip?' : "Start today's trip?"}
         </Text>
