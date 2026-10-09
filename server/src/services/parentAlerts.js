@@ -110,7 +110,7 @@ export async function checkGeofences({ tripId, position, school }) {
     // sister) can be recognised.
     const students = await Student.find({ _id: { $in: trip.studentProgress.map((row) => row.student) } })
       .select('firstName lat lng geofenceRadius primaryGuardian household arrivalCalls')
-      .populate('primaryGuardian', 'phone')
+      .populate('primaryGuardian', 'phone preferredLanguage')
       .lean();
     const byId = new Map(students.map((s) => [String(s._id), s]));
     // A student's family on this trip: their parent and their shared home.
@@ -157,7 +157,7 @@ export async function checkGeofences({ tripId, position, school }) {
         // the student's card). A missed call is the alert itself: no text
         // follows it. Without a voice provider the alert is a text.
         // eslint-disable-next-line no-await-in-loop
-        const placed = voiceLive() && phone ? await placeCall({ to: phone, purpose: 'approaching_call' }) : { status: 'off' };
+        const placed = voiceLive() && phone ? await placeCall({ to: phone, purpose: 'approaching_call', language: s.primaryGuardian?.preferredLanguage }) : { status: 'off' };
         if (placed.status === 'calling') {
           call = { callId: placed.callId, callStatus: 'calling', callAt: new Date() };
           status = ALERT_STATUS.calling;
