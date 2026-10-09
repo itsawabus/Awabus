@@ -3,8 +3,7 @@
 export const VOICE_LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'tw', label: 'Twi' },
-  { code: 'ee', label: 'Ewe' },
-  { code: 'ha', label: 'Hausa' },
+  { code: 'ga', label: 'Ga' },
 ];
 export const DEFAULT_LANGUAGE = 'en';
 export const languageLabel = (code) => (VOICE_LANGUAGES.find((l) => l.code === code) || VOICE_LANGUAGES[0]).label;
